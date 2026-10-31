@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.12.0] — 2026-10-31
+
+### Changed
+- Capture product photographs directly using the in-app camera, without a visible file picker.
+- Consolidate product name, units, stock, barcode, and photograph into one edit form with one Save changes button.
+- Keep the destructive Delete product action separate.
+
+### Validation
+- CI and live Home Assistant testing pending; combined save is sequential, not transactional.
+
+
 ## [0.11.3] — 2026-10-31
 
 ### Changed
