@@ -353,11 +353,11 @@ def update_product_info(product_id, name, pack_size, unit_id=None):
     description = PHOTO_MARKER.sub("", PACK_MARKER.sub(
         "", str(product.get("description") or ""))).strip()
     if photo_url:
-        description += ("\\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
+        description += ("\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
     if purchase_id in pack_ids and unit_id in piece_ids:
         changes["qu_id_purchase"] = purchase_id
         changes["qu_factor_purchase_to_stock"] = pack_size
-        description += ("\\n" if description else "") + (
+        description += ("\n" if description else "") + (
             f"[Despensa: unidades_por_envase={pack_size}]")
     else:
         pack_size = 1
@@ -537,7 +537,7 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
         "name": name, "location_id": location_id, "qu_id_stock": unit_id,
         "qu_id_purchase": purchase_id,
         "qu_factor_purchase_to_stock": pack_size, "min_stock_amount": 0,
-        "description": (("[Despensa: imagen=" + safe_url + "]\\n") if safe_url else "") +
+        "description": (("[Despensa: imagen=" + safe_url + "]\n") if safe_url else "") +
                        (f"[Despensa: unidades_por_envase={pack_size}]" if pack_size > 1 else ""),
     })
     pid = int(result["created_object_id"])
