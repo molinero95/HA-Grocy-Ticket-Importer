@@ -111,6 +111,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .inventory-list{margin-top:14px}
 .inventory-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
 .inventory-row[hidden]{display:none}
+.product-detail-link{display:block;text-decoration:none;color:var(--text);padding:4px 0}
+.product-detail-link:hover strong{text-decoration:underline}
+.product-sheet img{max-width:100%;height:auto;border-radius:12px}
 .inventory-row strong{display:block}
 .inventory-row small{display:block;color:var(--muted);font-size:.79rem;margin-top:3px}
 .inventory-quantity{text-align:right;min-width:80px}
@@ -158,7 +161,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
 <article class="inventory-row" data-name="{{ p.name }}">
-<div><strong>{{ p.name }}</strong><small>Producto #{{ p.id }}</small></div>
+<div><a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
 <div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
 </article>
 {% endfor %}
@@ -172,10 +175,38 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <a class="action-link" href="{{ url_for('index', view='remove') }}"><span aria-hidden="true">➖</span><strong>Consumir producto</strong><small>Quitar del stock</small></a>
 <a class="action-link" href="{{ url_for('index', view='associate') }}"><span aria-hidden="true">🔗</span><strong>Asociar código</strong><small>Producto existente</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
-<a class="action-link" href="{{ url_for('index', view='photo') }}"><span aria-hidden="true">📷</span><strong>Buscar fotografía</strong><small>Vista previa</small></a>
 </nav></div>
 {% else %}
-<p><a class="back-link" href="{{ url_for('index', view='actions') }}">← Volver a acciones</a></p>
+<p><a class="back-link" href="{{ url_for('index', view='inventory') if view == 'product' else url_for('index', view='actions') }}">← {{ 'Volver a mi despensa' if view == 'product' else 'Volver a acciones' }}</a></p>
+{% endif %}
+{% if view == 'product' %}
+<section class="product-sheet">
+{% if product %}
+<p class="section-eyebrow">Ficha del artículo</p>
+<h2>{{ product.name }}</h2>
+<p>Las unidades por envase son informativas. Cambiarlas <strong>no modifica las existencias</strong> de Grocy.</p>
+<form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label for="edit-product-name">Nombre del artículo</label>
+<input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
+<label for="edit-pack-size">Unidades por envase</label>
+<input id="edit-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="{{ product.pack_size }}" required>
+<p class="helper">Ejemplo: si el aroma de vainilla contiene 4 botellitas, indica 4. Se seguirá contando como un envase hasta que configuremos otra unidad de stock.</p>
+<button type="submit">Guardar cambios</button>
+</form>
+<h3>Fotografía</h3>
+{% if photo %}<img src="{{ photo.image_url }}" alt="Fotografía de {{ photo.name }}" width="200" loading="lazy"><p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">Fuente: Open Food Facts</a></p><p class="helper">Fotografía de referencia. Todavía no se guarda en Grocy.</p>{% endif %}
+{% if product.barcodes %}
+<form method="post" action="{{ url_for('product_photo', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<button type="submit">📷 Buscar foto por código de barras</button>
+</form>
+<p class="helper">Códigos: {{ product.barcodes|join(', ') }}</p>
+{% else %}
+<p>Este producto aún no tiene un código de barras asociado. Puedes vincularlo desde Acciones → Asociar código.</p>
+{% endif %}
+{% else %}<p role="alert">No se ha podido cargar la ficha del producto.</p>{% endif %}
+</section>
 {% endif %}
 {% if view == 'add' %}
 <section id="entrada"><p class="section-eyebrow">Entrada de productos</p><h2>Guardar producto en despensa</h2>
@@ -447,13 +478,15 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-VIEWS = {"inventory", "actions", "add", "remove", "associate", "ticket", "photo"}
+VIEWS = {"inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product"}
 POST_VIEWS = {
     "barcode_add": "add",
     "barcode_associate": "associate",
     "barcode_remove_preview": "remove",
     "barcode_remove": "remove",
     "barcode_photo": "photo",
+    "product_update": "product",
+    "product_photo": "product",
     "upload": "ticket",
     "preview": "ticket",
     "commit": "ticket",
@@ -469,6 +502,15 @@ def current_view():
 def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None):
     view = current_view()
     inventory, inventory_error = [], False
+    product = None
+    if view == "product" and (INGRESS_MODE or session.get("auth")):
+        pid = request.view_args.get("product_id") if request.view_args else request.args.get("product_id")
+        try:
+            product = barcode_stock.product_detail(pid)
+        except (ValueError, TypeError, KeyError, barcode_stock.BarcodeError):
+            pass
+        except Exception:
+            pass
     if view == "inventory" and (INGRESS_MODE or session.get("auth")):
         try:
             inventory = barcode_stock.inventory_snapshot()
@@ -478,6 +520,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
                                   view=view, inventory=inventory, inventory_error=inventory_error,
+                                  product=product,
                                   products=product_choices() if view == "associate" else [],
                                   authenticated=INGRESS_MODE or bool(session.get("auth")),
                                   ingress_mode=INGRESS_MODE)
@@ -533,6 +576,36 @@ def barcode_associate():
         LOCK.release()
     return render(("El código ya estaba asociado a " if result["already_linked"]
                    else "Código asociado a ") + result["name"] + ". Stock sin cambios.")
+
+@app.post("/product/<int:product_id>/edit")
+def product_update(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = barcode_stock.update_product_info(
+            product_id, request.form.get("name"), request.form.get("pack_size"))
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("Error al actualizar el producto. Comprueba Grocy antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return render("Producto actualizado: " + result["name"] + ". Existencias sin cambios.")
+
+
+@app.post("/product/<int:product_id>/photo")
+def product_photo(product_id):
+    try:
+        product = barcode_stock.product_detail(product_id)
+        if not product["barcodes"]:
+            return render("Este producto no tiene códigos asociados."), 400
+        photo = product_images.lookup_image(product["barcodes"][0])
+    except Exception:
+        return render("No se ha podido buscar la fotografía."), 502
+    if not photo:
+        return render("No se ha encontrado una foto para este producto.")
+    return render("Fotografía encontrada. No se ha guardado en Grocy.", photo=photo)
+
 
 @app.post("/barcode/photo")
 def barcode_photo():
