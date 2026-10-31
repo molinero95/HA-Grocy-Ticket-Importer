@@ -91,6 +91,12 @@ class IdentityPlannerTests(unittest.TestCase):
                           choices={"arroz": {"product_id": 2}})
         self.assertEqual(p["remove_alexa"][0]["name"], "Arroz")
 
+    def test_duplicate_display_name_product_and_note_blocks_sync(self):
+        note = ("Arroz basmati", {"id": 20, "product_id": None,
+                                  "note": "Arroz basmati", "amount": 1})
+        with self.assertRaisesRegex(IdentityConflict, "normalized Grocy"):
+            plan_identity([], [entry(2, 1), note], PRODUCTS)
+
     def test_duplicate_grocy_product_entry_is_not_silently_removed(self):
         with self.assertRaisesRegex(IdentityConflict, "Duplicate Grocy"):
             identities([], [entry(2, 1), entry(2, 2)], PRODUCTS)
