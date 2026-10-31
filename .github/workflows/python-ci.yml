@@ -34,5 +34,12 @@ jobs:
               py_compile.compile(str(path), doraise=True)
           print(f'Compiled {len(files)} Python files')
           PY
+      - name: Check Home Assistant packaged sources are synchronized
+        run: |
+          for file in extract.py importer.py barcode_stock.py product_images.py web.py; do
+            cmp "$file" "ha_grocy_ticket_importer/$file"
+          done
+      - name: Build Home Assistant add-on container
+        run: docker build --pull --file ha_grocy_ticket_importer/Dockerfile ha_grocy_ticket_importer
       - name: Run unit tests without external API calls
         run: python -m unittest discover -v -p 'test_*.py'
