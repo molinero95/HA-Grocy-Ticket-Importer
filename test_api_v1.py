@@ -9,6 +9,9 @@ with patch.dict(os.environ, {"WEB_PASSWORD": "test-password", "WEB_SESSION_SECRE
 
 class ShoppingApiTests(unittest.TestCase):
     def setUp(self):
+        env = patch.dict(os.environ, {"WEB_PASSWORD": "test-password", "WEB_SESSION_SECRET": "test-secret-key"}, clear=False)
+        env.start()
+        self.addCleanup(env.stop)
         self.client = web.app.test_client()
 
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
