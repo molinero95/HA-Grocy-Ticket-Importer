@@ -212,6 +212,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if shopping_error %}<p role="alert">No se pudo cargar la lista desde Grocy.</p>{% else %}
 <p>{{ shopping|length }} artículos en la lista. Marcarlos como comprados no añade stock automáticamente.</p>
 {% if not shopping %}<p>Tu lista está vacía. Añade un artículo desde Mi despensa.</p>{% endif %}
+{% if shopping|selectattr("done")|list|length %}<form method="post" action="{{ url_for('shopping_clear_completed') }}" onsubmit="return confirm('¿Eliminar todos los artículos marcados como comprados?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="scan-trigger">🗑 Eliminar comprados ({{ shopping|selectattr("done")|list|length }})</button></form>{% endif %}
 <div class="inventory-list">
 {% for item in shopping %}
 <article class="inventory-row shopping-list-row">
@@ -998,6 +999,23 @@ def shopping_add(product_id):
     finally:
         LOCK.release()
     return render(name + " añadido a la lista de la compra.")
+
+
+@app.post("/shopping/clear-completed")
+def shopping_clear_completed():
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        completed_ids = [row["id"] for row in barcode_stock.shopping_list_snapshot() if row["done"]]
+        for item_id in completed_ids:
+            barcode_stock.remove_shopping_list_item(item_id)
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se pudieron eliminar todos los artículos comprados. Actualiza la lista para comprobar cuáles quedan."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="shopping"))
 
 
 @app.post("/shopping/<int:item_id>/toggle")
