@@ -94,6 +94,21 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         remove.assert_called_once_with(7, "8412345678901")
 
+    def test_clear_completed_shopping_requires_csrf(self):
+        with patch.object(web, "INGRESS_MODE", True):
+            response = self.client.post("/api/v1/shopping/clear-completed")
+        self.assertEqual(response.status_code, 403)
+
+    def test_clear_completed_shopping_removes_only_done(self):
+        rows = [{"id": 1, "done": True}, {"id": 2, "done": False}, {"id": 3, "done": True}]
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=rows), patch.object(web.barcode_stock, "remove_shopping_list_item") as remove:
+            with self.client.session_transaction() as sess:
+                sess["csrf"] = "test-clear"
+            response = self.client.post("/api/v1/shopping/clear-completed", headers={"X-CSRF-Token": "test-clear"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["removed"], 2)
+        self.assertEqual([call.args[0] for call in remove.call_args_list], [1, 3])
+
     def test_merge_preview_rejects_same_product_without_writes(self):
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "product_detail") as detail:
             response = self.client.get("/api/v1/catalog/merge-preview?source_id=7&target_id=7")
