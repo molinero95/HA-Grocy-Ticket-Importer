@@ -1,0 +1,36 @@
+name: Python CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.13']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile every Python file (catches syntax errors)
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import py_compile
+          files = sorted(p for p in Path('.').rglob('*.py') if '.venv' not in p.parts)
+          for path in files:
+              py_compile.compile(str(path), doraise=True)
+          print(f'Compiled {len(files)} Python files')
+          PY
+      - name: Run unit tests without external API calls
+        run: python -m unittest discover -v -p 'test_*.py'
