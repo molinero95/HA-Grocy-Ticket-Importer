@@ -80,3 +80,29 @@ def choose(path, key, product_id):
             raise ValueError("La coincidencia ya no está disponible; actualiza la lista")
         db.execute("UPDATE pending_matches SET selected_product_id=? WHERE normalized_name=?",
                    (pid, key))
+
+
+def resolved_choices(path, alexa_names, products):
+    """Read-only, validated identity mapping for the next sync stage.
+
+    Never changes remote shopping entries or local checkpoints. An explicit
+    selection is valid only while the original Alexa item is present and the
+    chosen product remains a current candidate in the Grocy catalog.
+    """
+    present = {normalize(name) for name in alexa_names}
+    catalog = {int(product["id"]): product for product in products}
+    result = {}
+    for entry in pending(path):
+        key = entry["key"]
+        selected = entry["selected_product_id"]
+        if key not in present or selected is None:
+            continue
+        candidate_ids = {int(candidate["id"]) for candidate in entry["candidates"]}
+        if selected not in candidate_ids or selected not in catalog:
+            continue
+        decision, current = suggest_catalog_matches(entry["name"], products)
+        if decision != "review" or selected not in {int(item["id"]) for item in current}:
+            continue
+        result[key] = {"product_id": selected, "product_name": catalog[selected]["name"],
+                       "original_name": entry["name"]}
+    return result
