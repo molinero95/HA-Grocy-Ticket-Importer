@@ -46,6 +46,13 @@ class IdentityPlannerTests(unittest.TestCase):
             plan_identity(["Arroz"], [note], PRODUCTS, None,
                           {"arroz": {"product_id": 2}})
 
+    def test_canonical_product_name_note_conflict(self):
+        note = ("Arroz basmati", {"id": 10, "product_id": None,
+                                  "note": "Arroz basmati", "amount": 3})
+        with self.assertRaisesRegex(IdentityConflict, "canonical product"):
+            plan_identity(["Arroz"], [note], PRODUCTS, None,
+                          {"arroz": {"product_id": 2}})
+
     def test_duplicate_product_identity_fails_closed(self):
         with self.assertRaisesRegex(IdentityConflict, "same identity"):
             plan_identity(["Arroz", "Arroz basmati"], [], PRODUCTS, None,
