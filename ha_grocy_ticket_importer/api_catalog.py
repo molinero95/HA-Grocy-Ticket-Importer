@@ -181,6 +181,17 @@ def register_catalog_routes(app, barcode_stock, lock):
             app.logger.exception("api_v1_catalog_duplicates_failed")
             return jsonify({"error": "duplicates_unavailable"}), 503
 
+    @app.get("/api/v1/catalog/audit")
+    def api_v1_catalog_audit():
+        """Read-only export; fail closed on incomplete Grocy data."""
+        try:
+            from catalog_audit import build_snapshot
+            return jsonify(build_snapshot())
+        except Exception:
+            app.logger.exception("api_v1_catalog_audit_failed")
+            return jsonify({"error": "catalog_audit_unavailable"}), 503
+
+
     @app.get("/api/v1/catalog/merge-preview")
     def api_v1_catalog_merge_preview():
         try:
