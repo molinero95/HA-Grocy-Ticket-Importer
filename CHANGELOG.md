@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.11.0] — 2026-10-31
+
+### Added
+- Suggest up to five similarly named existing Grocy products for each receipt item during review.
+- Explicit user selection replaces the editable receipt name to reuse the existing catalog match; no automatic matching.
+
+### Validation
+- CI and live receipt smoke test pending.
+
+
 ## [0.10.0] — 2026-10-31
 
 ### Added
