@@ -118,3 +118,9 @@ export async function saveCatalogBarcode(id: number, barcode: string, oldBarcode
   const result = await response.json() as { error?: string };
   if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar el código de barras');
 }
+
+export async function removeCatalogBarcode(id: number, barcode: string): Promise<void> {
+  const response = await fetch(base + 'catalog/products/' + id + '/barcodes/' + encodeURIComponent(barcode), { method: 'DELETE', credentials: 'same-origin', headers: { 'X-CSRF-Token': await token() } });
+  const result = await response.json() as { error?: string; details?: string };
+  if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo eliminar el código');
+}
