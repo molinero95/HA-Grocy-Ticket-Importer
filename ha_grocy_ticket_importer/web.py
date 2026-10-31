@@ -454,7 +454,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 {% for item in receipt['items'] %}
 <div class="ticket-review-item">
-<strong>{{ item.name }}</strong>
+<label>Nombre del artículo<input name="item_name_{{ loop.index0 }}" maxlength="200" value="{{ item.name }}" required></label>
 <p>{{ item.quantity }} × {{ item.unit_price }} € · {{ 'Revisión necesaria: ' + item.reason if item.ambiguous else 'Propuesto' }}</p>
 <div class="ticket-review-fields">
 <label>Unidades compradas
@@ -1439,6 +1439,10 @@ def preview(rid):
     from decimal import Decimal, InvalidOperation
     try:
         for i, item in enumerate(receipt["items"]):
+            new_name = request.form.get(f"item_name_{i}", str(item["name"])).strip()
+            if not new_name or len(new_name) > 200:
+                raise ValueError("Nombre de artículo no válido")
+            item["name"] = new_name
             qty = Decimal(request.form.get(f"purchase_units_{i}", str(item["quantity"])))
             factor = Decimal(request.form.get(f"pieces_per_pack_{i}", str(item.get("pieces_per_pack", 1))))
             if (not qty.is_finite() or qty <= 0 or qty != Decimal(str(item["quantity"]))
@@ -1449,7 +1453,7 @@ def preview(rid):
             item["pieces_per_pack"] = int(factor)
         receipt_path(rid).write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
     except (ValueError, InvalidOperation, TypeError):
-        return render("Revisa las cantidades: deben coincidir con el ticket; las piezas por envase son enteras.", receipt, rid), 400
+        return render("Revisa los nombres y cantidades: las cantidades deben coincidir con el ticket; las piezas por envase son enteras.", receipt, rid), 400
     result = run_import(rid, "--dry-run")
     if result.returncode != 0:
         session.pop("previewed", None)
