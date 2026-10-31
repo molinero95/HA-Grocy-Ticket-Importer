@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.19] — 2026-10-31
+
+### Fixed
+- Improve Home Assistant WebSocket event subscription and exact shopping-list event filtering.
+- Remove redundant wait in shopping sync worker; log whether each run is startup, event or polling.
+- Preserve 120-second polling fallback and existing configuration.
+
+### Validation
+- Correction PR #3 passed Python 3.11 and 3.13 CI, including add-on container build and tests. Live WebSocket validation pending after installation.
+
+
 ## [0.7.18] — 2026-10-31
 
 ### Added
