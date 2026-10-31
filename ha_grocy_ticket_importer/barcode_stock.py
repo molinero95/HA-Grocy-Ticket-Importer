@@ -330,10 +330,16 @@ def update_product_info(product_id, name, pack_size=None, unit_id=None):
     photo_url = saved_photo(product)
     if photo_url:
         description += ("\\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
-    grocy("PUT", f"objects/products/{pid}", {
-        "name": name, "qu_id_stock": selected, "qu_id_purchase": selected,
-        "qu_factor_purchase_to_stock": 1, "description": description,
-    })
+    changes = {"name": name}
+    if selected != int(product["qu_id_stock"]):
+        changes["qu_id_stock"] = selected
+    if selected != int(product.get("qu_id_purchase") or product["qu_id_stock"]):
+        changes["qu_id_purchase"] = selected
+    if Decimal(str(product.get("qu_factor_purchase_to_stock") or 1)) != 1:
+        changes["qu_factor_purchase_to_stock"] = 1
+    if description != str(product.get("description") or "").strip():
+        changes["description"] = description
+    grocy("PUT", f"objects/products/{pid}", changes)
     return {"id": pid, "name": name, "pack_size": 1, "unit_id": selected}
 
 
