@@ -8,14 +8,14 @@ The stable Home Assistant UI must remain available until the React frontend repl
 | Alexa ambiguous product selection | `/alexa/match/choose` | Implemented through v1 API | Verify keeping original does not requeue the same suggestion |
 | Inventory, name/barcode search, shopping +/- | `/inventory/barcode-lookup`, `/shopping/step/*` | Implemented through v1 API | Test mobile camera and scanner fallback |
 | Generic product variants | `/product/*/variant` | Variant list and edit/create in React | Verify barcode ownership conflicts and stock invariants |
-| Receipt upload, preview and commit | `/upload`, `/preview/*`, `/commit/*` | **Missing** | Add v1 API and React workflow with import tests |
-| Product creation, editing and deletion | `/barcode/add`, `/product/*/edit`, `/product/*/delete` | **Missing** | Confirm safe product lifecycle and Grocy errors |
-| Stock adjustments | `/product/*/stock-save`, `/product/*/edit-all` | **Missing** | Validate units/packs and audit trail |
-| Barcode association and removal | `/barcode/associate`, `/barcode/remove*`, `/product/*/barcode` | Lookup and variant creation only | Add reassignment/removal safeguards |
-| Product merge | `/product/*/merge-preview` | **Missing** | Preview and conflict-confirmation flow |
-| Product photos | `/product/*/photo*`, `/photo/lookup`, `/barcode/photo` | **Missing** | Upload, fetch and persistence tests |
-| Catalog audit | `/catalog/audit` | **Missing** | Expose audit read-only and review UI |
-| Clear completed shopping | `/shopping/clear-completed` | **Missing** | Confirm bulk-operation semantics |
+| Receipt upload, preview and commit | `/upload`, `/preview/*`, `/commit/*` | Implemented through v1 API and React | Add v1 API and React workflow with import tests |
+| Product creation, editing and deletion | `/barcode/add`, `/product/*/edit`, `/product/*/delete` | Create/edit implemented; deletion read-only safety check, destructive action blocked | Confirm safe product lifecycle and Grocy errors |
+| Stock adjustments | `/product/*/stock-save`, `/product/*/edit-all` | Implemented with stale-stock guard | Validate units/packs and audit trail |
+| Barcode association and removal | `/barcode/associate`, `/barcode/remove*`, `/product/*/barcode` | Implemented with variant ownership checks | Add reassignment/removal safeguards |
+| Product merge | `/product/*/merge-preview` | Read-only preview and dependency audit; merge disabled | Preview and conflict-confirmation flow |
+| Product photos | `/product/*/photo*`, `/photo/lookup`, `/barcode/photo` | Upload implemented; display/lookup parity incomplete | Upload, fetch and persistence tests |
+| Catalog audit | `/catalog/audit` | Read-only audit and JSON export implemented | Expose audit read-only and review UI |
+| Clear completed shopping | `/shopping/clear-completed` | Implemented in React with confirmation | Confirm bulk-operation semantics |
 | Login/logout outside HA ingress | `/login`, `/logout` | **Missing** | Preserve standalone authentication |
 
 ## Release criteria
