@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.14] — 2026-10-31
+
+### Fixed
+- Accept `HASSIO_TOKEN` as an additional Home Assistant API credential source alongside `SUPERVISOR_TOKEN` and `HA_TOKEN`.
+- Explicitly identify missing API credentials in safe synchronization error logs without exposing token values.
+
+### Known limitations
+- Requires validation on the actual Home Assistant add-on; if Supervisor does not expose any supported token, synchronization will still fail and logs will explain why.
+
+
 ## [0.7.13] — 2026-10-31
 
 ### Fixed
