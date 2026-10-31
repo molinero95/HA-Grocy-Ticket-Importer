@@ -23,8 +23,14 @@ STATE = Path(os.environ.get("SHOPPING_SYNC_STATE", "/data/shopping-sync-" + ENTI
 
 
 def run_once(*, dry_run=True):
-    alexa = ha_todo_items()
-    grocy = grocy_shopping_names()
+    try:
+        alexa = ha_todo_items()
+    except Exception as exc:
+        raise RuntimeError("Alexa read failed: " + type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else "")) from None
+    try:
+        grocy = grocy_shopping_names()
+    except Exception as exc:
+        raise RuntimeError("Grocy read failed: " + type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else "")) from None
     baseline = load_baseline(STATE)
     result = reconcile(
         alexa, grocy, baseline, dry_run=dry_run,
@@ -57,7 +63,7 @@ def main():
                       flush=True)
             except Exception as exc:
                 # Do not log exception bodies: remote APIs may include sensitive data.
-                print("Shopping sync failed (" + type(exc).__name__ + ")", flush=True)
+                print("Shopping sync failed: " + str(exc)[:180], flush=True)
             time.sleep(120)
 
 
