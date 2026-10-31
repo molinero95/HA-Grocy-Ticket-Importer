@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.2] — 2026-10-31
+
+### Fixed
+- Register duplicate detection as a supported view so its Actions link no longer falls back to the shopping list.
+- Add a navigation regression test that opens the duplicate detector and checks its candidate links.
+
+### Validation
+- CI and live Home Assistant verification pending.
+
+
 ## [0.14.1] — 2026-10-31
 
 ### Added
