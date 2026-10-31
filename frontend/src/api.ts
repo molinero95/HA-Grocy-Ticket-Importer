@@ -22,7 +22,7 @@ async function token(): Promise<string> {
 async function mutate(path: string, method: 'POST' | 'DELETE', body?: object): Promise<void> {
   const response = await fetch(base + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: body ? JSON.stringify(body) : undefined });
   if (!response.ok) {
-    if (response.status === 403) csrfToken = undefined;
+    if (response.status === 401 || response.status === 403) csrfToken = undefined;
     const data = await response.json().catch(() => ({})) as { error?: string };
     throw new Error(data.error ?? 'No se ha podido guardar el cambio');
   }
@@ -185,13 +185,17 @@ export async function getAuthStatus(): Promise<AuthStatus> {
   const response = await fetch(base + 'auth/status', { credentials: 'same-origin' });
   if (!response.ok) throw new Error('No se pudo comprobar la sesión');
   const status = await response.json() as AuthStatus;
-  csrfToken = status.csrf_token;
+  // Never retain a token across a session transition or an expired login.
+  csrfToken = status.authenticated ? status.csrf_token : undefined;
   return status;
 }
 export async function loginStandalone(password: string): Promise<void> {
   const response = await fetch(base + 'auth/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify({ password }) });
   const result = await response.json() as { csrf_token?: string; error?: string };
-  if (!response.ok) throw new Error(response.status === 401 ? 'Contraseña incorrecta' : result.error ?? 'Error al iniciar sesión');
+  if (!response.ok) {
+    csrfToken = undefined;
+    throw new Error(response.status === 401 ? 'Contraseña incorrecta' : result.error ?? 'Error al iniciar sesión');
+  }
   csrfToken = result.csrf_token;
 }
 export async function logoutStandalone(): Promise<void> {
