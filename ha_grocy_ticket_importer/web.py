@@ -1314,6 +1314,11 @@ def product_barcode_add(product_id):
     if not LOCK.acquire(blocking=False):
         abort(409, "Otra operación está en marcha")
     try:
+        if (request.form.get("old_barcode") and
+                request.form.get("old_barcode") != request.form.get("barcode") and
+                variant_catalog.is_registered_variant(request.form["old_barcode"])):
+            raise barcode_stock.BarcodeError(
+                "Este código pertenece a una variante. No lo sustituyas desde el editor general.")
         if request.form.get("old_barcode"):
             result = barcode_stock.replace_product_barcode(
                 product_id, request.form["old_barcode"], request.form.get("barcode", ""))
@@ -1415,6 +1420,9 @@ def product_edit_all(product_id):
         if new_barcode:
             barcode_stock.validate_barcode(new_barcode)
         # Detect conflicts before any writes: never partially save an edit.
+        if (old_barcode and new_barcode and old_barcode != new_barcode and
+                variant_catalog.is_registered_variant(old_barcode)):
+            raise ValueError("El código pertenece a una variante. Edítala por separado.")
         if new_barcode and new_barcode != old_barcode:
             owner = barcode_stock.find_product(new_barcode)
             if owner and int(owner["id"]) != int(product_id):
