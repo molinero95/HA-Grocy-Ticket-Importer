@@ -121,6 +121,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .shopping-stepper button:disabled{opacity:.35}
 .shopping-stepper output{text-align:center;white-space:nowrap;font-size:.85rem;font-weight:750;color:var(--primary-dark)}
 .shopping-stepper output small{display:block;font-size:.66rem;font-weight:500}
+.shopping-stepper[data-busy="true"]{opacity:.65}
+.shopping-stepper-message{grid-column:1/-1;font-size:.7rem;color:var(--danger);margin:0;line-height:1.3}
+.shopping-stepper-message:empty{display:none}
 .inventory-row[hidden]{display:none}
 .product-detail-link{display:block;text-decoration:none;color:var(--text);padding:4px 0}
 .product-detail-link:hover strong{text-decoration:underline}
@@ -233,11 +236,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
 <div class="pantry-side">
 <div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
-<div class="shopping-stepper" aria-label="Cantidad de {{ p.name }} en lista de compra">
+<div class="shopping-stepper" aria-label="Cantidad de {{ p.name }} en lista de compra" data-busy="false">
 <form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='minus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="minus" type="submit" aria-label="Quitar {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}" {% if not p.shopping_can_subtract %}disabled{% endif %}>−</button></form>
-<output>{{ p.shopping_amount }}<small>{{ p.shopping_unit }}</small></output>
+<output><span class="shopping-amount">{{ p.shopping_amount }}</span><small>{{ p.shopping_unit }}</small></output>
 <form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='plus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" aria-label="Añadir {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}">+</button></form>
-</div></div>
+<p class="shopping-stepper-message" role="status" aria-live="polite"></p></div></div>
 </article>
 {% endfor %}
 </div><p id="inventory-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
@@ -528,6 +531,38 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         : 'No ha sido posible abrir la cámara. Usa el código manual o prueba desde Chrome.';
     }
   }
+  // Update shopping quantities in place; keep the current scroll position.
+  document.querySelectorAll('.shopping-stepper').forEach(stepper => {
+    const buttons = Array.from(stepper.querySelectorAll('button[type="submit"]'));
+    const minus = stepper.querySelector('button.minus');
+    const value = stepper.querySelector('.shopping-amount');
+    const message = stepper.querySelector('.shopping-stepper-message');
+    stepper.querySelectorAll('form').forEach(form => {
+      form.addEventListener('submit', async event => {
+        if (!window.fetch || !window.FormData) return; // normal form fallback
+        event.preventDefault();
+        if (stepper.dataset.busy === 'true') return;
+        stepper.dataset.busy = 'true';
+        buttons.forEach(b => { b.disabled = true; });
+        if (message) message.textContent = '';
+        try {
+          const response = await fetch(form.action, {
+            method: 'POST', credentials: 'same-origin',
+            headers: {'Accept': 'application/json'},
+            body: new FormData(form)
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'No se pudo modificar la lista.');
+          if (value) value.textContent = data.amount;
+        } catch (error) {
+          if (message) message.textContent = error.message || 'Error de conexión. Revisa la lista antes de reintentar.';
+        } finally {
+          stepper.dataset.busy = 'false';
+          buttons.forEach(b => { b.disabled = b === minus && Number(value?.textContent || '0') <= 0; });
+        }
+      });
+    });
+  });
   const productAuto = document.getElementById('product-photo-autoload');
   if (productAuto) {
     const statusNode = document.getElementById('product-photo-status');
@@ -818,16 +853,27 @@ def product_choices():
 
 @app.post("/shopping/step/<int:product_id>/<direction>")
 def shopping_step(product_id, direction):
+    wants_json = request.accept_mimetypes.best_match(
+        ["application/json", "text/html"]) == "application/json"
     if not LOCK.acquire(blocking=False):
+        if wants_json:
+            return jsonify({"error": "Otra operación está en marcha"}), 409
         abort(409, "Otra operación está en marcha")
     try:
-        barcode_stock.change_shopping_quantity(product_id, direction)
+        result = barcode_stock.change_shopping_quantity(product_id, direction)
     except barcode_stock.BarcodeError as exc:
+        if wants_json:
+            return jsonify({"error": str(exc)}), 400
         return render(str(exc)), 400
     except Exception:
-        return render("Error de Grocy. Comprueba la cantidad de compra antes de reintentar."), 502
+        message = "Error de Grocy. Comprueba la lista antes de volver a intentarlo."
+        if wants_json:
+            return jsonify({"error": message}), 502
+        return render(message), 502
     finally:
         LOCK.release()
+    if wants_json:
+        return jsonify({"amount": result["amount"], "product_id": product_id})
     return redirect(url_for("index", view="inventory"))
 
 
