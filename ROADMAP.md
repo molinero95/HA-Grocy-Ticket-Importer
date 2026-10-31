@@ -97,3 +97,21 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
 - [x] Installed Despensa remains 0.15.0; PR candidate 0.16.0 is **not** deployed.
 - [ ] Validate add/remove and restart recovery against disposable items on the candidate build. Read-only access alone does not establish write semantics.
 - [ ] Validate variant camera, Grocy barcode persistence and shopping API on the installed candidate before merge.
+
+
+## PR #5 finalization handoff — 2026-10-31
+
+- Removed unused duplicate `shopping_sync_identity.py` preview and its mirror/test;
+  `shopping_identity_sync.py` is the single authoritative v2 planner.
+- Added fail-closed protection when an unresolved Alexa suggestion overlaps a
+  product already present in Grocy's shopping list, plus regression tests.
+  Do not create a duplicate free-text note or infer the product automatically.
+- The preceding GitHub Actions run 41240799152 passed Python 3.11/3.13,
+  embedded JS checks, source mirrors, Docker build and tests. **The newer
+  commit requires its own successful CI run** (41240890623 was running when
+  last inspected); recheck the current PR head before merging.
+- Home Assistant MCP returned HTTP 403 when rechecking the live todo list and
+  add-on logs in this run. Treat it as a connection blocker, not evidence of
+  broken Grocy/Alexa behavior. Do not expose private add-on configuration.
+- Do not merge until live API smoke tests, camera and upgrade persistence
+  checks have passed. No production stock or shopping entries were changed.
