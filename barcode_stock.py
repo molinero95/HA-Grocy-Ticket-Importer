@@ -73,6 +73,76 @@ def inventory_snapshot():
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))
 
 
+def shopping_list_snapshot():
+    """Read Grocy's default shopping list and resolve catalog names."""
+    entries = grocy("GET", "objects/shopping_list")
+    products = grocy("GET", "objects/products")
+    units = grocy("GET", "objects/quantity_units")
+    if not all(isinstance(x, list) for x in (entries, products, units)):
+        raise BarcodeError("Grocy devolvió una lista de compra no válida")
+    by_product = {int(p["id"]): p for p in products}
+    by_unit = {int(u["id"]): str(u["name"]) for u in units}
+    rows = []
+    for entry in entries:
+        if int(entry.get("shopping_list_id") or 1) != 1:
+            continue
+        pid = int(entry.get("product_id") or 0)
+        product = by_product.get(pid)
+        name = str(product["name"]) if product else str(entry.get("note") or "Artículo sin nombre")
+        amount = Decimal(str(entry.get("amount") or 1))
+        if not amount.is_finite() or amount < 0:
+            raise BarcodeError("Cantidad no válida en la lista de compra")
+        unit_id = int(entry.get("qu_id") or (product or {}).get("qu_id_stock") or 0)
+        rows.append({
+            "id": int(entry["id"]),
+            "product_id": pid,
+            "name": name,
+            "amount": format(amount.normalize(), "f"),
+            "unit": by_unit.get(unit_id, "ud."),
+            "done": bool(entry.get("done")),
+        })
+    return sorted(rows, key=lambda r: (r["done"], r["name"].casefold(), r["id"]))
+
+
+def add_to_shopping_list(product_id):
+    """Add one stock unit to Grocy's default shopping list, without touching inventory."""
+    try:
+        pid = int(product_id)
+    except (TypeError, ValueError) as exc:
+        raise BarcodeError("Producto no válido") from exc
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id") or 0) != pid:
+        raise BarcodeError("Producto inexistente")
+    grocy("POST", "stock/shoppinglist/add-product", {
+        "product_id": pid, "list_id": 1, "product_amount": 1,
+    })
+    return str(product["name"])
+
+
+def update_shopping_list_item(item_id, done):
+    """Mark an existing list entry done/undone, without moving stock."""
+    item_id = int(item_id)
+    if item_id <= 0:
+        raise BarcodeError("Artículo de compra no válido")
+    item = grocy("GET", f"objects/shopping_list/{item_id}")
+    if not isinstance(item, dict) or int(item.get("shopping_list_id") or 1) != 1:
+        raise BarcodeError("Artículo de compra no disponible")
+    grocy("PUT", f"objects/shopping_list/{item_id}", {"done": 1 if done else 0})
+
+
+def remove_shopping_list_item(item_id):
+    """Remove only a default-list entry, without changing inventory."""
+    item_id = int(item_id)
+    if item_id <= 0:
+        raise BarcodeError("Artículo de compra no válido")
+    item = grocy("GET", f"objects/shopping_list/{item_id}")
+    if not isinstance(item, dict) or int(item.get("shopping_list_id") or 1) != 1:
+        raise BarcodeError("Artículo de compra no disponible")
+    grocy("DELETE", f"objects/shopping_list/{item_id}")
+
+
 PACK_MARKER = re.compile(r"(?:\n|^)\[Despensa: unidades_por_envase=(\d+)\]\s*")
 
 def product_detail(product_id):
