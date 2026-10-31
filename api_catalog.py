@@ -187,35 +187,6 @@ def register_catalog_routes(app, barcode_stock, lock):
             source_id = int(request.args.get("source_id", "0"))
             target_id = int(request.args.get("target_id", "0"))
             if source_id <= 0 or target_id <= 0 or source_id == target_id:
-                return jsonify({"error": "Selecciona dos productos diferentes"}), 400
-            source = barcode_stock.product_detail(source_id)
-            target = barcode_stock.product_detail(target_id)
-            from variant_catalog import variants_for_product
-            source_variants = variants_for_product(source_id)
-            target_variants = variants_for_product(target_id)
-            warnings = ["La fusión no está habilitada: las referencias de compra, historial y tickets requieren auditoría antes de mover datos."]
-            if source["unit_id"] != target["unit_id"]:
-                warnings.append("Las unidades de stock son diferentes; no se pueden sumar cantidades directamente.")
-            if source["pack_size"] != target["pack_size"]:
-                warnings.append("Los factores de envase son distintos.")
-            if source_variants or target_variants:
-                warnings.append("Existen variantes locales: deben migrarse sus asociaciones y códigos de forma transaccional.")
-            if set(source["barcodes"]) & set(target["barcodes"]):
-                warnings.append("Hay códigos de barras compartidos; revisa la integridad del catálogo.")
-            return jsonify({"source": source, "target": target, "source_variants": source_variants,
-                            "target_variants": target_variants, "warnings": warnings, "merge_allowed": False})
-        except (ValueError, TypeError, barcode_stock.BarcodeError):
-            return jsonify({"error": "Productos no válidos o inexistentes"}), 400
-        except Exception:
-            app.logger.exception("api_v1_catalog_merge_preview_failed")
-            return jsonify({"error": "merge_preview_unavailable"}), 503
-
-    @app.get("/api/v1/catalog/merge-preview")
-    def api_v1_catalog_merge_preview():
-        try:
-            source_id = int(request.args.get("source_id", "0"))
-            target_id = int(request.args.get("target_id", "0"))
-            if source_id <= 0 or target_id <= 0 or source_id == target_id:
                 return jsonify({"error": "Selecciona dos productos distintos"}), 400
             from variant_catalog import variants_for_product
             source = barcode_stock.product_detail(source_id)
