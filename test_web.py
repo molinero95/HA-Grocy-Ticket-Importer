@@ -533,9 +533,18 @@ class WebTests(unittest.TestCase):
             data["csrf"] = token
             response = self.client.post("/alexa/match/choose", data=data)
         self.assertEqual(response.status_code, 302)
-        self.assertIn("view=alexa_matches", response.headers["Location"])
+        self.assertIn("view=shopping", response.headers["Location"])
         choose.assert_called_once()
         adjust.assert_not_called()
+
+
+
+class AlexaInlineShoppingTests(unittest.TestCase):
+    def test_shopping_view_renders_pending_alexa_choices(self):
+        self.assertIn('id="alexa-pending-alert"', web.PAGE)
+        self.assertIn('Coincidencias pendientes ({{ pending_matches|length }})', web.PAGE)
+        self.assertIn('if view in ("alexa_matches", "shopping")',
+                      __import__("inspect").getsource(web.render))
 
 if __name__ == "__main__":
     unittest.main()

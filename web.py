@@ -223,6 +223,26 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% else %}
 <nav class="main-tabs" aria-label="Secciones principales"><a href="{{ url_for('index', view='shopping') }}" {% if view == 'shopping' %}aria-current="page"{% endif %}>🛒 Lista de la compra</a><a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' or view == 'product' %}aria-current="page"{% endif %}>📦 Mi despensa</a><a href="{{ url_for('index', view='actions') }}" {% if view not in ('shopping','inventory','product','shopping_add') %}aria-current="page"{% endif %}>⚡ Acciones</a></nav>
 {% if view == 'shopping' %}
+{% if pending_matches or pending_matches_error %}
+<section id="alexa-pending-alert" role="region" aria-label="Sugerencias pendientes de Alexa"><p class="section-eyebrow">🔔 Alexa</p><h3>Coincidencias pendientes ({{ pending_matches|length }})</h3>
+<p class="helper">Se conservan los nombres originales de Alexa y las notas de Grocy. Elegir un producto guarda una propuesta. Si la sincronización está activada, se usará solo cuando no haya conflictos; nunca convierte notas existentes ni modifica existencias.</p>
+{% if pending_matches_error %}<p role="alert">No se pudo leer la cola de coincidencias.</p>
+{% elif not pending_matches %}<p>No hay coincidencias ambiguas pendientes. La lista se analiza cuando está activa la sincronización con Alexa.</p>
+{% else %}
+{% for match in pending_matches %}
+<div class="ticket-review-item"><strong>{{ match.name }}</strong>
+{% if match.selection_stale %}<p role="alert">La propuesta anterior ya no es válida. Selecciona de nuevo un producto antes de sincronizar.</p>{% endif %}
+<form method="post" action="{{ url_for('alexa_match_choose') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ match.key }}">
+<label>Producto genérico propuesto<select name="product_id" required>
+<option value="">Selecciona manualmente</option>
+{% for candidate in match.candidates %}<option value="{{ candidate.id }}" {% if candidate.id == match.selected_product_id %}selected{% endif %}>{{ candidate.name }}</option>{% endfor %}
+</select></label><button type="submit">Guardar elección</button></form>
+{% if match.selected_product_id %}<p class="helper">Propuesta guardada. Se conserva el nombre original de Alexa; la sincronización aplicará la identidad solo si supera las comprobaciones.</p>{% endif %}
+</div>
+{% endfor %}{% endif %}
+</section>
+{% endif %}
 <section id="shopping-live-section"><button type="button" id="shopping-refresh" class="scan-trigger" style="float:right">↻ Actualizar</button><p class="section-eyebrow">Sincronizada con Grocy</p><h2>🛒 Lista de la compra</h2>
 {% if shopping_error %}<p role="alert">No se pudo cargar la lista desde Grocy.</p>{% else %}
 <p>{{ shopping|length }} artículos en la lista. Marcarlos como comprados no añade stock automáticamente.</p>
@@ -1086,7 +1106,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
         except Exception:
             pass
     pending_matches, pending_matches_error = [], False
-    if view == "alexa_matches" and (INGRESS_MODE or session.get("auth")):
+    if view in ("alexa_matches", "shopping") and (INGRESS_MODE or session.get("auth")):
         try:
             pending_matches = shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
         except Exception:
@@ -1188,7 +1208,7 @@ def alexa_match_choose():
     except Exception:
         app.logger.exception("alexa_match_choice_failed")
         return render("No se pudo guardar la propuesta; las listas no se han modificado."), 502
-    return redirect(url_for("index", view="alexa_matches"))
+    return redirect(url_for("index", view="shopping"))
 
 
 @app.get("/catalog/audit")
