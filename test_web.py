@@ -64,20 +64,22 @@ class WebTests(unittest.TestCase):
 
     def test_inventory_home_and_actions_are_separate(self):
         token = self.login()
-        with patch.object(web.barcode_stock, "inventory_snapshot", return_value=[
-            {"id": 5, "name": "Leche", "amount": "3", "unit": "Unidad"},
-            {"id": 8, "name": "Tomate", "amount": "1.5", "unit": "Kilogramo"}]):
+        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=[
+            {"id": 5, "name": "Leche", "amount": "3", "unit": "Unidad", "shopping_amount": "2", "shopping_unit": "Unidad", "shopping_step": "1", "shopping_can_subtract": True},
+            {"id": 8, "name": "Tomate", "amount": "1.5", "unit": "Kilogramo", "shopping_amount": "0.2", "shopping_unit": "kg", "shopping_step": "0.10", "shopping_can_subtract": True}]):
             response = self.client.get("/?view=inventory")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'id="inventory-search"', response.data)
         self.assertIn(b'Leche', response.data)
         self.assertIn(b'3', response.data)
         self.assertNotIn(b'<input name="barcode"', response.data)
-        self.assertIn(b'view=shopping_add', response.data)
+        self.assertIn(b'/shopping/step/5/plus', response.data)
+        self.assertIn(b'/shopping/step/8/minus', response.data)
+        self.assertIn(b'0.2', response.data)
         self.assertIn(b'view=actions', response.data)
         self.assertTrue(token)
 
-        with patch.object(web.barcode_stock, "inventory_snapshot", side_effect=AssertionError("Should not fetch")):
+        with patch.object(web.barcode_stock, "inventory_with_shopping", side_effect=AssertionError("Should not fetch")):
             actions = self.client.get("/?view=actions")
         self.assertEqual(actions.status_code, 200)
         self.assertIn(b'class="action-grid"', actions.data)
@@ -100,7 +102,7 @@ class WebTests(unittest.TestCase):
 
     def test_inventory_backend_failure_has_no_fake_zeroes(self):
         self.login()
-        with patch.object(web.barcode_stock, "inventory_snapshot", side_effect=RuntimeError("offline")):
+        with patch.object(web.barcode_stock, "inventory_with_shopping", side_effect=RuntimeError("offline")):
             response = self.client.get("/?view=inventory")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'No se ha podido consultar', response.data)
@@ -110,7 +112,7 @@ class WebTests(unittest.TestCase):
         with patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=[
                 {"id": 9, "product_id": 5, "name": "Leche", "amount": "2",
                  "unit": "Unidad", "done": False}]):
-            with patch.object(web.barcode_stock, "inventory_snapshot",
+            with patch.object(web.barcode_stock, "inventory_with_shopping",
                               side_effect=AssertionError("inventory should not load")):
                 response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
@@ -140,6 +142,17 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'name="unit_id"', response.data)
         self.assertIn(b'step="0.01"', response.data)
 
+    def test_inline_shopping_buttons_change_quantity_without_form_page(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "change_shopping_quantity") as change:
+            response = self.client.post("/shopping/step/5/plus", data={"csrf": token})
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("view=inventory", response.headers["Location"])
+            change.assert_called_once_with(5, "plus")
+            response = self.client.post("/shopping/step/5/minus", data={"csrf": token})
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(change.call_count, 2)
+
     def test_shopping_toggle_and_remove(self):
         token = self.login()
         with patch.object(web.barcode_stock, "update_shopping_list_item") as toggle:
@@ -153,8 +166,8 @@ class WebTests(unittest.TestCase):
 
     def test_product_sheet_from_inventory_and_picture_inside_sheet(self):
         token = self.login()
-        with patch.object(web.barcode_stock, "inventory_snapshot", return_value=[
-            {"id": 5, "name": "Aroma de vainilla", "amount": "1", "unit": "Unidad"}]):
+        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=[
+            {"id": 5, "name": "Aroma de vainilla", "amount": "1", "unit": "Unidad", "shopping_amount": "0", "shopping_unit": "Unidad", "shopping_step": "1", "shopping_can_subtract": False}]):
             home = self.client.get("/?view=inventory")
         self.assertIn(b'view=product', home.data)
         self.assertIn(b'product_id=5', home.data)
