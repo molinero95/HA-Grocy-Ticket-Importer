@@ -306,68 +306,35 @@ def product_detail(product_id):
     }
 
 
-def update_product_info(product_id, name, pack_size, unit_id=None):
-    """Edit name and package metadata only. No stock units are changed."""
+def update_product_info(product_id, name, pack_size=None, unit_id=None):
+    """Edit product using only pieces or kilograms, without pack conversion."""
     pid = int(product_id)
     if pid <= 0:
         raise BarcodeError("Producto no válido")
     name = (name or "").strip()
     if not name or len(name) > 200:
         raise BarcodeError("Indica un nombre de 1 a 200 caracteres")
-    try:
-        pack_size = int(pack_size)
-    except (TypeError, ValueError) as exc:
-        raise BarcodeError("Unidades por envase no válidas") from exc
-    if not 1 <= pack_size <= 1000:
-        raise BarcodeError("Las unidades por envase deben estar entre 1 y 1000")
     product = grocy("GET", f"objects/products/{pid}")
     if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
         raise BarcodeError("Producto inexistente")
-    current_unit = int(product["qu_id_stock"])
     units = {int(u["id"]): str(u["name"]) for u in grocy("GET", "objects/quantity_units")}
-    piece_ids = {uid for uid, label in units.items() if label.casefold().strip() in ("piece", "pieces", "unidad", "unidades")}
-    pack_ids = {uid for uid, label in units.items() if "pack" in label.casefold()}
-    purchase_id = int(product.get("qu_id_purchase") or current_unit)
-    if unit_id in (None, ""):
-        unit_id = purchase_id
+    allowed = {uid for uid, label in units.items() if label.casefold().strip() in
+               ("piece", "pieces", "unidad", "unidades", "kg", "kilogram", "kilogramo", "kilogramos")}
     try:
-        selected_purchase = int(unit_id)
-    except (TypeError, ValueError) as exc:
+        selected = int(unit_id) if unit_id not in (None, "") else int(product["qu_id_stock"])
+    except (ValueError, TypeError) as exc:
         raise BarcodeError("Unidad de medida no válida") from exc
-    if selected_purchase not in units:
-        raise BarcodeError("Unidad de compra no disponible en Grocy")
-    if selected_purchase in pack_ids:
-        if not piece_ids:
-            raise BarcodeError("No existe la unidad Piece en Grocy")
-        desired_stock_unit = sorted(piece_ids)[0]
-    else:
-        desired_stock_unit = selected_purchase
-    if desired_stock_unit != current_unit:
-        current_stock = Decimal(str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
-        if not current_stock.is_finite() or current_stock != 0:
-            raise BarcodeError("No puedes cambiar las unidades de stock con existencias. Si ahora tienes Pack en el inventario, convierte las cantidades a Piece manualmente antes de cambiar.")
-    purchase_id = selected_purchase
-    unit_id = desired_stock_unit
-    changes = {"name": name}
+    if selected not in allowed:
+        raise BarcodeError("Selecciona unidades o kilogramos")
+    description = PHOTO_MARKER.sub("", PACK_MARKER.sub("", str(product.get("description") or ""))).strip()
     photo_url = saved_photo(product)
-    description = PHOTO_MARKER.sub("", PACK_MARKER.sub(
-        "", str(product.get("description") or ""))).strip()
     if photo_url:
-        description += ("\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
-    if purchase_id in pack_ids and unit_id in piece_ids:
-        changes["qu_id_purchase"] = purchase_id
-        changes["qu_factor_purchase_to_stock"] = pack_size
-        description += ("\n" if description else "") + (
-            f"[Despensa: unidades_por_envase={pack_size}]")
-    else:
-        pack_size = 1
-        changes["qu_id_purchase"] = unit_id
-        changes["qu_factor_purchase_to_stock"] = 1
-    if unit_id != current_unit:
-        changes["qu_id_stock"] = unit_id
-    changes["description"] = description
-    grocy("PUT", f"objects/products/{pid}", changes)
-    return {"id": pid, "name": name, "pack_size": pack_size, "unit_id": unit_id}
+        description += ("\\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
+    grocy("PUT", f"objects/products/{pid}", {
+        "name": name, "qu_id_stock": selected, "qu_id_purchase": selected,
+        "qu_factor_purchase_to_stock": 1, "description": description,
+    })
+    return {"id": pid, "name": name, "pack_size": 1, "unit_id": selected}
 
 
 def associate_barcode(barcode, product_id):
