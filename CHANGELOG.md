@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.13] — 2026-10-31
+
+### Fixed
+- Publish release notes in the Home Assistant add-on directory so Supervisor can display the changelog in the add-on interface.
+- No changes to stock, product catalog, or shopping-list data.
+
+### Known limitations
+- Alexa ↔ Grocy synchronization is still being diagnosed; this update does not claim to fix the RuntimeError.
+
+
 ## [0.7.12] — 2026-10-31
 
 ### Fixed
