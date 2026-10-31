@@ -133,6 +133,9 @@ def add_grocy_identity(row):
                    if normalize(existing) == normalize(name)):
                 raise IdentityConflict("A Grocy product now conflicts with the note")
             return
+        products = grocy("GET", "objects/products")
+        if any(normalize(p["name"]) == normalize(name) for p in products):
+            raise IdentityConflict("Grocy catalog changed while adding a note")
         grocy("POST", "objects/shopping_list",
               {"shopping_list_id": 1, "note": name, "amount": 1})
 
