@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.0] — 2026-10-31
+
+### Added
+- In-page camera capture for receipts using getUserMedia, with native camera and file picker fallback.
+- Edit extracted receipt item names before preview and import.
+
+### Validation
+- CI and live Android Home Assistant camera permissions pending.
+
+
 ## [0.9.0] — 2026-10-31
 
 ### Added
