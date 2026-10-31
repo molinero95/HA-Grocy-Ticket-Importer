@@ -6,7 +6,7 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 
 > **Estado:** versión de desarrollo. La instalación desde repositorio y la configuración nativa aún requieren validación en Home Assistant.
 
-## Funcionalidades
+> **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. No se suben archivos de imagen a Grocy y puede haber productos sin fotografía.\n\n## Funcionalidades
 
 - **Lista de la compra (inicio):** sincronizada con la lista predeterminada de Grocy; marcar artículos como comprados o quitarlos sin modificar el inventario.\n- **Mi despensa:** búsqueda de productos y cantidades actuales obtenidas de Grocy, con controles `− / +` directamente en cada fila para consultar y modificar la cantidad de la lista de compra. Los productos en kg cambian en pasos de 0,10 kg (100 g) y los demás en pasos de 1 unidad.
 - **Ficha de producto:** editar el nombre, definir unidades por envase, consultar o cambiar la unidad de medida (cuando no hay existencias), asociar códigos de barras y buscar una foto de referencia.\n- **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
@@ -16,7 +16,7 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 - **Tickets:** subir PDF/JPG/PNG, extraer líneas con OpenAI, revisar, simular y confirmar la importación.
 - **Historial de importaciones:** SQLite persistente para evitar registrar de nuevo líneas de tickets ya importadas.
 
-> Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; la edición avanzada puede usar otras unidades si tienen una conversión válida. Añadir a la lista no registra entrada de existencias.\n\n> «Unidades por envase» es una propiedad informativa de la ficha. Por ejemplo, indicar «4» en un pack de aromas de vainilla **no convierte automáticamente un envase en cuatro unidades de stock**. La vista previa de fotografía tampoco la guarda todavía en Grocy. La unidad de stock no puede cambiarse con existencias sin convertirlas antes, para evitar confundir unidades con kilogramos.
+> Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; la edición avanzada puede usar otras unidades si tienen una conversión válida. Añadir a la lista no registra entrada de existencias.\n\n> «Piezas por pack» solo aparece cuando la unidad del artículo es Pack; es una propiedad informativa de la ficha. Por ejemplo, indicar «4» en un pack de aromas de vainilla **no convierte automáticamente un envase en cuatro unidades de stock**. La vista previa de fotografía tampoco la guarda todavía en Grocy. La unidad de stock no puede cambiarse con existencias sin convertirlas antes, para evitar confundir unidades con kilogramos.
 
 ## Instalar desde Home Assistant (repositorio comunitario)
 
