@@ -25,12 +25,34 @@ class ProductCreationTests(unittest.TestCase):
         api.assert_any_call("DELETE", "objects/products/5")
 
     @patch("barcode_stock.grocy")
-    def test_delete_rejects_stock(self, api):
+    def test_delete_consumes_stock_before_deletion(self, api):
+        state = {"amount": 2}
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/5":
+                return {"id": 5, "name": "Leche"}
+            if method == "GET" and path == "stock/products/5":
+                return {"stock_amount": state["amount"]}
+            if method == "POST" and path == "stock/products/5/consume":
+                self.assertEqual(body["amount"], 2.0)
+                state["amount"] = 0
+                return {}
+            if method == "DELETE" and path == "objects/products/5":
+                self.assertEqual(state["amount"], 0)
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        self.assertEqual(barcode_stock.delete_catalog_product(5, "Leche"), "Leche")
+        api.assert_any_call("DELETE", "objects/products/5")
+
+    @patch("barcode_stock.grocy")
+    def test_delete_does_not_remove_if_stock_remains(self, api):
         def fake(method, path, body=None):
             if method == "GET" and path == "objects/products/5":
                 return {"id": 5, "name": "Leche"}
             if method == "GET" and path == "stock/products/5":
                 return {"stock_amount": 2}
+            if method == "POST" and path == "stock/products/5/consume":
+                return {}
             raise AssertionError((method, path))
         api.side_effect = fake
         with self.assertRaises(barcode_stock.BarcodeError):
