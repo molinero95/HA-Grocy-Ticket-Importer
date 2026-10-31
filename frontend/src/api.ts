@@ -132,3 +132,12 @@ export async function uploadCatalogPhoto(id: number, file: File): Promise<void> 
   const result = await response.json() as { error?: string };
   if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar la fotografía');
 }
+
+export type DuplicateCandidate = { id: number; name: string; barcodes: string[] };
+export type DuplicateGroup = { reason: string; items: DuplicateCandidate[] };
+export async function getDuplicateCandidates(): Promise<DuplicateGroup[]> {
+  const response = await fetch(base + 'catalog/duplicates', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se pudo revisar el catálogo');
+  const data = await response.json() as { groups: DuplicateGroup[] };
+  return data.groups;
+}
