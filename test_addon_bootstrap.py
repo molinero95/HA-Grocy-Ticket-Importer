@@ -58,7 +58,7 @@ class BootstrapTests(unittest.TestCase):
                 boot.main()
         nginx.assert_called_once_with(["nginx"], check=True)
         worker.assert_called_once()
-        self.assertEqual(worker.call_args.args[1], "/app/shopping_sync_worker.py")
+        self.assertEqual(worker.call_args.args[0][1], "/app/shopping_sync_worker.py")
         self.assertEqual(worker.call_args.kwargs["env"]["SHOPPING_SYNC_ENABLED"], "0")
 
     def test_bootstrap_does_not_run_services_when_config_missing(self):
