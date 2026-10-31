@@ -115,7 +115,8 @@ class WebTests(unittest.TestCase):
         self.assertNotIn(b'Buscar fotograf', self.client.get("/?view=actions").data)
         with patch.object(web.barcode_stock, "product_detail", return_value={
                 "id": 5, "name": "Aroma de vainilla", "pack_size": 4,
-                "description": "", "barcodes": ["1234567890123"]}):
+                "description": "", "barcodes": ["1234567890123"],
+                "unit_id": 2, "units": [{"id": 2, "name": "Unidad"}, {"id": 4, "name": "Kilogramo"}], "stock_amount": "1.25"}):
             sheet = self.client.get("/?view=product&product_id=5")
             self.assertEqual(sheet.status_code, 200)
             self.assertIn(b'name="pack_size"', sheet.data)
@@ -125,16 +126,17 @@ class WebTests(unittest.TestCase):
             with patch.object(web.barcode_stock, "update_product_info",
                               return_value={"id": 5, "name": "Aroma", "pack_size": 4}) as change:
                 response = self.client.post("/product/5/edit", data={
-                    "csrf": token, "name": "Aroma", "pack_size": "4"})
+                    "csrf": token, "name": "Aroma", "pack_size": "4", "unit_id": "2"})
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(b'Existencias sin cambios', response.data)
-                change.assert_called_once_with(5, "Aroma", "4")
+                change.assert_called_once_with(5, "Aroma", "4", "2")
 
     def test_product_picture_lookup_does_not_edit_product(self):
         token = self.login()
         with patch.object(web.barcode_stock, "product_detail", return_value={
                 "id": 5, "name": "Aroma", "pack_size": 4, "description": "",
-                "barcodes": ["1234567890123"]}):
+                "barcodes": ["1234567890123"],
+                "unit_id": 2, "units": [{"id": 2, "name": "Unidad"}], "stock_amount": "1"}):
             with patch.object(web.product_images, "lookup_image", return_value={
                     "name": "Aroma", "image_url": "https://images.openfoodfacts.org/a.jpg",
                     "source_url": "https://world.openfoodfacts.org/a"}) as lookup:
@@ -142,6 +144,43 @@ class WebTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(b'https://images.openfoodfacts.org/a.jpg', response.data)
                 lookup.assert_called_once_with("1234567890123")
+
+    def test_product_sheet_displays_quantity_unit_and_barcode_actions(self):
+        self.login()
+        with patch.object(web.barcode_stock, "product_detail", return_value={
+                "id": 5, "name": "Tomate en rama", "pack_size": 1,
+                "description": "", "barcodes": [],
+                "unit_id": 4,
+                "units": [{"id": 2, "name": "Unidad"}, {"id": 4, "name": "Kilogramo"}],
+                "stock_amount": "1.25"}):
+            response = self.client.get("/?view=product&product_id=5")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'name="unit_id"', response.data)
+        self.assertIn(b'name="desired_amount"', response.data)
+        self.assertIn(b'step="0.01"', response.data)
+        self.assertIn(b'/product/5/barcode', response.data)
+
+    def test_stock_change_requires_preview_and_confirm(self):
+        token = self.login()
+        self.assertEqual(self.client.post("/product/5/stock-commit", data={
+            "csrf": token}).status_code, 403)
+        with patch.object(web.barcode_stock, "prepare_stock_adjustment", return_value={
+                "product_id": 5, "before": "1.25", "after": "1.50",
+                "difference": "0.25", "direction": "add"}):
+            with patch.object(web.barcode_stock, "product_detail", return_value={
+                    "id": 5, "name": "Tomate", "pack_size": 1,
+                    "unit_id": 4, "units": [{"id": 4, "name": "Kilogramo"}],
+                    "stock_amount": "1.25", "barcodes": []}):
+                r = self.client.post("/product/5/stock-preview", data={
+                    "csrf": token, "desired_amount": "1.50", "expected_amount": "1.25"})
+                self.assertEqual(r.status_code, 200)
+                self.assertIn(b'Confirmar cambio de existencias', r.data)
+                with patch.object(web.barcode_stock, "apply_stock_adjustment", return_value={
+                        "after": "1.50"}) as commit:
+                    r = self.client.post("/product/5/stock-commit", data={"csrf": token})
+                    self.assertEqual(r.status_code, 200)
+                    commit.assert_called_once()
+        self.assertEqual(self.client.post("/product/5/stock-commit", data={"csrf": token}).status_code, 403)
 
     def test_camera_scanner_available_for_all_barcode_actions(self):
         self.login()
