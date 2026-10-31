@@ -1,0 +1,40 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "mi despensa",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AddShoppingItemIntent",
+          "slots": [
+            {
+              "name": "producto",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "añade {producto} a la lista de la compra",
+            "apunta {producto}",
+            "pon {producto} en la lista",
+            "necesito {producto}"
+          ]
+        }
+      ]
+    }
+  }
+}
