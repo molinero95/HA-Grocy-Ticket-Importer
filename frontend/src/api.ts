@@ -170,3 +170,12 @@ export async function getCatalogAudit(): Promise<CatalogAudit> {
   if (!response.ok) throw new Error('No se pudo auditar el catálogo');
   return response.json() as Promise<CatalogAudit>;
 }
+
+export type DeletionCheck = { error: string; details?: string; collection?: string };
+export async function checkCatalogDeletion(id: number, expectedName: string): Promise<DeletionCheck> {
+  const response = await fetch(base + 'catalog/products/' + id + '/deletion-check?expected_name=' + encodeURIComponent(expectedName), { credentials: 'same-origin' });
+  const result = await response.json() as DeletionCheck;
+  if (response.status === 409) return result;
+  if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo comprobar la eliminación');
+  return result;
+}
