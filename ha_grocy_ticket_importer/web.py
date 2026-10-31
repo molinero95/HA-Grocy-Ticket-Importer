@@ -722,6 +722,35 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
     window.addEventListener('pagehide', stop);
   }
   document.querySelectorAll('.ticket-match-select').forEach(select => select.addEventListener('change', () => { const input = document.getElementById(select.dataset.target); if(input && select.value) input.value = select.value; }));
+  const productOpen = document.getElementById('product-camera-open');
+  if (productOpen) {
+    const panel = document.getElementById('product-camera-panel');
+    const video = document.getElementById('product-camera-video');
+    let productStream = null;
+    const closeProductCamera = () => { if (productStream) productStream.getTracks().forEach(t => t.stop()); productStream = null; panel.hidden = true; };
+    productOpen.addEventListener('click', async () => {
+      try {
+        productStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+        video.srcObject = productStream; panel.hidden = false;
+      } catch(e) { const status = document.getElementById('product-photo-status'); if(status) status.textContent = 'No se pudo abrir la cámara. Comprueba los permisos.'; }
+    });
+    document.getElementById('product-camera-close').addEventListener('click', closeProductCamera);
+    document.getElementById('product-camera-snapshot').addEventListener('click', () => {
+      if (!productStream || !video.videoWidth) return;
+      const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const dt = new DataTransfer(); dt.items.add(new File([blob], 'producto.jpg', {type:'image/jpeg'}));
+        document.getElementById('product-photo-upload').files = dt.files;
+        const image = document.getElementById('product-photo-display');
+        if (image) { image.src = URL.createObjectURL(blob); image.hidden = false; }
+        const status = document.getElementById('product-photo-status'); if(status) status.textContent = 'Foto capturada. Pulsa Guardar cambios.';
+        closeProductCamera();
+      }, 'image/jpeg', 0.88);
+    });
+    window.addEventListener('pagehide', closeProductCamera);
+  }
   const uploadForm = document.getElementById('ticket-upload-form');
   if (uploadForm) {
     let submitting = false;
@@ -1275,9 +1304,9 @@ def product_edit_all(product_id):
             barcode_stock.validate_barcode(new_barcode)
         barcode_stock.update_product_info(product_id, name, "1", unit)
         if Decimal(amount) != Decimal(old_amount):
-            barcode_stock.set_product_stock(product_id, amount, old_amount)
+            barcode_stock.apply_stock_adjustment(barcode_stock.prepare_stock_adjustment(product_id, amount, old_amount))
         if new_barcode and new_barcode != old_barcode:
-            barcode_stock.add_product_barcode(product_id, new_barcode, old_barcode)
+            (barcode_stock.replace_product_barcode(product_id, old_barcode, new_barcode) if old_barcode else barcode_stock.associate_product_barcode(product_id, new_barcode))
         if photo and photo.filename:
             from PIL import Image, ImageOps
             data = photo.read(8 * 1024 * 1024 + 1)
