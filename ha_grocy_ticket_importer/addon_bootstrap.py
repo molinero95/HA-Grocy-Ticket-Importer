@@ -27,6 +27,7 @@ def load_config(path=OPTIONS):
         "GROCY_API_KEY": options["grocy_api_key"],
         "OPENAI_API_KEY": options["openai_api_key"],
         "GROCY_LOCATION_ID": str(location),
+        "SHOPPING_SYNC_ENABLED": "1" if options.get("shopping_sync_enabled") is True else "0",
     }
 
 
@@ -59,6 +60,9 @@ def main():
     )
     os.environ["DESPENSA_DISTRIBUTION"] = "Repositorio comunitario de GitHub"
     subprocess.run(["nginx"], check=True)
+    if os.environ.get("SHOPPING_SYNC_ENABLED") == "1":
+        subprocess.Popen(["/venv/bin/python", "/app/shopping_sync_worker.py"], env=os.environ,
+                         stdout=sys.stdout, stderr=sys.stderr)
     os.execvpe(
         "/venv/bin/gunicorn",
         ["/venv/bin/gunicorn", "--workers", "1", "--threads", "4", "--timeout", "210",
