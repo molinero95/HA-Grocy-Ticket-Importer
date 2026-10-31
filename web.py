@@ -999,9 +999,9 @@ def configured():
 def protect():
     if not configured():
         abort(503, "Configure WEB_PASSWORD and WEB_SESSION_SECRET in .env")
-    if request.method == "POST":
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         token = session.get("csrf")
-        if not token or not hmac.compare_digest(request.form.get("csrf", ""), token):
+        if not token or not hmac.compare_digest((request.headers.get("X-CSRF-Token", "") if request.path.startswith("/api/v1/") else request.form.get("csrf", "")), token):
             abort(403)
     if request.endpoint not in ("index", "login", "static") and not (INGRESS_MODE or session.get("auth")):
         abort(401)
@@ -1178,6 +1178,63 @@ def load_receipt(rid):
     if not path.is_file():
         abort(404)
     return json.loads(path.read_text(encoding="utf-8"))
+
+@app.get("/api/v1/session")
+def api_v1_session():
+    if not (INGRESS_MODE or session.get("auth")):
+        return jsonify({"error": "authentication_required"}), 401
+    return jsonify({"csrf_token": csrf_token()})
+
+
+@app.post("/api/v1/alexa/matches/<key>/choose")
+def api_v1_choose_alexa_match(key):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or type(payload.get("product_id")) is not int or payload["product_id"] <= 0:
+        return jsonify({"error": "invalid_product_id"}), 400
+    try:
+        shopping_match_queue.choose(shopping_match_queue.DEFAULT_PATH, key, payload["product_id"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "stale_or_invalid_candidate"}), 409
+    except Exception:
+        app.logger.exception("api_v1_alexa_choice_failed")
+        return jsonify({"error": "selection_failed"}), 502
+    return jsonify({"ok": True})
+
+
+@app.post("/api/v1/shopping/<int:item_id>/toggle")
+def api_v1_toggle_shopping(item_id):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or type(payload.get("done")) is not bool:
+        return jsonify({"error": "invalid_done"}), 400
+    if not LOCK.acquire(blocking=False):
+        return jsonify({"error": "operation_in_progress"}), 409
+    try:
+        barcode_stock.update_shopping_list_item(item_id, payload["done"])
+    except barcode_stock.BarcodeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("api_v1_shopping_toggle_failed")
+        return jsonify({"error": "shopping_update_failed"}), 502
+    finally:
+        LOCK.release()
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/v1/shopping/<int:item_id>")
+def api_v1_remove_shopping(item_id):
+    if not LOCK.acquire(blocking=False):
+        return jsonify({"error": "operation_in_progress"}), 409
+    try:
+        barcode_stock.remove_shopping_list_item(item_id)
+    except barcode_stock.BarcodeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("api_v1_shopping_remove_failed")
+        return jsonify({"error": "shopping_remove_failed"}), 502
+    finally:
+        LOCK.release()
+    return jsonify({"ok": True})
+
 
 @app.get("/api/v1/shopping")
 def api_v1_shopping():
