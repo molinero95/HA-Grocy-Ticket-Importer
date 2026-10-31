@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, abort, redirect, render_template_string, request, session, url_for
+from flask import Flask, abort, jsonify, redirect, render_template_string, request, session, url_for
 from werkzeug.utils import secure_filename
 
 import extract
@@ -125,6 +125,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .product-detail-link{display:block;text-decoration:none;color:var(--text);padding:4px 0}
 .product-detail-link:hover strong{text-decoration:underline}
 .product-sheet img{max-width:100%;height:auto;border-radius:12px}
+.product-thumb{width:52px;height:52px;border-radius:11px;object-fit:contain;background:#f0f4f1;border:1px solid var(--line);flex-shrink:0}
+.product-photo-full{width:210px;max-width:100%;height:210px;object-fit:contain;background:#f4f6f5;border-radius:14px;border:1px solid var(--line)}
+.product-name-with-photo{display:flex;gap:11px;align-items:center;min-width:0}
+.product-name-with-photo>div{min-width:0}
+.photo-preview{margin:10px 0}
+.photo-preview img{width:140px;height:140px;object-fit:contain;border-radius:12px;border:1px solid var(--line)}
+
 .inventory-row strong{display:block}
 .inventory-row small{display:block;color:var(--muted);font-size:.79rem;margin-top:3px}
 .inventory-quantity{text-align:right;min-width:80px}
@@ -186,7 +193,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="inventory-list">
 {% for item in shopping %}
 <article class="inventory-row">
-<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{{ item.name }}</strong><small>{{ item.amount }} {{ item.unit }}</small></div>
+<div class="product-name-with-photo">{% if item.image_url %}<img class="product-thumb" src="{{ item.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{{ item.name }}</strong><small>{{ item.amount }} {{ item.unit }}</small></div></div>
 <div class="shopping-controls">
 <form method="post" action="{{ url_for('shopping_toggle', item_id=item.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="done" value="{{ '0' if item.done else '1' }}">
@@ -223,7 +230,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
 <article class="inventory-row pantry-row" data-name="{{ p.name }}">
-<div class="pantry-info"><a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
+<div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
 <div class="pantry-side">
 <div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
 <div class="shopping-stepper" aria-label="Cantidad de {{ p.name }} en lista de compra">
@@ -262,6 +269,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if product %}
 <p class="section-eyebrow">Ficha del artículo</p>
 <h2>{{ product.name }}</h2>
+<div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"></div>
 <p>Las unidades por envase son informativas. Cambiarlas <strong>no modifica las existencias</strong> de Grocy.</p>
 <form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -292,9 +300,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <form method="post" action="{{ url_for('product_barcode_add', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
+<div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía encontrada" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
 <button type="submit">Asociar código a este artículo</button></form>
 <h3>Fotografía</h3>
-{% if photo %}<img src="{{ photo.image_url }}" alt="Fotografía de {{ photo.name }}" width="200" loading="lazy"><p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">Fuente: Open Food Facts</a></p><p class="helper">Fotografía de referencia. Todavía no se guarda en Grocy.</p>{% endif %}
+{% if product.image_url %}<p class="helper">Imagen guardada desde Open Food Facts.</p>{% endif %}
 {% if product.barcodes %}
 <form method="post" action="{{ url_for('product_photo', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -302,7 +311,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </form>
 <p class="helper">Códigos: {{ product.barcodes|join(', ') }}</p>
 {% else %}
-<p>Este producto aún no tiene un código de barras asociado. Puedes vincularlo desde Acciones → Asociar código.</p>
+<p>Este producto aún no tiene un código de barras asociado. Puedes vincularlo en esta misma ficha.</p>
 {% endif %}
 {% else %}<p role="alert">No se ha podido cargar la ficha del producto.</p>{% endif %}
 </section>
@@ -319,9 +328,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% endif %}
 <form method="post" action="{{ url_for('barcode_add') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="image_url" class="barcode-image-url" value="">
 <label for="new-product-name">Nombre del producto</label>
 <input id="new-product-name" name="name" maxlength="200" placeholder="Tomate en rama" required>
 <label>Código de barras (opcional) <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" placeholder="Escanear o escribir"><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
+<div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía del nuevo producto" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
 <label for="new-product-unit">Unidad de medida</label>
 <select id="new-product-unit" name="unit_id" required>
 {% for u in new_product_units %}<option value="{{ u.id }}" {% if u.name|lower in ('piece','unidad','unidades') %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
@@ -509,6 +520,47 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         : 'No ha sido posible abrir la cámara. Usa el código manual o prueba desde Chrome.';
     }
   }
+  // Scanning or typing a complete EAN/UPC previews an image automatically.
+  document.querySelectorAll('form input[name="barcode"]').forEach(input => {
+    const form = input.closest('form');
+    const preview = form?.querySelector('.barcode-photo-preview');
+    const status = form?.querySelector('.photo-status');
+    const hidden = form?.querySelector('.barcode-image-url');
+    if (!preview) return;
+    let sequence = 0;
+    async function loadPhoto() {
+      const id = ++sequence;
+      const barcode = input.value.trim();
+      if (hidden) hidden.value = '';
+      preview.hidden = true;
+      preview.removeAttribute('src');
+      if (!/^\\d{8,14}$/.test(barcode)) {
+        if (status) status.textContent = '';
+        return;
+      }
+      if (status) status.textContent = 'Buscando foto automáticamente…';
+      try {
+        const url = new URL({{ url_for('photo_lookup')|tojson }}, window.location.href);
+        url.searchParams.set('barcode', barcode);
+        const response = await fetch(url.toString(), {credentials:'same-origin'});
+        if (!response.ok) throw new Error('lookup');
+        const data = await response.json();
+        if (sequence !== id) return;
+        if (data.image_url) {
+          preview.src = data.image_url;
+          preview.hidden = false;
+          if (hidden) hidden.value = data.image_url;
+          if (status) status.textContent = 'Foto encontrada en Open Food Facts.';
+        } else if (status) status.textContent = 'No hay foto para este código.';
+      } catch (_) {
+        if (sequence === id && status) status.textContent = 'No se pudo buscar la foto; puedes continuar igualmente.';
+      }
+    }
+    input.addEventListener('input', () => {
+      clearTimeout(input._photoTimer);
+      input._photoTimer = setTimeout(loadPhoto, 350);
+    });
+  });
   document.querySelectorAll('.scan-trigger').forEach(button => {
     button.addEventListener('click', () => {
       const input = button.closest('form')?.querySelector('input[name="barcode"]');
@@ -817,6 +869,13 @@ def product_barcode_add(product_id):
         return render("No se pudo asociar el código. Comprueba Grocy."), 502
     finally:
         LOCK.release()
+    try:
+        if not barcode_stock.product_detail(product_id)["image_url"]:
+            found = product_images.lookup_image(request.form.get("barcode", ""))
+            if found:
+                barcode_stock.save_product_photo(product_id, found["image_url"])
+    except Exception:
+        pass  # Linking succeeded even when Open Food Facts is unavailable.
     return render("Código ya asociado." if result["already_linked"] else "Código asociado sin modificar existencias.")
 
 
@@ -848,7 +907,25 @@ def product_photo(product_id):
         return render("No se ha podido buscar la fotografía."), 502
     if not photo:
         return render("No se ha encontrado una foto para este producto.")
-    return render("Fotografía encontrada. No se ha guardado en Grocy.", photo=photo)
+    try:
+        barcode_stock.save_product_photo(product_id, photo["image_url"])
+    except Exception:
+        return render("Foto encontrada, pero no se pudo guardar en Grocy."), 502
+    return render("Fotografía guardada en la ficha del producto.")
+
+
+@app.get("/photo/lookup")
+def photo_lookup():
+    if not (INGRESS_MODE or session.get("auth")):
+        abort(401)
+    try:
+        barcode = barcode_stock.validate_barcode(request.args.get("barcode", ""))
+        found = product_images.lookup_image(barcode)
+    except barcode_stock.BarcodeError:
+        return jsonify({"image_url": None}), 400
+    except Exception:
+        return jsonify({"image_url": None}), 503
+    return jsonify({"image_url": found["image_url"] if found else None})
 
 
 @app.post("/barcode/photo")
@@ -871,7 +948,8 @@ def barcode_add():
         result = barcode_stock.create_catalog_product(
             request.form.get("name"), request.form.get("barcode", ""),
             request.form.get("unit_id"), request.form.get("initial_stock", "0"),
-            location_id=int(os.getenv("GROCY_LOCATION_ID", "2")))
+            location_id=int(os.getenv("GROCY_LOCATION_ID", "2")),
+            image_url=request.form.get("image_url"))
     except (barcode_stock.BarcodeError, ValueError) as exc:
         return render("No se pudo crear: " + str(exc)), 400
     except Exception:
