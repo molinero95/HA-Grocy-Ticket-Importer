@@ -37,3 +37,6 @@ New option: `shopping_sync_enabled` (boolean, default `false`). The background p
 The state file `/data/shopping-sync.json` is persistent across restarts. Preserve it in backups. The first run merges pending items; subsequent runs propagate adds/removes. Historical completed Alexa items are excluded. Existing catalog stock is never changed. Unknown items may be added as Grocy shopping-list notes.
 
 **Release gate:** do not enable this feature until HA service responses, Grocy writes, error recovery and CI have been tested against the installed versions. The proposed 0.7.11 release is not installed merely because GitHub contains the code.
+
+
+**Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.
