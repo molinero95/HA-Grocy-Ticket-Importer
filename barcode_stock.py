@@ -188,6 +188,49 @@ def associate_product_barcode(product_id, barcode):
     return {"name": str(product["name"]), "already_linked": False}
 
 
+def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
+    """Validate a deliberate stock correction without writing to Grocy."""
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    try:
+        target = Decimal(str(desired_amount).strip().replace(",", "."))
+        expected = Decimal(str(expected_amount).strip().replace(",", "."))
+    except Exception as exc:
+        raise BarcodeError("Introduce una cantidad válida") from exc
+    if not target.is_finite() or not expected.is_finite() or target < 0 or expected < 0:
+        raise BarcodeError("La cantidad debe ser un número positivo o cero")
+    if target.as_tuple().exponent < -3:
+        raise BarcodeError("Máximo tres decimales")
+    details = grocy("GET", f"stock/products/{pid}")
+    current = Decimal(str(details.get("stock_amount", 0)))
+    if not current.is_finite() or current != expected:
+        raise BarcodeError("El stock ha cambiado desde que abriste la ficha. Actualízala y vuelve a intentar.")
+    if current == target:
+        raise BarcodeError("La cantidad indicada ya es la actual")
+    return {"product_id": pid, "before": str(current), "after": str(target),
+            "difference": str(abs(target - current)), "direction": "add" if target > current else "consume"}
+
+
+def apply_stock_adjustment(preview):
+    """Apply an explicitly confirmed difference, after checking for stale stock."""
+    pid = int(preview["product_id"])
+    validated = prepare_stock_adjustment(pid, preview["after"], preview["before"])
+    if validated["direction"] != preview["direction"] or validated["difference"] != preview["difference"]:
+        raise BarcodeError("El ajuste ha cambiado; debes revisarlo de nuevo")
+    diff = validated["difference"]
+    if validated["direction"] == "add":
+        location = int(__import__("os").environ.get("GROCY_LOCATION_ID", "2"))
+        grocy("POST", f"stock/products/{pid}/add", {
+            "amount": float(Decimal(diff)), "price": 0,
+            "best_before_date": "2999-12-31",
+            "location_id": location, "note": "Corrección manual desde Despensa"})
+    else:
+        grocy("POST", f"stock/products/{pid}/consume", {
+            "amount": float(Decimal(diff)), "spoiled": False})
+    return validated
+
+
 def _get_name_and_id(barcode):
     product = find_product(barcode)
     if product is None:
