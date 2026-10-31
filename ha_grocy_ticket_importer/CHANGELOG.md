@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3] — 2026-10-31
+
+### Changed
+- Remove the Consume product shortcut and its dedicated screen from the interface.
+- Preserve existing stock operations elsewhere and the underlying API for compatibility.
+
+
 ## [0.11.2] — 2026-10-31
 
 ### Fixed
