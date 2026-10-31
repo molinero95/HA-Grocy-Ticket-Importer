@@ -14,6 +14,7 @@ from flask import Flask, abort, redirect, render_template_string, request, sessi
 from werkzeug.utils import secure_filename
 
 import extract
+import barcode_stock
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env")
@@ -48,6 +49,27 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="submit">Entrar</button></form></section>
 {% else %}
+<section><h2>Añadir producto por código de barras</h2>
+<form method="post" action="{{ url_for('barcode_add') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Código de barras (EAN/UPC) <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<label>Nombre (solo si es nuevo) <input name="name" maxlength="200" placeholder="Leche entera 1 L"></label>
+<button type="submit">Añadir 1 al stock</button></form>
+<p>Si el código no está registrado, indica un nombre para crear el producto. Si existe, se reutiliza.</p></section>
+<section><h2>Eliminar una unidad del stock</h2>
+<form method="post" action="{{ url_for('barcode_remove_preview') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<button type="submit">Buscar unidad para descontar</button></form>
+<p>Esta opción consume una unidad; nunca elimina el producto de la base de datos.</p></section>
+{% if remove_candidate %}
+<section><h3>Confirmar salida de stock</h3>
+<p>Producto: <strong>{{ remove_candidate.name }}</strong> ({{ remove_candidate.barcode }})</p>
+<form method="post" action="{{ url_for('barcode_remove') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="barcode" value="{{ remove_candidate.barcode }}">
+<button type="submit">Confirmar: quitar 1 unidad</button></form></section>
+{% endif %}
 <section><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -90,10 +112,10 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-def render(message="", receipt=None, rid=None, simulation=None, can_commit=False):
+def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None):
     return render_template_string(PAGE, csrf=csrf_token(), message=message,
                                   receipt=receipt, rid=rid, simulation=simulation,
-                                  can_commit=can_commit)
+                                  can_commit=can_commit, remove_candidate=remove_candidate)
 
 def receipt_path(rid):
     if len(rid) != 32 or any(c not in "0123456789abcdef" for c in rid):
@@ -122,6 +144,54 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("index"))
+
+@app.post("/barcode/add")
+def barcode_add():
+    barcode = request.form.get("barcode", "")
+    name = request.form.get("name", "")
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = barcode_stock.add_one(barcode, name,
+                                      location_id=int(os.getenv("GROCY_LOCATION_ID", "2")))
+    except (barcode_stock.BarcodeError, ValueError) as exc:
+        return render("No se pudo añadir: " + str(exc)), 400
+    except Exception:
+        return render("Error de Grocy. Comprueba el stock antes de volver a intentarlo."), 502
+    finally:
+        LOCK.release()
+    return render("Añadida 1 unidad al stock" + (" (producto nuevo)" if result["created"] else ""))
+
+@app.post("/barcode/remove-preview")
+def barcode_remove_preview():
+    try:
+        barcode = barcode_stock.validate_barcode(request.form.get("barcode", ""))
+        product = barcode_stock.find_product(barcode)
+        if product is None:
+            return render("No hay ningún producto con ese código"), 404
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se pudo consultar Grocy"), 502
+    session["remove_barcode"] = barcode
+    return render(remove_candidate={"barcode": barcode, "name": product["name"]})
+
+@app.post("/barcode/remove")
+def barcode_remove():
+    barcode = request.form.get("barcode", "")
+    if session.pop("remove_barcode", None) != barcode:
+        abort(403, "Primero confirma el producto")
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = barcode_stock.remove_one(barcode)
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("Error de Grocy. Comprueba el stock antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return render("Descontada 1 unidad de " + result["name"] + ". El producto sigue en el catálogo.")
 
 @app.post("/upload")
 def upload():
