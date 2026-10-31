@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.1] — 2026-10-31
+
+### Added
+- Read-only merge preview when a newly entered barcode belongs to another catalog product.
+- Show both product names, stock amounts and unit identifiers, with navigation to either editor.
+- Detect the conflict before writing name, stock or barcode updates; merging remains disabled pending safe reconciliation.
+
+### Validation
+- CI and live Home Assistant verification pending.
+
+
 ## [0.14.0] — 2026-10-31
 
 ### Added
