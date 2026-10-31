@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.27] — 2026-10-31
+
+### Changed
+- Product editing uses only pieces or kilograms and always sets purchase-to-stock factor to 1.
+- Removed pack conversion and nonzero-stock restriction from the product edit backend.
+- Product names, barcodes and saved photos are retained; no automatic migration of existing Grocy records.
+
+### Validation
+- Pending CI and Grocy edit smoke tests. Existing receipt and product-creation pack paths still require cleanup.
+
+
 ## [0.7.26] — 2026-10-31
 
 ### Fixed
