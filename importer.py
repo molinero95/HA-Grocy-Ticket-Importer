@@ -56,9 +56,12 @@ def classify(item):
         return 'EXPENSE', None, 'Non-stock charge (tracked in local expense ledger)'
     if re.search(r'\bhielo\b', name) and re.search(r'\bbolsa\b', name) and qty == 1:
         return 'STOCK', 2, ''
-    # Explicitly packaged goods are counted as one Piece, even if the name ends in "kg".
-    # For example: "Patata Meleiro bolsa 2,5 kg" or "Hielo cubitos bolsa 2 kg".
-    if qty == 1 and re.search(r'\bbolsa\s+\d+(?:\s+\d+)?\s+kg
+    # Packaged items sold as a single bag are counted as Piece.
+    if qty == 1 and re.search(r'\bbolsa\s+\d+(?:\s+\d+)?\s+kg$', name):
+        return 'STOCK', 2, ''
+    # Weighted fish may include a size range, e.g. "Lubina kg (800-1200 g)".
+    if qty != qty.to_integral_value() and re.search(r'\bkg\s+\d+\s+\d+\s+g$', name):
+        return 'STOCK', 4, ''
     # Packaged goods such as 'hielo bolsa 2 kg' have qty=1 and stay as Piece.
     weighed = bool(re.search(r'\bkg\s*$', name)) and qty != qty.to_integral_value()
     if weighed:
