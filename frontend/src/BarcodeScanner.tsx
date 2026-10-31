@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isBarcode } from './barcodes';
 import { Camera, X } from 'lucide-react';
 
 type Detection = { rawValue: string };
@@ -28,7 +29,7 @@ export function BarcodeScanner({ onDetect }: { onDetect: (code: string) => void 
         scanning = true;
         try {
           const results = await detector.detect(video.current);
-          const code = results.find(item => /^\d{8,14}$/.test(item.rawValue))?.rawValue;
+          const code = results.find(item => isBarcode(item.rawValue))?.rawValue;
           if (code && !stopped) { onDetect(code); setOpen(false); return; }
         } catch { if (!stopped) setError('No se ha podido leer el código. Puedes escribirlo manualmente.'); }
         finally { scanning = false; }
