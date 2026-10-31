@@ -533,7 +533,7 @@ class WebTests(unittest.TestCase):
             data["csrf"] = token
             response = self.client.post("/alexa/match/choose", data=data)
         self.assertEqual(response.status_code, 302)
-        self.assertIn("view=alexa_matches", response.headers["Location"])
+        self.assertIn("view=shopping", response.headers["Location"])
         choose.assert_called_once()
         adjust.assert_not_called()
 
