@@ -9,8 +9,8 @@ const empty: VariantInput = { barcode: '', name: '', supermarket: '', brand: '',
 export function ProductDetail({ id, onClose, stockAmount = '0', stockUnit = 'ud.' }: { id: number; onClose: () => void; stockAmount?: string; stockUnit?: string }) {
   const client = useQueryClient();
   const [showDeletionCheck, setShowDeletionCheck] = useState(false);
-  const deletionCheck = useQuery({ queryKey: ['deletion-check', id, showDeletionCheck], queryFn: () => checkCatalogDeletion(id, data!.product.name), enabled: showDeletionCheck && !!data });
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['variants', id], queryFn: () => getProductVariants(id) });
+  const deletionCheck = useQuery({ queryKey: ['deletion-check', id, showDeletionCheck], queryFn: () => checkCatalogDeletion(id, data!.product.name), enabled: showDeletionCheck && !!data });
   const barcodes = useQuery({ queryKey: ['catalog-barcodes', id], queryFn: () => getCatalogBarcodes(id) });
   const removeBarcode = useMutation({ mutationFn: (barcode: string) => removeCatalogBarcode(id, barcode), onSuccess: () => { void client.invalidateQueries({ queryKey: ['catalog-barcodes', id] }); } });
   const [barcodeInput, setBarcodeInput] = useState('');
