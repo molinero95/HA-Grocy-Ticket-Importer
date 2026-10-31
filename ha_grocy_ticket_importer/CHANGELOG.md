@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0] — 2026-10-31
+
+### Added
+- Upload and persist product photographs locally from the product edit page (JPEG, PNG, WebP).
+- Cache barcode-discovered Open Food Facts photographs in persistent add-on storage.
+- Authenticated local image endpoint; image normalization and size limits.
+
+### Notes
+- Previously linked external photographs are not yet bulk-migrated; existing external links remain usable.
+- CI and live Home Assistant validation pending.
+
+
 ## [0.8.3] — 2026-10-31
 
 ### Changed
