@@ -81,8 +81,14 @@ def pending(path):
         rows = db.execute(
             "SELECT normalized_name, original_name, candidates_json, selected_product_id "
             "FROM pending_matches WHERE active=1 ORDER BY original_name").fetchall()
-    return [{"key": key, "name": original, "candidates": json.loads(candidates),
-             "selected_product_id": selected} for key, original, candidates, selected in rows]
+    result = []
+    for key, original, candidates, selected in rows:
+        options = json.loads(candidates)
+        candidate_ids = {int(option["id"]) for option in options}
+        result.append({"key": key, "name": original, "candidates": options,
+                       "selected_product_id": selected,
+                       "selection_stale": selected is not None and selected not in candidate_ids})
+    return result
 
 
 def choose(path, key, product_id):
