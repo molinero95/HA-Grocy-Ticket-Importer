@@ -196,7 +196,7 @@ def register_catalog_routes(app, barcode_stock, lock):
             blockers = []
             if source["unit_id"] != target["unit_id"]:
                 blockers.append("Unidades de stock diferentes: no se pueden sumar directamente")
-            if source["pack_size"] != target["pack_size"] or source["purchase_unit_id"] != target["purchase_unit_id"]:
+            if source["pack_size"] != target["pack_size"] or source.get("purchase_unit_id") != target.get("purchase_unit_id"):
                 blockers.append("Configuración de envases o unidades de compra diferente")
             if source_variants or target_variants:
                 blockers.append("Hay variantes de supermercado que requieren migración de referencias")
@@ -205,7 +205,7 @@ def register_catalog_routes(app, barcode_stock, lock):
             blockers.append("Falta auditar referencias en listas de compra, historial y recetas antes de fusionar")
             return jsonify({"source": source, "target": target,
                             "source_variants": source_variants, "target_variants": target_variants,
-                            "blockers": blockers, "can_merge": False})
+                            "blockers": blockers, "warnings": blockers, "can_merge": False, "merge_allowed": False})
         except (ValueError, TypeError, barcode_stock.BarcodeError) as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception:
