@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2] — 2026-10-31
+
+### Added
+- Scan a new EAN/UPC barcode with the existing in-app camera directly from the product editor.
+- Populate the new barcode field automatically; saving remains an explicit action.
+
+
 ## [0.13.1] — 2026-10-31
 
 ### Changed
