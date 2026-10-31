@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local-only prototype UI. NOT a Home Assistant ingress add-on."""
 import hmac
+import difflib
 import io
 import urllib.request
 import json
@@ -456,7 +457,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 {% for item in receipt['items'] %}
 <div class="ticket-review-item">
-<label>Nombre del artículo<input name="item_name_{{ loop.index0 }}" maxlength="200" value="{{ item.name }}" required></label>
+<label>Nombre del artículo<input id="ticket-item-name-{{ loop.index0 }}" name="item_name_{{ loop.index0 }}" maxlength="200" value="{{ item.name }}" required></label>
+{% if suggestions and suggestions[loop.index0] %}<label>Posibles coincidencias en tu despensa<select class="ticket-match-select" data-target="ticket-item-name-{{ loop.index0 }}"><option value="">Mantener nombre del ticket / escribir otro</option>{% for candidate in suggestions[loop.index0] %}<option value="{{ candidate.name }}">{{ candidate.name }}</option>{% endfor %}</select></label><p class="helper">Selecciona un artículo existente para reutilizarlo; no se selecciona automáticamente.</p>{% endif %}
 <p>{{ item.quantity }} × {{ item.unit_price }} € · {{ 'Revisión necesaria: ' + item.reason if item.ambiguous else 'Propuesto' }}</p>
 <div class="ticket-review-fields">
 <label>Unidades compradas
@@ -759,6 +761,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
     });
     window.addEventListener('pagehide', stop);
   }
+  document.querySelectorAll('.ticket-match-select').forEach(select => select.addEventListener('change', () => { const input = document.getElementById(select.dataset.target); if(input && select.value) input.value = select.value; }));
   const camera = document.getElementById('ticket-camera');
   const file = document.getElementById('ticket-file');
   if (!camera || !file) return;
@@ -983,7 +986,17 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             inventory = barcode_stock.inventory_with_shopping()
         except Exception:
             inventory_error = True
-    return render_template_string(PAGE, csrf=csrf_token(), message=message,
+    suggestions = []
+    if receipt and view == "ticket":
+        try:
+            catalog = barcode_stock.list_products()
+            for item in receipt["items"]:
+                query = str(item.get("name", "")).casefold().strip()
+                ranked = sorted(((difflib.SequenceMatcher(None, query, p["name"].casefold()).ratio(), p) for p in catalog), key=lambda x: x[0], reverse=True)
+                suggestions.append([p for score, p in ranked[:5] if score >= 0.42 and p["name"].casefold() != query])
+        except Exception:
+            suggestions = [[] for _ in receipt["items"]]
+    return render_template_string(PAGE, csrf=csrf_token(), message=message, suggestions=suggestions,
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
                                   view=view, inventory=inventory, inventory_error=inventory_error,
