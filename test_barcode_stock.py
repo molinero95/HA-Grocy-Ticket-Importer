@@ -84,6 +84,36 @@ class ProductCreationTests(unittest.TestCase):
 
 class BarcodeTests(unittest.TestCase):
     @patch("barcode_stock.grocy")
+    def test_replace_barcode_updates_existing_record(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/5":
+                return {"id": 5, "name": "Leche"}
+            if method == "GET" and path == "objects/product_barcodes":
+                return [{"id": 9, "product_id": 5, "barcode": "1234567890123"}]
+            if method == "PUT" and path == "objects/product_barcodes/9":
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        result = barcode_stock.replace_product_barcode(5, "1234567890123", "1234567890124")
+        self.assertTrue(result["replaced"])
+        api.assert_any_call("PUT", "objects/product_barcodes/9",
+                            {"product_id": 5, "barcode": "1234567890124"})
+
+    @patch("barcode_stock.grocy")
+    def test_replace_barcode_rejects_duplicate_without_writing(self, api):
+        def fake(method, path, body=None):
+            if path == "objects/products/5":
+                return {"id": 5, "name": "Leche"}
+            if path == "objects/product_barcodes":
+                return [{"id": 9, "product_id": 5, "barcode": "1234567890123"},
+                        {"id": 10, "product_id": 8, "barcode": "1234567890124"}]
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.replace_product_barcode(5, "1234567890123", "1234567890124")
+        self.assertFalse(any(c.args[0] in ("POST", "PUT", "DELETE") for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
     def test_link_existing_product_does_not_write_stock(self, api):
         def fake(method, path, body=None):
             if method == "GET" and path == "objects/products":
