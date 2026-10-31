@@ -26,7 +26,7 @@ class WebTests(unittest.TestCase):
         self.client = web.app.test_client()
 
     def csrf(self):
-        self.client.get("/")
+        self.client.get("/?view=actions")
         with self.client.session_transaction() as session:
             return session["csrf"]
 
