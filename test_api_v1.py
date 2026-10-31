@@ -1,7 +1,10 @@
 """Read-only API contract tests for the incremental React migration."""
 import unittest
+import os
 from unittest.mock import patch
-import web
+
+with patch.dict(os.environ, {"WEB_PASSWORD": "test-password", "WEB_SESSION_SECRET": "test-secret-key"}, clear=False):
+    import web
 
 
 class ShoppingApiTests(unittest.TestCase):
