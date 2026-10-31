@@ -181,16 +181,24 @@ class BarcodeTests(unittest.TestCase):
             "amount": "1.5", "unit": "Kilogramo", "done": False}])
 
     @patch("barcode_stock.grocy")
-    def test_shopping_add_preserves_stock(self, api):
+    def test_shopping_add_with_quantity_and_unit_conversion(self, api):
         def fake(method, path, body=None):
             if method == "GET" and path == "objects/products/7":
-                return {"id": 7, "name": "Tomate"}
+                return {"id": 7, "name": "Tomate", "qu_id_stock": 4,
+                        "qu_id_purchase": 5, "qu_factor_purchase_to_stock": 0.5}
+            if method == "GET" and path == "objects/quantity_units":
+                return [{"id": 4, "name": "Kilogramo"}, {"id": 5, "name": "Bolsa"}]
             if method == "POST" and path == "stock/shoppinglist/add-product":
-                self.assertEqual(body, {"product_id": 7, "list_id": 1, "product_amount": 1})
+                self.assertEqual(body, {"product_id": 7, "qu_id": 5,
+                                        "list_id": 1, "product_amount": 1.5})
                 return {}
             raise AssertionError((method, path))
         api.side_effect = fake
-        self.assertEqual(barcode_stock.add_to_shopping_list(7), "Tomate")
+        self.assertEqual(barcode_stock.add_to_shopping_list(7, "3", "5"), "Tomate")
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.add_to_shopping_list(7, "1.555", "4")
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.add_to_shopping_list(7, "2", "999")
         self.assertEqual(sum(x.args[0] == "POST" for x in api.call_args_list), 1)
 
     @patch("barcode_stock.grocy")
