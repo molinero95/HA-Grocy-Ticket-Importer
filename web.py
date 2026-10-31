@@ -271,20 +271,20 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <h2>{{ product.name }}</h2>
 <div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
 {% if not product.image_url and product.barcodes %}<div id="product-photo-autoload" data-barcode="{{ product.barcodes[0] }}" data-save-url="{{ url_for('product_photo_save', product_id=product.id) }}" data-csrf="{{ csrf }}"></div>{% endif %}
-<p>Las unidades por envase son informativas. Cambiarlas <strong>no modifica las existencias</strong> de Grocy.</p>
+<p>Pack es la unidad de compra; Piece es la unidad de stock que se consume. La conversión solo se aplica a nuevas entradas de stock.</p>
 <form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label for="edit-product-name">Nombre del artículo</label>
 <input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
-<label for="edit-unit">Unidad de medida del stock</label>
+<label for="edit-unit">Unidad de compra</label>
 <select id="edit-unit" name="unit_id" required>
-{% for u in product.units %}<option value="{{ u.id }}" {% if u.id == product.unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
+{% for u in product.units %}<option value="{{ u.id }}" {% if u.id == product.purchase_unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
 </select>
-<p class="helper">Si hay existencias ({{ product.stock_amount }}), no se puede cambiar la unidad. Ajusta antes la cantidad a cero y luego establece la nueva unidad para evitar conversiones erróneas.</p>
+<p class="helper">El stock se cuenta en piezas cuando compras packs. Un pack de 5 añade 5 piezas; consumir 1 descuenta una pieza. No se convierten automáticamente las existencias antiguas configuradas como Pack.</p>
 <div id="pack-size-fields" {% if not product.is_pack %}hidden{% endif %}>
 <label for="edit-pack-size">Piezas por pack</label>
 <input id="edit-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="{{ product.pack_size }}" required>
-<p class="helper">Solo se aplica a productos medidos en Pack. No cambia automáticamente las existencias.</p>
+<p class="helper">1 Pack equivale a este número de Piece. No cambia automáticamente las existencias anteriores.</p>
 </div>
 <button type="submit">Guardar cambios</button>
 </form>
@@ -336,11 +336,16 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input id="new-product-name" name="name" maxlength="200" placeholder="Tomate en rama" required>
 <label>Código de barras (opcional) <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" placeholder="Escanear o escribir"><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía del nuevo producto" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
-<label for="new-product-unit">Unidad de medida</label>
+<label for="new-product-unit">Unidad de compra</label>
 <select id="new-product-unit" name="unit_id" required>
 {% for u in new_product_units %}<option value="{{ u.id }}" {% if u.name|lower in ('piece','unidad','unidades') %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
 </select>
-<label for="new-product-stock">Cantidad inicial en despensa</label>
+<div id="new-pack-fields" hidden>
+<label for="new-pack-size">Piezas por pack</label>
+<input id="new-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="1">
+<p class="helper">Si compras 2 packs de 5, se guardarán 10 Piece en el inventario.</p>
+</div>
+<label for="new-product-stock">Cantidad inicial (en la unidad elegida)</label>
 <input id="new-product-stock" name="initial_stock" type="number" min="0" step="0.01" inputmode="decimal" value="0" required>
 <p class="helper">Puedes dejarlo en 0 y añadir existencias más adelante. Máximo dos decimales, por ejemplo 1,50 kg.</p>
 <button type="submit">Crear producto</button>
@@ -541,6 +546,18 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         if (statusNode) statusNode.textContent = 'Imagen guardada desde Open Food Facts.';
       }
     }).catch(() => {});
+  }
+  const newUnitSelector = document.getElementById('new-product-unit');
+  const newPackFields = document.getElementById('new-pack-fields');
+  if (newUnitSelector && newPackFields) {
+    const updateNewPack = () => {
+      const pack = (newUnitSelector.selectedOptions[0]?.textContent || '').toLowerCase().includes('pack');
+      newPackFields.hidden = !pack;
+      const input = document.getElementById('new-pack-size');
+      if (input) input.required = pack;
+    };
+    newUnitSelector.addEventListener('change', updateNewPack);
+    updateNewPack();
   }
   const unitSelector = document.getElementById('edit-unit');
   const packFields = document.getElementById('pack-size-fields');
@@ -1003,7 +1020,8 @@ def barcode_add():
             request.form.get("name"), request.form.get("barcode", ""),
             request.form.get("unit_id"), request.form.get("initial_stock", "0"),
             location_id=int(os.getenv("GROCY_LOCATION_ID", "2")),
-            image_url=request.form.get("image_url"))
+            image_url=request.form.get("image_url"),
+            pack_size=request.form.get("pack_size", "1"))
     except (barcode_stock.BarcodeError, ValueError) as exc:
         return render("No se pudo crear: " + str(exc)), 400
     except Exception:
