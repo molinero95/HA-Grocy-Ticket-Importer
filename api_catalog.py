@@ -69,3 +69,53 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify(result)
+
+    @app.get("/api/v1/catalog/products/<int:product_id>/barcodes")
+    def api_v1_catalog_barcodes(product_id):
+        try:
+            rows = barcode_stock.grocy("GET", "objects/product_barcodes")
+            if not isinstance(rows, list):
+                raise ValueError("Invalid barcode response")
+            return jsonify({"barcodes": sorted({str(row["barcode"]) for row in rows if int(row["product_id"]) == product_id})})
+        except Exception:
+            app.logger.exception("api_v1_catalog_barcodes_failed")
+            return jsonify({"error": "barcodes_unavailable"}), 503
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/barcodes")
+    def api_v1_add_catalog_barcode(product_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            result = barcode_stock.associate_product_barcode(product_id, payload.get("barcode"))
+        except barcode_stock.BarcodeError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_catalog_barcode_add_failed")
+            return jsonify({"error": "barcode_add_uncertain"}), 502
+        finally:
+            lock.release()
+        return jsonify(result)
+
+    @app.patch("/api/v1/catalog/products/<int:product_id>/barcodes/<old_barcode>")
+    def api_v1_replace_catalog_barcode(product_id, old_barcode):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            from variant_catalog import is_registered_variant
+            if is_registered_variant(old_barcode):
+                return jsonify({"error": "Este código pertenece a una variante. Edítalo desde la variante."}), 409
+            result = barcode_stock.replace_product_barcode(product_id, old_barcode, payload.get("barcode"))
+        except barcode_stock.BarcodeError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_catalog_barcode_replace_failed")
+            return jsonify({"error": "barcode_replace_uncertain"}), 502
+        finally:
+            lock.release()
+        return jsonify(result)
