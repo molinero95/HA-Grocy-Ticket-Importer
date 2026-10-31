@@ -22,7 +22,14 @@ def load_config(path=OPTIONS):
         raise ValueError("grocy_location_id debe ser positivo")
     if not options["grocy_url"].startswith(("http://", "https://")):
         raise ValueError("grocy_url debe ser una URL HTTP o HTTPS")
+    alexa_entity = str(options.get("alexa_shopping_list_entity") or "").strip()
+    if alexa_entity and (not alexa_entity.startswith("todo.") or
+                         not all(c.islower() or c.isdigit() or c in "._" for c in alexa_entity)):
+        raise ValueError("alexa_shopping_list_entity debe ser una entidad todo.* válida")
+    if options.get("shopping_sync_enabled") is True and not alexa_entity:
+        raise ValueError("Configura alexa_shopping_list_entity antes de activar la sincronización")
     return {
+        "ALEXA_SHOPPING_LIST_ENTITY": alexa_entity,
         "GROCY_URL": options["grocy_url"].rstrip("/"),
         "GROCY_API_KEY": options["grocy_api_key"],
         "OPENAI_API_KEY": options["openai_api_key"],
