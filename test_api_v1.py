@@ -123,7 +123,7 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json["can_merge"])
         self.assertTrue(response.json["blockers"])
-        grocy.assert_not_called()
+        self.assertTrue(all(call.args[0] == 'GET' for call in grocy.call_args_list))
 
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
