@@ -105,3 +105,16 @@ export async function adjustCatalogStock(id: number, desiredAmount: string, expe
   const result = await response.json() as { error?: string; details?: string };
   if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo actualizar el stock');
 }
+
+export async function getCatalogBarcodes(id: number): Promise<string[]> {
+  const response = await fetch(base + 'catalog/products/' + id + '/barcodes', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se pudieron cargar los códigos de barras');
+  const data = await response.json() as { barcodes: string[] };
+  return data.barcodes;
+}
+export async function saveCatalogBarcode(id: number, barcode: string, oldBarcode?: string): Promise<void> {
+  const path = 'catalog/products/' + id + '/barcodes' + (oldBarcode ? '/' + encodeURIComponent(oldBarcode) : '');
+  const response = await fetch(base + path, { method: oldBarcode ? 'PATCH' : 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify({ barcode }) });
+  const result = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar el código de barras');
+}
