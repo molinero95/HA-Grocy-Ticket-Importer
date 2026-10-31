@@ -2,7 +2,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Estado:** versión de desarrollo. La instalación local se ha probado en Home Assistant, pero la instalación desde un repositorio público, el formulario de configuración nativo y la migración entre instalaciones todavía deben validarse en un Home Assistant real. **No desinstales la versión local hasta completar y comprobar la migración.**
+> **Estado:** versión de desarrollo. La instalación desde repositorio y la configuración nativa aún requieren validación en Home Assistant.
 
 ## Funcionalidades
 
@@ -25,8 +25,6 @@ El repositorio contiene `repository.yaml` y `ha_grocy_ticket_importer/config.yam
 4. Introduce los valores descritos a continuación y guarda.
 5. Inicia el complemento y usa **Abrir interfaz web**; puedes habilitar su entrada **Despensa** en la barra lateral.
 
-Si instalaste antes una versión local con el mismo nombre, **no la desinstales todavía**: consulta primero la sección de migración.
-
 ### Configuración en Home Assistant
 
 La configuración se introduce en el formulario oficial del complemento; **no es necesario crear ni subir un archivo `.env`**.
@@ -42,29 +40,13 @@ Las claves se gestionan mediante las opciones del complemento y se entregan al p
 
 El complemento se ejecuta por **Ingress**, a través de la autenticación de Home Assistant. **No abras el puerto interno 8099** en el router.
 
-## Migración desde la instalación local anterior (importante)
-
-La instalación local actual usa un identificador como `local_ha_grocy_ticket_importer`. Al instalar el complemento desde un repositorio GitHub, Home Assistant le asigna **otro identificador y otra carpeta `app_config`**.
-
-Antes de comenzar:
-
-1. Crea una copia de seguridad del complemento local desde Home Assistant.
-2. Conserva la instalación local y el archivo `grocy_imports.sqlite3` **sin borrar ni sobrescribir**.
-3. Instala la versión del repositorio, pero **antes de importar tickets**, copia la base de datos del complemento local a la carpeta `app_config` del nuevo complemento; confirma primero la ruta exacta asignada por Home Assistant.
-4. Configura las claves en la pestaña **Configuración** del nuevo complemento (ya no necesita `.env`).
-5. Comprueba el inventario, el arranque y que el historial de importaciones se ha conservado. Solo entonces considera retirar la instalación local.
-
-La nueva instalación crea un historial vacío si no existe uno. **Eso es correcto para instalaciones nuevas, pero peligroso para usuarios que ya han importado tickets**, porque el historial antiguo no estará disponible hasta que se copie. Nunca importes otra vez un ticket anterior antes de verificar la migración.
-
-La base de datos se almacena en `/config/grocy_imports.sqlite3` (volumen privado `app_config`), y los tickets temporales y la clave de sesión se almacenan en `/data`. Las actualizaciones del complemento no deben eliminar estos volúmenes persistentes.
-
 ## Actualizaciones automáticas de versiones
 
 Con el repositorio **público** y añadido a la tienda, Home Assistant puede detectar una versión nueva cuando cambia `ha_grocy_ticket_importer/config.yaml → version`.
 
 - Para comprobarlo, utiliza **Buscar actualizaciones** en la tienda.
 - Home Assistant debería ofrecer el botón **Actualizar** sin descargar ZIP ni copiar archivos.
-- Una vez validada la migración, se podrá activar la opción de actualizaciones automáticas si se desea.
+- Las actualizaciones automáticas se pueden activar si se desea, después de verificar que las actualizaciones manuales funcionan correctamente.
 
 **Importante:** publicar código en GitHub no publica automáticamente una GitHub Release, y una GitHub Release no es imprescindible para que Home Assistant detecte la versión del complemento. Las versiones deben incrementarse en `config.yaml` y las pruebas de GitHub Actions deben estar verdes antes de actualizar.
 
@@ -82,11 +64,11 @@ python -m unittest discover -v -p 'test_*.py'
 
 No ejecuta llamadas reales a Grocy ni a OpenAI en los tests automatizados.
 
-## Privacidad y seguridad antes de hacer público el repositorio
+## Privacidad y seguridad
 
 - No subir `.env`, `.env.*`, claves API, certificados, tickets reales, fotografías personales, bases de datos SQLite ni registros de producción.
 - `.gitignore` protege contra inclusiones futuras accidentales, **pero no limpia el historial de Git**.
 - Antes de cambiar la visibilidad del repositorio, revisar **todos los commits antiguos y sus adjuntos** para detectar secretos o datos personales; si alguna credencial se filtró, revocarla/rotarla.
-- La auditoría del historial y el cambio de visibilidad **no están completados**; hasta entonces, mantener el repositorio privado.
+- Antes de publicar el repositorio se debe completar la auditoría del historial para evitar exponer datos personales o credenciales.
 
 Documentación específica del complemento: [ha_grocy_ticket_importer/DOCS.md](ha_grocy_ticket_importer/DOCS.md).
