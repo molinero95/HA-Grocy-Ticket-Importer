@@ -10,7 +10,8 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 
 - **Lista de la compra (inicio):** sincronizada con la lista predeterminada de Grocy; marcar artículos como comprados o quitarlos sin modificar el inventario.\n- **Mi despensa:** búsqueda de productos y cantidades actuales obtenidas de Grocy, con controles `− / +` directamente en cada fila para consultar y modificar la cantidad de la lista de compra. Los productos en kg cambian en pasos de 0,10 kg (100 g) y los demás en pasos de 1 unidad.
 - **Ficha de producto:** editar el nombre, definir unidades por envase, consultar o cambiar la unidad de medida (cuando no hay existencias), asociar códigos de barras y buscar una foto de referencia.\n- **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
-- **Acciones separadas:** guardar producto, consumir una unidad, asociar un código a un producto existente e importar un ticket.
+- **Alta de productos nuevos:** desde Acciones → Añadir producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
+- **Acciones separadas:** añadir un producto nuevo, consumir una unidad, asociar un código a un producto existente e importar un ticket.
 - **Escáner de cámara:** lectura EAN/UPC desde un móvil compatible, con entrada manual alternativa.
 - **Tickets:** subir PDF/JPG/PNG, extraer líneas con OpenAI, revisar, simular y confirmar la importación.
 - **Historial de importaciones:** SQLite persistente para evitar registrar de nuevo líneas de tickets ya importadas.
