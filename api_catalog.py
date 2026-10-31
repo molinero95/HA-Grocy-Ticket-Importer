@@ -119,3 +119,18 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify(result)
+
+    @app.delete("/api/v1/catalog/products/<int:product_id>/barcodes/<barcode>")
+    def api_v1_remove_catalog_barcode(product_id, barcode):
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            result = barcode_stock.remove_product_barcode(product_id, barcode)
+        except barcode_stock.BarcodeError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_catalog_barcode_remove_failed")
+            return jsonify({"error": "barcode_remove_uncertain", "details": "Comprueba los códigos de Grocy antes de reintentar."}), 502
+        finally:
+            lock.release()
+        return jsonify(result)
