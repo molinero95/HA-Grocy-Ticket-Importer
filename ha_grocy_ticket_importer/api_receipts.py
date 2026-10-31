@@ -1,5 +1,6 @@
 """Receipt upload and extraction API; never imports into Grocy on upload."""
 import json
+import hashlib
 import secrets
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -31,6 +32,7 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
             source.unlink(missing_ok=True)
         session["receipt_id"] = receipt_id
         session.pop("previewed", None)
+        session.pop("previewed_digest", None)
         return jsonify({"receipt_id": receipt_id, "receipt": receipt}), 201
 
     @app.get("/api/v1/receipts/<receipt_id>")
@@ -82,6 +84,7 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
         if result.returncode:
             return jsonify({"error": "receipt_preview_rejected", "details": result.stderr[-1200:]}), 400
         session["previewed"] = receipt_id
+        session["previewed_digest"] = hashlib.sha256(path.read_bytes()).hexdigest()
         return jsonify({"receipt_id": receipt_id, "preview": result.stdout, "ready_to_commit": True})
 
     @app.post("/api/v1/receipts/<receipt_id>/commit")
@@ -93,6 +96,10 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
         path = data_dir / (receipt_id + ".json")
         if not path.is_file():
             return jsonify({"error": "receipt_not_found"}), 404
+        if session.get("previewed_digest") != hashlib.sha256(path.read_bytes()).hexdigest():
+            session.pop("previewed", None)
+            session.pop("previewed_digest", None)
+            return jsonify({"error": "receipt_changed_since_preview"}), 409
         if not lock.acquire(blocking=False):
             return jsonify({"error": "import_in_progress"}), 409
         try:
