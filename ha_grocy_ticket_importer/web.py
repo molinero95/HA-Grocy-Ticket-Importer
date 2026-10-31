@@ -110,6 +110,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .back-link{display:inline-flex;align-items:center;min-height:40px;text-decoration:none;font-weight:700}
 .inventory-list{margin-top:14px}
 .inventory-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.inventory-row[hidden]{display:none}
 .inventory-row strong{display:block}
 .inventory-row small{display:block;color:var(--muted);font-size:.79rem;margin-top:3px}
 .inventory-quantity{text-align:right;min-width:80px}
