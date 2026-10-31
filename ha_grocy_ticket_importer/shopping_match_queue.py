@@ -3,6 +3,7 @@
 Queue entries are advisory. No code here modifies Alexa, Grocy, stock,
 shopping notes, or sync checkpoints. Manual selection is stored separately.
 """
+import hashlib
 import json
 import os
 import sqlite3
@@ -11,8 +12,24 @@ from pathlib import Path
 
 from shopping_sync import normalize, suggest_catalog_matches
 
-DEFAULT_PATH = Path(os.environ.get("ALEXA_MATCH_QUEUE_DB", "/config/alexa-match-queue.sqlite3"
+BASE_PATH = Path(os.environ.get("ALEXA_MATCH_QUEUE_DB", "/config/alexa-match-queue.sqlite3"
     if os.environ.get("HA_INGRESS_MODE") == "1" else str(Path(__file__).resolve().parent / "runtime" / "alexa-match-queue.sqlite3")))
+
+
+def scoped_path(base_path, entity):
+    """Keep manual choices isolated to the configured Alexa list entity.
+
+    The legacy unscoped database is deliberately left untouched: migrating
+    choices without knowing their originating list could cross-link products.
+    """
+    path = Path(base_path)
+    if not entity:
+        return path
+    digest = hashlib.sha256(entity.strip().encode("utf-8")).hexdigest()[:16]
+    return path.with_name(path.stem + "-" + digest + path.suffix)
+
+
+DEFAULT_PATH = scoped_path(BASE_PATH, os.environ.get("ALEXA_SHOPPING_LIST_ENTITY", ""))
 
 def connect(path):
     path = Path(path)
