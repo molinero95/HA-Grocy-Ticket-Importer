@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.13.0] — 2026-10-31
+
+### Added
+- Exact EAN lookup now falls back to Open Products Facts after Open Food Facts.
+- Accept product photo URLs from both trusted Open Facts image hosts.
+- Preserve existing Grocy catalog matching and manual product registration when neither source recognizes a barcode.
+
+### Validation
+- CI and live Sanytol barcode lookup pending; public databases may not contain every product.
+
+
 ## [0.12.0] — 2026-10-31
 
 ### Changed
