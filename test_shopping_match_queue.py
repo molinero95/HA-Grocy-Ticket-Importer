@@ -3,10 +3,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from shopping_match_queue import refresh, pending, choose, resolved_choices
+from shopping_match_queue import refresh, pending, choose, resolved_choices, scoped_path
 
 
 class AlexaMatchQueueTests(unittest.TestCase):
+    def test_queue_is_scoped_to_alexa_list(self):
+        base = Path("/config/alexa-match-queue.sqlite3")
+        first = scoped_path(base, "todo.alexa_shopping")
+        second = scoped_path(base, "todo.another_list")
+        self.assertNotEqual(first, second)
+        self.assertEqual(first, scoped_path(base, "todo.alexa_shopping"))
+        self.assertEqual(scoped_path(base, ""), base)
+
     def test_ambiguous_item_retains_original_and_requires_manual_choice(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "queue.sqlite3"
