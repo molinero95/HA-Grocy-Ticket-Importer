@@ -437,11 +437,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="ticket-file">Elegir archivo PDF o imagen</label>
+<label for="ticket-camera">📷 Hacer foto del ticket</label>
+<input id="ticket-camera" type="file" name="ticket" accept="image/jpeg,image/png" capture="environment">
+<label for="ticket-file">📁 Elegir PDF o imagen existente</label>
 <input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png">
-<label for="ticket-camera">O hacer una foto del ticket</label>
-<input id="ticket-camera" type="file" name="ticket" accept="image/*" capture="environment">
-<p class="helper">Usa una de las dos opciones. En móviles compatibles, la segunda abre la cámara trasera.</p>
+<p class="helper" id="ticket-selection-status" role="status">Elige una de las dos opciones. En móviles compatibles, la primera abre la cámara trasera.</p>
 <button type="submit">Extraer y revisar</button></form></section>
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
@@ -717,6 +717,20 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   dialog.addEventListener('close', stop);
   document.addEventListener('visibilitychange', () => {if (document.hidden) stop();});
   window.addEventListener('pagehide', stop);
+})();
+</script>
+<script>
+(() => {
+  const camera = document.getElementById('ticket-camera');
+  const file = document.getElementById('ticket-file');
+  if (!camera || !file) return;
+  const status = document.getElementById('ticket-selection-status');
+  camera.addEventListener('change', () => {
+    if (camera.files.length) { file.value = ''; status.textContent = 'Foto seleccionada: ' + camera.files[0].name; }
+  });
+  file.addEventListener('change', () => {
+    if (file.files.length) { camera.value = ''; status.textContent = 'Archivo seleccionado: ' + file.files[0].name; }
+  });
 })();
 </script>
 <script>
