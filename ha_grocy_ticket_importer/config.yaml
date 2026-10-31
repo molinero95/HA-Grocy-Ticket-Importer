@@ -1,5 +1,5 @@
 name: "Grocy Ticket Importer"
-version: "0.7.8"
+version: "0.7.9"
 slug: "ha_grocy_ticket_importer"
 description: "Import receipts and manage Grocy stock via Home Assistant"
 url: "https://github.com/molinero95/HA-Grocy-Ticket-Importer"
