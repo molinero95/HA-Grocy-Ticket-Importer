@@ -1117,7 +1117,8 @@ def barcode_add():
     except (barcode_stock.BarcodeError, ValueError) as exc:
         return render("No se pudo crear: " + str(exc)), 400
     except Exception:
-        return render("Error de Grocy. Comprueba el catálogo antes de intentarlo otra vez."), 502
+        app.logger.exception("catalog_product_create_failed: Grocy product creation or lookup failed")
+        return render("No se pudo completar el alta en Grocy. Comprueba si el producto existe antes de reintentar. Revisa el registro de Despensa (catalog_product_create_failed)."), 502
     finally:
         LOCK.release()
     if not result["created"]:
