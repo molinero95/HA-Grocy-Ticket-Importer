@@ -28,18 +28,45 @@ The session key and receipt upload working files are in `/data` and managed by H
 Home Assistant detects a new version when the app's `config.yaml` version changes in the added GitHub repository. Choose **Check for updates** in the app store if necessary. The repository must be publicly readable by Supervisor; keeping GitHub source public does **not** make Grocy API keys public.
 
 
-## Alexa Devices shopping synchronization (experimental)
+## Alexa ↔ Grocy shopping synchronization (experimental)
 
-Requires Home Assistant Alexa Devices with the primary shopping-list `todo` entity working. The add-on declares `homeassistant_api: true` and uses its Supervisor token internally. **Do not manually expose a long-lived token.**
+The add-on declares `homeassistant_api: true` and uses a Supervisor token
+internally, or the optional `homeassistant_access_token` configured privately.
+Set `alexa_shopping_list_entity` to the desired Alexa Devices `todo.*`
+entity. The worker reads only its pending items and Grocy shopping list ID 1.
+`shopping_sync_enabled` defaults to `false`. Do not enable it before
+validating the Home Assistant and Grocy APIs on the installed versions.
 
-New option: `shopping_sync_enabled` (boolean, default `false`). The background process runs only when enabled and checks every two minutes. It uses the default Grocy shopping list (ID 1), not the Home Assistant generic shopping list. The main Alexa shopping entity is currently fixed in code and must be made configurable before shipping generally.
+### Identity-aware v2 behavior
 
-The state file `/data/shopping-sync.json` is persistent across restarts. Preserve it in backups. The first run merges pending items; subsequent runs propagate adds/removes. Historical completed Alexa items are excluded. Existing catalog stock is never changed. Unknown items may be added as Grocy shopping-list notes.
+The worker uses canonical Grocy product IDs for exact unique matches and
+explicitly approved Alexa suggestions. Ambiguous or unknown Alexa names remain
+free-text shopping notes. Alexa summaries are never renamed by the matching
+process. The first v2 run performs a non-destructive union; later runs use
+verified checkpoints for deletion propagation.
 
-**Release gate:** do not enable this feature until HA service responses, Grocy writes, error recovery and CI have been tested against the installed versions. The proposed 0.7.11 release is not installed merely because GitHub contains the code.
+The review screen **Acciones → Coincidencias Alexa** persists explicit
+selections in `/config/alexa-match-queue-<entity-hash>.sqlite3`. It never
+merges Grocy products or rewrites existing shopping notes. If a selected
+product conflicts with an existing note (including its canonical name), the
+worker fails closed until the user reviews the conflict. Stale selections,
+duplicate identities, changed quantities and concurrent edits also stop
+mutations. A successful cycle re-reads both remote lists and atomically saves
+the checkpoint only after identity verification.
 
+New checkpoints use
+`/data/shopping-sync-<entity-hash>-identity-v2.json`. The older v1
+name-based checkpoint and unscoped Alexa queue are intentionally retained
+without automatic migration: their identities cannot be safely inferred.
+After upgrading, the first v2 run unions both lists and can reintroduce a
+previously removed note. Previously chosen ambiguous matches must be
+reselected for the configured list. Preserve the old files in backups.
 
-**Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.
+Shopping sync does not change stock. It does not synchronize quantities,
+units, completed items or renames. A deletion removes only a shopping-list
+entry, never the underlying Grocy product. Verify the real Grocy 4.7.1
+shopping API, Home Assistant todo response and restart recovery before
+enabling this feature.
 
 ## Generic product variants (development)
 
@@ -49,20 +76,12 @@ display name and purchase factor) after auditing barcode ownership in Grocy.
 No product consolidation or stock migration happens automatically.
 
 Variant metadata is persisted at `/config/generic_catalog.sqlite3` in the
-existing `app_config` mount. Back it up together with the receipt ledger.
-The read-only catalog audit download under **Acciones → Detectar duplicados**
-includes product IDs, stock, units, barcodes, shopping references and variants.
-Review this before proposing any explicit merge.
+existing `app_config` mount. Back it up with the receipt ledger and Alexa
+review queues. The read-only catalog audit under
+**Acciones → Detectar duplicados** includes product IDs, stock, units,
+barcodes, shopping references and variants. Review it before any proposed
+consolidation; explicit approval is required.
 
-Purchase factors stored on variants are informational; Grocy's stock unit
-and receipt import conversions are not changed. Alexa ambiguous matches
-remain unresolved and require further integration work and validation.
-
-## Alexa ambiguous-match review queue (development)
-
-With the existing opt-in shopping sync running, candidate suggestions for
-ambiguous Alexa names are persisted to `/config/alexa-match-queue.sqlite3`.
-The Actions → Coincidencias Alexa page allows a manual candidate selection.
-This is **advisory only**: the original free-text shopping entry and sync
-checkpoint are unchanged. Identity-aware conversion is not implemented yet.
-Back up this database along with the generic catalog and receipt ledger.
+Variant purchase factors are informational until Grocy/receipt conversion is
+implemented and verified. Real barcode association, camera capture and
+persistence across an add-on upgrade still need end-to-end validation.
