@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.0] — 2026-10-31
+
+### Added
+- Read-only duplicate detector under Actions, checking identical barcodes, normalized exact names, and highly similar names.
+- Review candidate groups and open product editors; no automatic deletion or merging.
+
+### Validation
+- CI and live Grocy verification pending.
+
+
 ## [0.13.2] — 2026-10-31
 
 ### Added
