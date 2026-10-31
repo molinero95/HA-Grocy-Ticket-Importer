@@ -43,3 +43,23 @@ jobs:
         run: docker build --pull --file ha_grocy_ticket_importer/Dockerfile ha_grocy_ticket_importer
       - name: Run unit tests without external API calls
         run: python -m unittest discover -v -p 'test_*.py'
+      - name: Package local Home Assistant app
+        if: matrix.python-version == '3.13'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          app = Path("ha_grocy_ticket_importer")
+          with ZipFile("ha-grocy-local-addon.zip", "w", ZIP_DEFLATED) as package:
+              for path in sorted(app.rglob("*")):
+                  if path.is_file() and "__pycache__" not in path.parts:
+                      package.write(path, path.as_posix())
+          PY
+      - name: Upload local installation package
+        if: matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha-grocy-local-addon
+          path: ha-grocy-local-addon.zip
+          if-no-files-found: error
+          retention-days: 14
