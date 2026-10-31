@@ -19,3 +19,5 @@
 ## [0.7.10] — Existing installed version
 
 - Prior shopping-list and pantry UI improvements. See repository history for details.
+
+- Configurable `alexa_shopping_list_entity` and per-entity synchronization checkpoints.
