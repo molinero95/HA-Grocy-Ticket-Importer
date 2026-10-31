@@ -18,7 +18,7 @@ import barcode_stock
 import product_images
 
 ROOT = Path(__file__).resolve().parent
-load_dotenv(ROOT / ".env")
+load_dotenv(os.environ.get("GROCY_ENV_FILE", str(ROOT / ".env")))
 DATA = Path(os.environ.get("RECEIPT_DATA_DIR", str(ROOT / "runtime" / "receipts")))
 ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
 LOCK = threading.Lock()
