@@ -150,8 +150,12 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .shopping-add-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 10px;font-size:.8rem;text-decoration:none;margin-top:8px}
 .consume-replenish{display:flex;align-items:center;gap:10px}
 .consume-replenish input{width:22px;height:22px;flex-shrink:0}
-.shopping-controls{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
-.shopping-controls button{min-height:38px;padding:7px 10px;font-size:.82rem}
+.shopping-list-row{display:grid;grid-template-columns:minmax(0,1fr) 220px;align-items:center;gap:12px}
+.shopping-list-product{min-width:0;overflow-wrap:anywhere}
+.shopping-list-product strong{overflow-wrap:anywhere}
+.shopping-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;align-items:center;min-width:0}
+.shopping-controls form{margin:0;min-width:0}
+.shopping-controls button[type=submit]{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;min-height:42px;margin:0;padding:7px 5px;line-height:1.2;font-size:.80rem;text-align:center;white-space:normal}
 .quantity-unknown{color:#a34b00;font-size:.85rem}
 .version-label{border:1px solid var(--line);border-radius:999px;background:var(--soft);padding:6px 11px;text-decoration:none;font-size:.77rem;font-weight:750;white-space:nowrap}
 .about-list{display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:12px 8px;overflow-wrap:anywhere}
@@ -178,6 +182,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
  .action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .action-link{min-height:108px}
  .inventory-row{gap:8px}
+ .shopping-list-row{grid-template-columns:minmax(0,1fr) 106px;align-items:center;gap:8px}
+ .shopping-list-row .product-thumb{width:40px;height:40px}
+ .shopping-list-product{gap:7px}
+ .shopping-controls{grid-template-columns:1fr;gap:5px}
+ .shopping-controls button[type=submit]{min-height:35px;padding:5px 3px;font-size:.73rem;border-radius:9px;min-width:0}
  .pantry-row{grid-template-columns:minmax(0,1fr) 132px;gap:8px}
  .shopping-stepper{grid-template-columns:33px minmax(0,1fr) 33px;gap:2px}
  .shopping-stepper button{width:33px;min-height:36px}
@@ -202,8 +211,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if not shopping %}<p>Tu lista está vacía. Añade un artículo desde Mi despensa.</p>{% endif %}
 <div class="inventory-list">
 {% for item in shopping %}
-<article class="inventory-row">
-<div class="product-name-with-photo">{% if item.image_url %}<img class="product-thumb" src="{{ item.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{{ item.name }}</strong><small>{{ item.amount }} {{ item.unit }}</small></div></div>
+<article class="inventory-row shopping-list-row">
+<div class="product-name-with-photo shopping-list-product">{% if item.image_url %}<img class="product-thumb" src="{{ item.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{{ item.name }}</strong><small>{{ item.amount }} {{ item.unit }}</small></div></div>
 <div class="shopping-controls">
 <form method="post" action="{{ url_for('shopping_toggle', item_id=item.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="done" value="{{ '0' if item.done else '1' }}">
