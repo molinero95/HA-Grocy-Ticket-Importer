@@ -443,11 +443,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="button" id="ticket-live-camera">📷 Abrir cámara</button>
 <div id="ticket-camera-panel" hidden><video id="ticket-video" autoplay playsinline muted style="width:100%;max-height:420px"></video><button type="button" id="ticket-snapshot">Capturar foto</button><button type="button" id="ticket-camera-close">Cancelar</button></div>
-<label for="ticket-camera" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📷 Cámara del sistema (alternativa)</label>
-<input id="ticket-camera" type="file" name="ticket" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
+<input id="ticket-camera" type="file" name="ticket" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
 <label for="ticket-file" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📁 Elegir PDF o imagen existente</label>
 <input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
-<p class="helper" id="ticket-selection-status" role="status">Pulsa «Hacer foto» para abrir la cámara del móvil o «Elegir archivo» para adjuntar un documento.</p>
+<p class="helper" id="ticket-selection-status" role="status">Pulsa «Abrir cámara» para hacer una foto o «Elegir archivo» para adjuntar un documento.</p>
 <button type="submit">Extraer y revisar</button></form></section>
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
@@ -740,7 +739,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
         video.srcObject = stream;
         panel.hidden = false;
-      } catch(e) { stop(); const status = document.getElementById('ticket-selection-status'); if(status) status.textContent = 'No se pudo abrir la cámara aquí. Usa Cámara del sistema o el navegador externo.'; }
+      } catch(e) { stop(); const status = document.getElementById('ticket-selection-status'); if(status) status.textContent = 'No se pudo abrir la cámara aquí. Prueba desde un navegador externo o utiliza Elegir archivo.'; }
     });
     document.getElementById('ticket-camera-close').addEventListener('click', stop);
     document.getElementById('ticket-snapshot').addEventListener('click', () => {
