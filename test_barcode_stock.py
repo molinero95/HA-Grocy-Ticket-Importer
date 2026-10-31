@@ -113,7 +113,7 @@ class BarcodeTests(unittest.TestCase):
 
     @patch("barcode_stock.grocy")
     def test_edit_product_pack_preserves_stock_and_description(self, api):
-        existing = {"id": 7, "name": "Vainilla", "description": "Uso repostería"}
+        existing = {"id": 7, "name": "Vainilla", "description": "Uso repostería", "qu_id_stock": 2}
         def fake(method, path, body=None):
             if method == "GET" and path == "objects/products/7":
                 return existing
@@ -126,6 +126,10 @@ class BarcodeTests(unittest.TestCase):
                 return {}
             if method == "GET" and path == "objects/product_barcodes":
                 return [{"product_id": 7, "barcode": "1234567890123"}]
+            if method == "GET" and path == "objects/quantity_units":
+                return [{"id": 2, "name": "Unidad"}]
+            if method == "GET" and path == "stock/products/7":
+                return {"stock_amount": 0}
             raise AssertionError((method, path))
         api.side_effect = fake
         result = barcode_stock.update_product_info(7, "Aroma vainilla", "4")
@@ -138,7 +142,7 @@ class BarcodeTests(unittest.TestCase):
     @patch("barcode_stock.grocy")
     def test_reediting_pack_updates_existing_marker_without_duplicates(self, api):
         product = {"id": 7, "name": "Vainilla",
-                   "description": "Nota antigua\n[Despensa: unidades_por_envase=4]"}
+                   "description": "Nota antigua\n[Despensa: unidades_por_envase=4]", "qu_id_stock": 2}
         def fake(method, path, body=None):
             if method == "GET":
                 return product
@@ -158,6 +162,68 @@ class BarcodeTests(unittest.TestCase):
             with self.assertRaises(barcode_stock.BarcodeError):
                 barcode_stock.update_product_info(7, "Vainilla", invalid)
         api.assert_not_called()
+
+    @patch("barcode_stock.grocy")
+    def test_changing_stock_unit_with_existing_stock_is_blocked(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/7":
+                return {"id": 7, "name": "Tomate", "qu_id_stock": 2}
+            if method == "GET" and path == "objects/quantity_units":
+                return [{"id": 2}, {"id": 4}]
+            if method == "GET" and path == "stock/products/7":
+                return {"stock_amount": 3}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.update_product_info(7, "Tomate", "1", "4")
+        self.assertFalse(any(c.args[0] == "PUT" for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_changing_stock_unit_with_zero_stock(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/7":
+                return {"id": 7, "name": "Tomate", "qu_id_stock": 2}
+            if method == "GET" and path == "objects/quantity_units":
+                return [{"id": 2}, {"id": 4}]
+            if method == "GET" and path == "stock/products/7":
+                return {"stock_amount": 0}
+            if method == "PUT" and path == "objects/products/7":
+                self.assertEqual(body["qu_id_stock"], 4)
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        barcode_stock.update_product_info(7, "Tomate", "1", "4")
+
+    @patch("barcode_stock.grocy")
+    def test_stock_adjustment_requires_confirmation_and_two_decimals(self, api):
+        api.side_effect = lambda method, path, body=None: (
+            {"stock_amount": "1.25"} if method == "GET" and path == "stock/products/7"
+            else {})
+        preview = barcode_stock.prepare_stock_adjustment(7, "2,50", "1.25")
+        self.assertEqual(preview["difference"], "1.25")
+        self.assertEqual(api.call_count, 1)
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.prepare_stock_adjustment(7, "2.555", "1.25")
+        self.assertEqual(api.call_count, 1)
+        result = barcode_stock.apply_stock_adjustment(preview)
+        self.assertEqual(result["after"], "2.50")
+        self.assertTrue(any(c.args[0] == "POST" and c.args[1] == "stock/products/7/add"
+                            for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_association_on_product_sheet_never_changes_stock(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/7":
+                return {"id": 7, "name": "Tomate"}
+            if method == "GET" and path == "objects/product_barcodes":
+                return []
+            if method == "POST" and path == "objects/product_barcodes":
+                self.assertEqual(body, {"product_id": 7, "barcode": "1234567890123"})
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        result = barcode_stock.associate_product_barcode(7, "1234567890123")
+        self.assertFalse(result["already_linked"])
 
     def test_reject_non_numeric_barcodes(self):
         with self.assertRaises(barcode_stock.BarcodeError):
