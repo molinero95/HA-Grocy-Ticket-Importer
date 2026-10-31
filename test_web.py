@@ -540,6 +540,23 @@ class WebTests(unittest.TestCase):
 
 
 class AlexaInlineShoppingTests(unittest.TestCase):
+
+    def test_inline_alexa_shopping_template_renders_without_500(self):
+        from flask import render_template_string
+        with web.app.test_request_context("/"):
+            rendered = render_template_string(web.PAGE, view="shopping", shopping=[{
+                "id": 1, "name": "Arroz", "amount": 1, "unit": "unidad",
+                "product_id": None, "done": False, "image_url": None,
+                "alexa_match": {"key": "arroz", "name": "Arroz", "candidates": [
+                    {"id": 2, "name": "Arroz basmati"},
+                    {"id": 3, "name": "Arroz integral"}],
+                    "selected_product_id": None}
+            }], shopping_error=False, pending_matches=[], shopping_match_keys={"arroz"},
+                csrf="test", ingress_mode=True)
+            self.assertIn("Arroz basmati", rendered)
+            self.assertIn("Arroz integral", rendered)
+            self.assertIn("Elegir producto para", rendered)
+
     def test_shopping_view_renders_pending_alexa_choices(self):
         self.assertIn('class="ticket-review-item alexa-inline-match"', web.PAGE)
         self.assertIn('Elegir producto para', web.PAGE)
