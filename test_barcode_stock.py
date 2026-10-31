@@ -65,6 +65,28 @@ class ProductCreationTests(unittest.TestCase):
         self.assertEqual(posts[-1][1]["amount"], 0.5)
 
     @patch("barcode_stock.grocy")
+    def test_new_pack_of_five_creates_piece_stock(self, api):
+        posts = []
+        def fake(method, path, body=None):
+            if method == "GET":
+                return {
+                    "objects/quantity_units": [
+                        {"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}],
+                    "objects/products": [], "objects/product_barcodes": [],
+                }[path]
+            posts.append((path, body))
+            return {"created_object_id": 19}
+        api.side_effect = fake
+        result = barcode_stock.create_catalog_product(
+            "Yogures", "", 3, "2", pack_size="5")
+        self.assertTrue(result["created"])
+        self.assertEqual(posts[0][1]["qu_id_stock"], 2)
+        self.assertEqual(posts[0][1]["qu_id_purchase"], 3)
+        self.assertEqual(posts[0][1]["qu_factor_purchase_to_stock"], 5)
+        self.assertEqual(posts[-1][0], "stock/products/19/add")
+        self.assertEqual(posts[-1][1]["amount"], 10.0)
+
+    @patch("barcode_stock.grocy")
     def test_invalid_creation_never_writes(self, api):
         for qty in ("-1", "1.123", "NaN"):
             with self.assertRaises(barcode_stock.BarcodeError):
