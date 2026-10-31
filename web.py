@@ -324,12 +324,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <button type="submit">Guardar cantidad</button>
 </form>
 <h3>{% if product.barcodes %}Modificar código de barras{% else %}Añadir código de barras{% endif %}</h3>
-<p class="helper">{% if product.barcodes %}Códigos actuales: {{ product.barcodes|join(", ") }}. Puedes añadir otro código al artículo sin cambiar las existencias.{% else %}El artículo ya está seleccionado. Añadir un código no cambia las existencias.{% endif %}</p>
+<p class="helper">{% if product.barcodes %}Selecciona el código que quieres sustituir. El código anterior dejará de estar asociado a este artículo; las existencias no cambian.{% else %}El artículo ya está seleccionado. Añadir un código no cambia las existencias.{% endif %}</p>
 <form method="post" action="{{ url_for('product_barcode_add', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
+{% if product.barcodes %}<label for="old-product-barcode">Código actual</label><select id="old-product-barcode" name="old_barcode" required>{% for code in product.barcodes %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select>{% endif %}
+<label>{% if product.barcodes %}Nuevo código{% else %}Código{% endif %} <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
 <div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía encontrada" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
-<button type="submit">{% if product.barcodes %}Guardar código adicional{% else %}Añadir código{% endif %}</button></form>
+<button type="submit">{% if product.barcodes %}Sustituir código{% else %}Añadir código{% endif %}</button></form>
 <h3>Fotografía</h3>
 {% if product.image_url %}<p class="helper">Imagen guardada desde Open Food Facts.</p>{% endif %}
 {% if product.barcodes %}
@@ -1011,7 +1012,11 @@ def product_barcode_add(product_id):
     if not LOCK.acquire(blocking=False):
         abort(409, "Otra operación está en marcha")
     try:
-        result = barcode_stock.associate_product_barcode(product_id, request.form.get("barcode", ""))
+        if request.form.get("old_barcode"):
+            result = barcode_stock.replace_product_barcode(
+                product_id, request.form["old_barcode"], request.form.get("barcode", ""))
+        else:
+            result = barcode_stock.associate_product_barcode(product_id, request.form.get("barcode", ""))
     except barcode_stock.BarcodeError as exc:
         return render(str(exc)), 400
     except Exception:
@@ -1025,7 +1030,9 @@ def product_barcode_add(product_id):
                 barcode_stock.save_product_photo(product_id, found["image_url"])
     except Exception:
         pass  # Linking succeeded even when Open Food Facts is unavailable.
-    return render("Código ya asociado." if result["already_linked"] else "Código asociado sin modificar existencias.")
+    return render("Código sin cambios." if result["already_linked"] else
+                  ("Código sustituido correctamente sin modificar existencias." if result.get("replaced")
+                   else "Código asociado sin modificar existencias."))
 
 
 @app.post("/product/<int:product_id>/stock-save")
