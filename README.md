@@ -100,3 +100,6 @@ El complemento solicita `homeassistant_api: true` para utilizar el token de Supe
 - **Limitaciones actuales:** la identidad es por nombre, no por ID; no se sincronizan cantidades, unidades, compras completadas ni renombrados. Los nombres duplicados equivalentes producen error de validación para evitar pérdidas. El borrado propagado elimina la entrada de la lista, no el producto del catálogo.
 
 El estado se guarda en `/data/shopping-sync.json`. Conservar este archivo durante las actualizaciones; eliminarlo provoca una nueva unión inicial y puede reintroducir artículos. Ver [DOCS.md](ha_grocy_ticket_importer/DOCS.md) y [ROADMAP.md](ROADMAP.md) antes de activar la función.
+
+
+**Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.
