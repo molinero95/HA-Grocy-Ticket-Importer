@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.3] — 2026-10-31
+
+### Fixed
+- Generic Alexa names such as «arroz» now offer both basmati and integral variants instead of dropping the second candidate.
+- Pending Alexa suggestions appear as expandable per-item buttons in the shopping list, not as a large panel at the top.
+- Advisory choices do not alter Grocy stock or merge products.
+
+
 ## [0.16.2] — 2026-10-31
 
 ### Changed
