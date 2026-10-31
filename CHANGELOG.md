@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.2] — 2026-10-31
+
+### Fixed
+- Prevent repeated taps on the receipt extraction submit button while processing.
+- Display a visible busy state and restore the button after browser history navigation.
+- Require a selected receipt photo or file before submitting.
+
+
 ## [0.11.1] — 2026-10-31
 
 ### Changed
