@@ -120,7 +120,7 @@ class WebTests(unittest.TestCase):
                 "unit_id": "4", "initial_stock": "0.5"})
         self.assertEqual(r.status_code, 302)
         self.assertIn("product_id=18", r.headers["Location"])
-        create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2)
+        create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2, image_url=None)
 
     def test_consume_form_has_amount_and_shopping_checkbox(self):
         self.login()
@@ -247,7 +247,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'Existencias sin cambios', response.data)
                 change.assert_called_once_with(5, "Aroma", "4", "2")
 
-    def test_product_picture_lookup_does_not_edit_product(self):
+    def test_product_picture_lookup_saves_reference(self):
         token = self.login()
         with patch.object(web.barcode_stock, "product_detail", return_value={
                 "id": 5, "name": "Aroma", "pack_size": 4, "description": "",
@@ -256,10 +256,31 @@ class WebTests(unittest.TestCase):
             with patch.object(web.product_images, "lookup_image", return_value={
                     "name": "Aroma", "image_url": "https://images.openfoodfacts.org/a.jpg",
                     "source_url": "https://world.openfoodfacts.org/a"}) as lookup:
-                response = self.client.post("/product/5/photo", data={"csrf": token})
-                self.assertEqual(response.status_code, 200)
-                self.assertIn(b'https://images.openfoodfacts.org/a.jpg', response.data)
-                lookup.assert_called_once_with("1234567890123")
+                with patch.object(web.barcode_stock, "save_product_photo") as save:
+                    response = self.client.post("/product/5/photo", data={"csrf": token})
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn(b'Fotograf', response.data)
+                    lookup.assert_called_once_with("1234567890123")
+                    save.assert_called_once_with(5, "https://images.openfoodfacts.org/a.jpg")
+
+    def test_photo_lookup_api_returns_found_image(self):
+        self.login()
+        with patch.object(web.product_images, "lookup_image", return_value={
+                "image_url": "https://images.openfoodfacts.org/sample.jpg"}):
+            r = self.client.get("/photo/lookup?barcode=1234567890123")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json["image_url"], "https://images.openfoodfacts.org/sample.jpg")
+
+    def test_pack_size_field_only_shows_when_unit_is_pack(self):
+        self.login()
+        with patch.object(web.barcode_stock, "product_detail", return_value={
+                "id": 5, "name": "Arroz", "is_pack": False,
+                "image_url": None, "pack_size": 1, "unit_id": 2,
+                "units": [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}],
+                "stock_amount": "0", "barcodes": []}):
+            r = self.client.get("/?view=product&product_id=5")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'id="pack-size-fields" hidden', r.data)
 
     def test_product_sheet_displays_quantity_unit_and_barcode_actions(self):
         self.login()
