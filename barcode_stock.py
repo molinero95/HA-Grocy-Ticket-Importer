@@ -411,6 +411,31 @@ def associate_product_barcode(product_id, barcode):
     return {"name": str(product["name"]), "already_linked": False}
 
 
+
+def replace_product_barcode(product_id, old_barcode, new_barcode):
+    """Replace an existing Grocy barcode record without modifying stock."""
+    old_barcode = validate_barcode(old_barcode)
+    new_barcode = validate_barcode(new_barcode)
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
+        raise BarcodeError("Producto inexistente")
+    rows = grocy("GET", "objects/product_barcodes")
+    previous = next((row for row in rows if str(row.get("barcode")) == old_barcode
+                     and int(row.get("product_id", 0)) == pid), None)
+    if previous is None:
+        raise BarcodeError("El código anterior ya no pertenece a este artículo. Recarga la ficha.")
+    if old_barcode == new_barcode:
+        return {"already_linked": True, "replaced": False}
+    if any(str(row.get("barcode")) == new_barcode for row in rows):
+        raise BarcodeError("El código nuevo ya está asociado a un artículo. No se ha modificado nada")
+    grocy("PUT", f"objects/product_barcodes/{int(previous['id'])}",
+          {"product_id": pid, "barcode": new_barcode})
+    return {"already_linked": False, "replaced": True}
+
+
 def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
     """Validate a deliberate stock correction without writing to Grocy."""
     pid = int(product_id)
