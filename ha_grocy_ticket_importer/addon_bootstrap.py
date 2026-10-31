@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Start the HA add-on with Supervisor configuration; never log secrets."""
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+from pathlib import Path
+
+OPTIONS = Path("/data/options.json")
+LEDGER = Path(os.environ.get("GROCY_IMPORT_DB", "/config/grocy_imports.sqlite3"))
+
+
+def load_config(path=OPTIONS):
+    options = json.loads(path.read_text(encoding="utf-8"))
+    required = ("grocy_url", "grocy_api_key", "openai_api_key")
+    for key in required:
+        if not isinstance(options.get(key), str) or not options[key].strip():
+            raise ValueError(f"Configura {key} en Home Assistant antes de iniciar Despensa")
+    location = int(options.get("grocy_location_id", 2))
+    if location <= 0:
+        raise ValueError("grocy_location_id debe ser positivo")
+    if not options["grocy_url"].startswith(("http://", "https://")):
+        raise ValueError("grocy_url debe ser una URL HTTP o HTTPS")
+    return {
+        "GROCY_URL": options["grocy_url"].rstrip("/"),
+        "GROCY_API_KEY": options["grocy_api_key"],
+        "OPENAI_API_KEY": options["openai_api_key"],
+        "GROCY_LOCATION_ID": str(location),
+    }
+
+
+def ensure_ledger(path=LEDGER):
+    """Existing ledgers are never rewritten; new installs start with an empty table."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS receipt_items "
+            "(receipt_hash TEXT, line INTEGER, product_id INTEGER, "
+            "state TEXT NOT NULL, detail TEXT, PRIMARY KEY(receipt_hash,line))"
+        )
+    os.chmod(path, 0o600)
+
+
+def main():
+    try:
+        config = load_config()
+        ensure_ledger()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError, sqlite3.Error) as exc:
+        # Never print entire configuration or an exception that may include a credential.
+        print("No se pudo iniciar Despensa. Revisa las opciones en Home Assistant y el historial.", file=sys.stderr)
+        return 1
+    os.environ.update(config)
+    subprocess.run(["nginx"], check=True)
+    os.execvpe(
+        "/venv/bin/gunicorn",
+        ["/venv/bin/gunicorn", "--workers", "1", "--threads", "4", "--timeout", "210",
+         "--bind", "127.0.0.1:8765", "web:app"],
+        os.environ,
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
