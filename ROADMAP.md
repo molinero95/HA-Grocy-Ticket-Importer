@@ -44,6 +44,7 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
 - [ ] Verify Grocy note-only `objects/shopping_list` create, and delete semantics with actual Grocy 4.7.1.
 - [ ] Test interruption between remote writes and checkpoint, duplicate names, completed items, concurrent edits and quantity preservation.
 - [ ] Run all Python tests and GitHub Actions including packaging/build; verify success explicitly.
-- [ ] Replace hardcoded Alexa entity ID with configurable option and document discovery.
+- [x] Replace hardcoded Alexa entity ID with configurable option and document discovery.
+- [ ] Validate configured entity exists and belongs to Alexa Devices (not an unrelated todo list).
 - [ ] Validate real two-way flow with a disposable item, then activate on Home Assistant; do not touch inventory stock.
 - [ ] Decide how to handle completion vs deletion, rename and quantity changes.
