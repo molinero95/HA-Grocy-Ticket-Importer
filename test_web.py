@@ -62,6 +62,19 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'id="selected-product-id"', response.data)
         self.assertNotIn(b'<select name="product_id"', response.data)
 
+    def test_camera_scanner_available_for_all_barcode_actions(self):
+        self.login()
+        with patch.object(web.barcode_stock, "list_products", return_value=[]):
+            response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.count(b'class="scan-trigger"'), 4)
+        self.assertIn(b'id="scanner-dialog"', response.data)
+        self.assertIn(b'new BarcodeDetector', response.data)
+        self.assertIn(b'getUserMedia', response.data)
+        self.assertIn(b'input[name="barcode"]', response.data)
+        self.assertIn(b'No se a', response.data)
+        self.assertIn(b'id="scanner-stop"', response.data)
+
     def test_invalid_file_type_blocked(self):
         token = self.login()
         r = self.client.post("/upload", data={"csrf": token,
