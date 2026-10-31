@@ -331,6 +331,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <label>{% if product.barcodes %}Nuevo código{% else %}Código{% endif %} <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
 <div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía encontrada" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
 <button type="submit">{% if product.barcodes %}Sustituir código{% else %}Añadir código{% endif %}</button></form>
+<h3>Eliminar artículo</h3>
+<p class="helper">Solo se permite eliminar artículos sin existencias. Esta operación no se puede deshacer.</p>
+<form method="post" action="{{ url_for('product_delete', product_id=product.id) }}" onsubmit="return confirm('¿Eliminar definitivamente este artículo de Grocy?');">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="expected_name" value="{{ product.name }}">
+<button type="submit">🗑️ Eliminar artículo</button>
+</form>
 <h3>Fotografía</h3>
 {% if product.image_url %}<p class="helper">Imagen guardada desde Open Food Facts.</p>{% endif %}
 {% if product.barcodes %}
@@ -796,6 +803,7 @@ POST_VIEWS = {
     "barcode_remove": "remove",
     "barcode_photo": "photo",
     "product_update": "product",
+    "product_delete": "product",
     "product_photo": "product",
     "product_barcode_add": "product",
     "product_stock_save": "product",
@@ -879,6 +887,8 @@ def load_receipt(rid):
 
 @app.get("/")
 def index():
+    if request.args.get("view") == "inventory" and request.args.get("deleted") == "1":
+        return render("✅ Artículo eliminado correctamente de Grocy.")
     if request.args.get("view") == "product" and request.args.get("created") == "1":
         return render("✅ Producto creado correctamente en Grocy.")
     return render()
@@ -1005,6 +1015,22 @@ def product_update(product_id):
     finally:
         LOCK.release()
     return render("Producto actualizado: " + result["name"] + ". Existencias sin cambios.")
+
+
+@app.post("/product/<int:product_id>/delete")
+def product_delete(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        name = barcode_stock.delete_catalog_product(product_id, request.form.get("expected_name", ""))
+    except barcode_stock.BarcodeError as exc:
+        return render("❌ No se pudo eliminar: " + str(exc)), 409
+    except Exception:
+        app.logger.exception("catalog_product_delete_failed")
+        return render("❌ No se pudo eliminar el artículo. Comprueba Grocy antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="inventory", deleted="1"))
 
 
 @app.post("/product/<int:product_id>/barcode")
