@@ -110,6 +110,17 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .back-link{display:inline-flex;align-items:center;min-height:40px;text-decoration:none;font-weight:700}
 .inventory-list{margin-top:14px}
 .inventory-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.pantry-row{display:grid;grid-template-columns:minmax(0,1fr) 144px;gap:12px;align-items:center}
+.pantry-info{min-width:0;overflow-wrap:anywhere}
+.pantry-side{min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:7px}
+.pantry-side .inventory-quantity{text-align:center}
+.shopping-stepper{display:grid;grid-template-columns:37px minmax(0,1fr) 37px;gap:3px;align-items:center;width:100%;background:var(--soft);border-radius:12px;padding:4px;border:1px solid #b9d8c6}
+.shopping-stepper form{margin:0}
+.shopping-stepper button{width:37px;min-height:37px;margin:0;padding:0;border-radius:9px;font-size:1.2rem}
+.shopping-stepper .minus{background:#dce9e1;color:var(--primary-dark)}
+.shopping-stepper button:disabled{opacity:.35}
+.shopping-stepper output{text-align:center;white-space:nowrap;font-size:.85rem;font-weight:750;color:var(--primary-dark)}
+.shopping-stepper output small{display:block;font-size:.66rem;font-weight:500}
 .inventory-row[hidden]{display:none}
 .product-detail-link{display:block;text-decoration:none;color:var(--text);padding:4px 0}
 .product-detail-link:hover strong{text-decoration:underline}
@@ -148,6 +159,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
  .action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .action-link{min-height:108px}
  .inventory-row{gap:8px}
+ .pantry-row{grid-template-columns:minmax(0,1fr) 132px;gap:8px}
+ .shopping-stepper{grid-template-columns:33px minmax(0,1fr) 33px;gap:2px}
+ .shopping-stepper button{width:33px;min-height:36px}
  #scanner-dialog{padding:14px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -206,10 +220,15 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <label for="inventory-search">Buscar en mi despensa</label><input id="inventory-search" type="search" autocomplete="off" placeholder="Busca leche, arroz, tomate…">
 <div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
-<article class="inventory-row" data-name="{{ p.name }}">
-<div><a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
-<div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}
-<a class="scan-trigger shopping-add-link" href="{{ url_for('index', view='shopping_add', product_id=p.id) }}" aria-label="Elegir cantidad para añadir {{ p.name }} a la compra">🛒 Añadir</a></div>
+<article class="inventory-row pantry-row" data-name="{{ p.name }}">
+<div class="pantry-info"><a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
+<div class="pantry-side">
+<div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
+<div class="shopping-stepper" aria-label="Cantidad de {{ p.name }} en lista de compra">
+<form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='minus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="minus" type="submit" aria-label="Quitar {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}" {% if not p.shopping_can_subtract %}disabled{% endif %}>−</button></form>
+<output>{{ p.shopping_amount }}<small>{{ p.shopping_unit }}</small></output>
+<form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='plus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" aria-label="Añadir {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}">+</button></form>
+</div></div>
 </article>
 {% endfor %}
 </div><p id="inventory-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
@@ -572,6 +591,7 @@ POST_VIEWS = {
     "shopping_add": "shopping",
     "shopping_toggle": "shopping",
     "shopping_remove": "shopping",
+    "shopping_step": "inventory",
     "upload": "ticket",
     "preview": "ticket",
     "commit": "ticket",
@@ -610,7 +630,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             pass
     if view == "inventory" and (INGRESS_MODE or session.get("auth")):
         try:
-            inventory = barcode_stock.inventory_snapshot()
+            inventory = barcode_stock.inventory_with_shopping()
         except Exception:
             inventory_error = True
     return render_template_string(PAGE, csrf=csrf_token(), message=message,
@@ -662,6 +682,21 @@ def product_choices():
         return barcode_stock.list_products()
     except Exception:
         return []
+
+@app.post("/shopping/step/<int:product_id>/<direction>")
+def shopping_step(product_id, direction):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        barcode_stock.change_shopping_quantity(product_id, direction)
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("Error de Grocy. Comprueba la cantidad de compra antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="inventory"))
+
 
 @app.post("/shopping/add/<int:product_id>")
 def shopping_add(product_id):
