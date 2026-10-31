@@ -46,7 +46,8 @@ def listen(wake: threading.Event):
         return
     while True:
         try:
-            with websocket.create_connection(websocket_url(), timeout=30, http_proxy_host=None, http_proxy_port=None) as ws:
+            ws = websocket.create_connection(websocket_url(), timeout=30, http_proxy_host=None, http_proxy_port=None)
+            try:
                 if json.loads(ws.recv()).get("type") != "auth_required":
                     raise RuntimeError("UnexpectedGreeting")
                 ws.send(json.dumps({"type": "auth", "access_token": token}))
@@ -67,6 +68,8 @@ def listen(wake: threading.Event):
                 print("Shopping sync HA event listener connected", flush=True)
                 while True:
                     handle_event(json.loads(ws.recv()), entity, wake)
+            finally:
+                ws.close()
         except Exception as exc:
             category = type(exc).__name__
             if isinstance(exc, websocket.WebSocketBadStatusException):
