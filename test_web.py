@@ -86,6 +86,42 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'view=associate', actions.data)
         self.assertNotIn(b'<input name="barcode"', actions.data)
 
+    def test_new_product_form_has_unit_optional_barcode_and_initial_stock(self):
+        self.login()
+        with patch.object(web.barcode_stock, "new_product_units", return_value=[
+                {"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}]):
+            response = self.client.get("/?view=add")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'A\xc3\xb1adir producto nuevo', response.data)
+        self.assertIn(b'name="unit_id"', response.data)
+        self.assertIn(b'name="initial_stock"', response.data)
+        self.assertIn(b'step="0.01"', response.data)
+        self.assertIn(b'Crear producto', response.data)
+        self.assertNotIn(b'A\xc3\xb1adir 1 al stock', response.data)
+
+    def test_existing_product_shows_link_to_edit_not_new_stock(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "create_catalog_product", return_value={
+                "created": False, "product_id": 17, "name": "Tomate"}):
+            with patch.object(web.barcode_stock, "new_product_units", return_value=[]):
+                r = self.client.post("/barcode/add", data={
+                    "csrf": token, "name": "Tomate", "barcode": "",
+                    "unit_id": "4", "initial_stock": "2"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'Ir a editar producto', r.data)
+        self.assertIn(b'product_id=17', r.data)
+
+    def test_new_product_redirects_to_its_sheet(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "create_catalog_product", return_value={
+                "created": True, "product_id": 18, "name": "Tomate"}) as create:
+            r = self.client.post("/barcode/add", data={
+                "csrf": token, "name": "Tomate", "barcode": "",
+                "unit_id": "4", "initial_stock": "0.5"})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("product_id=18", r.headers["Location"])
+        create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2)
+
     def test_action_forms_are_separate(self):
         self.login()
         for view, endpoint in [
