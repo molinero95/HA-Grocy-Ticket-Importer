@@ -30,6 +30,35 @@ def find_product(barcode):
         raise BarcodeError("El código referencia un producto inexistente")
     return matches[0]
 
+def list_products():
+    """Return existing catalog choices, without changing stock."""
+    return sorted(
+        [{"id": int(p["id"]), "name": str(p["name"])}
+         for p in grocy("GET", "objects/products")],
+        key=lambda p: (p["name"].casefold(), p["id"]),
+    )
+
+def associate_barcode(barcode, product_id):
+    """Link barcode to an existing product. Does not create stock movements."""
+    barcode = validate_barcode(barcode)
+    try:
+        product_id = int(product_id)
+    except (TypeError, ValueError) as exc:
+        raise BarcodeError("Selecciona un producto válido") from exc
+    if product_id <= 0:
+        raise BarcodeError("Selecciona un producto válido")
+    products = [p for p in list_products() if p["id"] == product_id]
+    if len(products) != 1:
+        raise BarcodeError("El producto elegido no existe")
+    existing = find_product(barcode)
+    if existing is not None:
+        if int(existing["id"]) == product_id:
+            return {"product_id": product_id, "name": products[0]["name"], "already_linked": True}
+        raise BarcodeError("Este código ya pertenece a otro producto. No se ha modificado nada")
+    grocy("POST", "objects/product_barcodes",
+          {"product_id": product_id, "barcode": barcode})
+    return {"product_id": product_id, "name": products[0]["name"], "already_linked": False}
+
 def _get_name_and_id(barcode):
     product = find_product(barcode)
     if product is None:
