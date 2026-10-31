@@ -36,5 +36,31 @@ class ShoppingSyncTests(unittest.TestCase):
             snapshot(["Café", "cafe"])
 
 
+
+class AlexaCatalogSuggestionTests(unittest.TestCase):
+    def test_exact_match_is_safe(self):
+        from shopping_sync import suggest_catalog_matches
+        decision, matches = suggest_catalog_matches("LECHE ENTERA", [{"id": 1, "name": "Leche entera"}])
+        self.assertEqual(decision, "exact")
+        self.assertEqual(matches[0]["id"], 1)
+
+    def test_variant_mismatch_never_auto_matches(self):
+        from shopping_sync import suggest_catalog_matches
+        decision, matches = suggest_catalog_matches("leche entera", [{"id": 1, "name": "leche desnatada"}])
+        self.assertEqual(decision, "unmatched")
+        self.assertEqual(matches, [])
+
+    def test_ambiguous_matches_require_review(self):
+        from shopping_sync import suggest_catalog_matches
+        decision, matches = suggest_catalog_matches("arroz", [
+            {"id": 1, "name": "Arroz redondo"},
+            {"id": 2, "name": "Arroz basmati"}])
+        self.assertEqual(decision, "review")
+        self.assertEqual(len(matches), 2)
+
+    def test_unrelated_products_are_not_suggested(self):
+        from shopping_sync import suggest_catalog_matches
+        self.assertEqual(suggest_catalog_matches("leche", [{"id": 1, "name": "detergente"}]), ("unmatched", []))
+
 if __name__ == "__main__":
     unittest.main()
