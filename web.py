@@ -2,6 +2,7 @@
 """Local-only prototype UI. NOT a Home Assistant ingress add-on."""
 import hmac
 import difflib
+import unicodedata
 import io
 import urllib.request
 import json
@@ -285,6 +286,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <nav class="action-grid" aria-label="Acciones de Despensa">
 <a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Añadir producto</strong><small>Crear artículo nuevo</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
+<a class="action-link" href="{{ url_for('index', view='duplicates') }}"><span aria-hidden="true">🔎</span><strong>Detectar duplicados</strong><small>Revisar artículos similares</small></a>
 </nav></div>
 {% else %}
 <p><a class="back-link" href="{{ url_for('index', view='inventory') if view == 'product' else url_for('index', view='actions') }}">← {{ 'Volver a mi despensa' if view == 'product' else 'Volver a acciones' }}</a></p>
@@ -333,6 +335,16 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <button type="submit">🗑️ Eliminar artículo</button>
 </form></details>
 {% else %}<p role="alert">No se ha podido cargar la ficha del producto.</p>{% endif %}
+</section>
+{% endif %}
+{% if view == 'duplicates' %}
+<section><p class="section-eyebrow">Catálogo · Solo lectura</p><h2>🔎 Posibles duplicados</h2>
+<p>Compara códigos de barras y nombres. No se modifica ni elimina ningún artículo.</p>
+{% if duplicates_error %}<p role="alert">No se ha podido consultar el catálogo de Grocy.</p>
+{% elif not duplicates %}<p>Sin posibles duplicados detectados.</p>
+{% else %}<p>{{ duplicates|length }} grupos para revisar.</p>
+{% for group in duplicates %}<div class="ticket-review-item"><strong>{{ group.reason }}</strong>
+{% for item in group.items %}<p><a href="{{ url_for('index', view='product', product_id=item.id) }}">{{ item.name }}</a> <small>· ID {{ item.id }}{% if item.barcodes %} · {{ item.barcodes|join(', ') }}{% endif %}</small></p>{% endfor %}</div>{% endfor %}{% endif %}
 </section>
 {% endif %}
 {% if view == 'add' %}
@@ -966,6 +978,42 @@ def current_view():
         candidate = POST_VIEWS.get(request.endpoint, "shopping")
     return candidate if candidate in VIEWS else "shopping"
 
+def detect_duplicates():
+    """Read-only candidate groups; never merge catalog entries automatically."""
+    products = barcode_stock.grocy("GET", "objects/products")
+    codes = barcode_stock.grocy("GET", "objects/product_barcodes")
+    if not isinstance(products, list) or not isinstance(codes, list):
+        raise ValueError("Unexpected Grocy catalog response")
+    by_id = {int(p["id"]): {"id": int(p["id"]), "name": str(p.get("name") or ""), "barcodes": []} for p in products}
+    for code in codes:
+        item = by_id.get(int(code["product_id"]))
+        if item and code.get("barcode"):
+            item["barcodes"].append(str(code["barcode"]))
+    def normalized(name):
+        return " ".join("".join(c for c in unicodedata.normalize("NFKD", name.casefold()) if not unicodedata.combining(c)).split())
+    groups = {}
+    for item in by_id.values():
+        name = normalized(item["name"])
+        if name:
+            groups.setdefault(("Nombre idéntico", name), {})[item["id"]] = item
+        for code in item["barcodes"]:
+            groups.setdefault(("Mismo código de barras", code), {})[item["id"]] = item
+    results = [{"reason": reason, "items": list(items.values())} for (reason, _), items in groups.items() if len(items) > 1]
+    seen = {tuple(sorted(item["id"] for item in group["items"])) for group in results}
+    entries = list(by_id.values())
+    for i, left in enumerate(entries):
+        a = normalized(left["name"])
+        if len(a) < 6:
+            continue
+        for right in entries[i+1:]:
+            b = normalized(right["name"])
+            pair = tuple(sorted((left["id"], right["id"])))
+            if pair not in seen and len(b) >= 6 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.88:
+                results.append({"reason": "Nombres parecidos · revisar", "items": [left, right]})
+                seen.add(pair)
+    return results
+
+
 def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None, existing_product=None):
     view = current_view()
     inventory, inventory_error = [], False
@@ -1003,6 +1051,12 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             inventory = barcode_stock.inventory_with_shopping()
         except Exception:
             inventory_error = True
+    duplicates, duplicates_error = [], False
+    if view == "duplicates" and (INGRESS_MODE or session.get("auth")):
+        try:
+            duplicates = detect_duplicates()
+        except Exception:
+            duplicates_error = True
     suggestions = []
     if receipt and view == "ticket":
         try:
@@ -1013,7 +1067,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                 suggestions.append([p for score, p in ranked[:5] if score >= 0.42 and p["name"].casefold() != query])
         except Exception:
             suggestions = [[] for _ in receipt["items"]]
-    return render_template_string(PAGE, csrf=csrf_token(), message=message, suggestions=suggestions,
+    return render_template_string(PAGE, csrf=csrf_token(), message=message, suggestions=suggestions, duplicates=duplicates, duplicates_error=duplicates_error,
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
                                   view=view, inventory=inventory, inventory_error=inventory_error,
