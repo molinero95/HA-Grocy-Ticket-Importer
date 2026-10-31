@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.17] — 2026-10-31
+
+### Added
+- Configurable `shopping_sync_interval_seconds` setting for bidirectional Alexa ↔ Grocy shopping-list synchronization (30–3600 seconds).
+- Default remains 120 seconds, preserving existing installations. Common choices: 30, 60, 120 and 300 seconds.
+- Interval is validated during add-on startup and applied to the worker after restart.
+
+
 ## [0.7.16] — 2026-10-31
 
 ### Added
