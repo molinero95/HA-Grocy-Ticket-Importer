@@ -414,7 +414,7 @@ class BarcodeTests(unittest.TestCase):
         api.side_effect = fake
         self.assertEqual(barcode_stock.shopping_list_snapshot(), [{
             "id": 9, "product_id": 7, "name": "Tomate en rama",
-            "amount": "1.5", "unit": "Kilogramo", "done": False}])
+            "amount": "1.5", "unit": "Kilogramo", "done": False, "image_url": None}])
 
     @patch("barcode_stock.grocy")
     def test_shopping_add_with_quantity_and_unit_conversion(self, api):
@@ -475,7 +475,7 @@ class BarcodeTests(unittest.TestCase):
             if method == "GET" and path == "objects/products/7":
                 return {"id": 7, "name": "Tomate", "qu_id_stock": 2}
             if method == "GET" and path == "objects/quantity_units":
-                return [{"id": 2}, {"id": 4}]
+                return [{"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}]
             if method == "GET" and path == "stock/products/7":
                 return {"stock_amount": 0}
             if method == "PUT" and path == "objects/products/7":
