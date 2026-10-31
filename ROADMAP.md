@@ -48,3 +48,19 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
 - [ ] Validate configured entity exists and belongs to Alexa Devices (not an unrelated todo list).
 - [ ] Validate real two-way flow with a disposable item, then activate on Home Assistant; do not touch inventory stock.
 - [ ] Decide how to handle completion vs deletion, rename and quantity changes.
+
+## P0 — Generic catalog and supermarket variants (PR #5)
+
+- [x] Additive SQLite metadata for canonical Grocy products and variants.
+- [x] Reject cross-product barcode ownership in both Grocy and local metadata.
+- [x] Product-sheet variant form with camera scanner; no stock writes.
+- [x] Read-only JSON audit export of Grocy stock, units, barcodes, shopping
+  references and locally registered variants.
+- [ ] Verify current PR head CI and Docker image build (do not infer from earlier commits).
+- [ ] Verify real Grocy barcode association and persistence across an HA upgrade.
+- [ ] Implement identity-aware Alexa sync with durable ambiguity queue,
+  manual selection and no loss of original free-text items.
+- [ ] Validate duplicate product migration plan and obtain explicit approval
+  before any product consolidation or deletion.
+- [ ] Prepare version bump and identical root/add-on changelogs only when
+  shipping a tested increment.
