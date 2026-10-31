@@ -26,7 +26,7 @@ def run_once(*, dry_run=True):
     try:
         alexa = ha_todo_items()
     except Exception as exc:
-        raise RuntimeError("Alexa read failed: " + type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else "")) from None
+        raise RuntimeError("Alexa read failed: " + (str(exc) if isinstance(exc, RuntimeError) and str(exc).startswith("Home Assistant API token unavailable") else type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else ""))) from None
     try:
         grocy = grocy_shopping_names()
     except Exception as exc:
