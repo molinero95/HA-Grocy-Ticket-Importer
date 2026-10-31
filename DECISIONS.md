@@ -43,3 +43,12 @@ Last reviewed: 2026-10-31. This records the user's explicitly requested behavior
 - Items spoken to Alexa that are not yet in the Grocy catalog must be supported as free-text shopping notes, without inventing stock.
 - Keep sync disabled until validated end to end. Do not silently remove products or modify inventory.
 - Initial implementation intentionally does not synchronize quantities, units or completion states; this remains a future product decision.
+
+
+## Generic products and supermarket variants — staged migration
+- Grocy remains the only stock source: one canonical Grocy product per generic, shared quantity across variants.
+- Variant metadata (barcode, supermarket, brand, purchase factor) is additive and cannot independently change stock.
+- Existing products are not merged or deleted automatically. First export and audit products, barcodes, units, stock and shopping references; require explicit approval for any consolidation.
+- Validate barcode ownership in both Grocy and local metadata; reject conflicts. Preserve shopping list entries and sync checkpoints.
+- Alexa ambiguity must retain original free-text entry pending selection. Identity-aware bidirectional sync and UI remain pending; do not activate feature before integration tests.
+- Generic metadata foundation is not yet connected to production routes or the Alexa worker. No installable release is claimed.
