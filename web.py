@@ -54,7 +54,12 @@ section{background:#f4f6f8;padding:18px;border-radius:12px;margin:16px 0}
 input,button{font:inherit;padding:10px;margin:5px 0;max-width:100%}
 button{cursor:pointer}table{border-collapse:collapse;width:100%}
 td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
-.review{color:#a34b00}.error{color:#a40000}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+.review{color:#a34b00}.error{color:#a40000}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.product-results{max-height:280px;overflow-y:auto;margin:8px 0;border:1px solid #c7d0d8;border-radius:10px;background:white}
+.product-result{display:block;width:100%;text-align:left;background:white;border:0;border-bottom:1px solid #edf0f2;border-radius:0;cursor:pointer;padding:12px;margin:0}
+.product-result:hover,.product-result:focus,.product-result[aria-selected="true"]{background:#e6f3ed}
+.product-result[hidden]{display:none}#product-search{width:100%;box-sizing:border-box}
+#selected-product-label{font-weight:600}</style>
 <header><h1>Tickets → Grocy</h1>{% if authenticated and not ingress_mode %}
 <form action="{{ url_for('logout') }}" method="post">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button>Salir</button></form>{% endif %}</header>
@@ -75,11 +80,17 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <form method="post" action="{{ url_for('barcode_associate') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
-<label>Producto existente <select name="product_id" required>
-<option value="">Selecciona un producto</option>
-{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
-</select></label>
-<button type="submit">Asociar código sin cambiar stock</button></form>
+<label for="product-search">Buscar producto existente</label>
+<input id="product-search" type="search" placeholder="Escribe el nombre (ej. Nutella)" autocomplete="off" aria-controls="product-results" aria-label="Buscar producto">
+<input type="hidden" id="selected-product-id" name="product_id" required>
+<p id="selected-product-label" role="status" aria-live="polite">No has seleccionado ningún producto.</p>
+<div id="product-results" class="product-results" role="listbox" aria-label="Productos encontrados">
+{% for p in products %}
+<button class="product-result" type="button" role="option" aria-selected="false" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" {% if loop.index > 8 %}hidden{% endif %}>{{ p.name }}</button>
+{% endfor %}
+</div>
+<p id="product-empty" hidden>No encontramos productos con ese nombre.</p>
+<button type="submit" id="associate-submit" disabled>Asociar código sin cambiar stock</button></form>
 <p>Permite reconocer al instante productos ya registrados y evita duplicados.</p>
 </section>
 <section><h2>Buscar foto por código de barras</h2>
@@ -127,7 +138,44 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <button type="submit">Confirmar importación</button></form>{% endif %}
 {% endif %}
 </section>{% endif %}
-{% endif %}</html>"""
+{% endif %}
+<script>
+(() => {
+  const search = document.getElementById('product-search');
+  if (!search) return;
+  const options = Array.from(document.querySelectorAll('.product-result'));
+  const selected = document.getElementById('selected-product-id');
+  const label = document.getElementById('selected-product-label');
+  const submit = document.getElementById('associate-submit');
+  const empty = document.getElementById('product-empty');
+  const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim();
+  function clearSelection() {
+    selected.value = '';
+    label.textContent = 'No has seleccionado ningún producto.';
+    submit.disabled = true;
+    options.forEach(option => option.setAttribute('aria-selected', 'false'));
+  }
+  function filter() {
+    const term = normalize(search.value);
+    let count = 0;
+    for (const option of options) {
+      const match = normalize(option.dataset.productName).includes(term);
+      option.hidden = !match || count >= 30;
+      if (match) count++;
+    }
+    empty.hidden = count > 0;
+  }
+  search.addEventListener('input', () => { clearSelection(); filter(); });
+  options.forEach(option => option.addEventListener('click', () => {
+    selected.value = option.dataset.productId;
+    label.textContent = 'Seleccionado: ' + option.dataset.productName;
+    search.value = option.dataset.productName;
+    submit.disabled = false;
+    options.forEach(other => other.setAttribute('aria-selected', String(other === option)));
+  }));
+  filter();
+})();
+</script></html>"""
 
 def configured():
     return bool(app.secret_key and (INGRESS_MODE or os.environ.get("WEB_PASSWORD")))
