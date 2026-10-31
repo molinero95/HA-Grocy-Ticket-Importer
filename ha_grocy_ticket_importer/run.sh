@@ -4,8 +4,9 @@ set -eu
 # App state (receipt import ledger) stays in the app's private persistent /config.
 export GROCY_IMPORT_DB="/config/grocy_imports.sqlite3"
 export RECEIPT_DATA_DIR="/data/receipts"
+export PRODUCT_IMAGE_DIR="/data/product_images"
 export HA_INGRESS_MODE="1"
-mkdir -p /config /data/receipts
+mkdir -p /config /data/receipts /data/product_images
 if [ ! -s /data/session_secret ]; then
     /venv/bin/python -c 'import secrets;open("/data/session_secret","w").write(secrets.token_urlsafe(48))'
     chmod 600 /data/session_secret
