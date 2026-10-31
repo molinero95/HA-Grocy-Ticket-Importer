@@ -82,3 +82,19 @@ Favor actionable fixes, tests and concise Spanish summaries with commit/version 
 - Product-sheet variant editor has scanner support and CSRF; variant purchase
   factors are metadata only. The Alexa ambiguity queue and identity mapping
   are not implemented. Avoid enabling automatic catalog association.
+
+## Alexa identity v2 implementation handoff (PR #5)
+
+- `shopping_identity_sync.py`: pure planner; canonical Grocy product IDs
+  and distinct free-text notes, with collision detection.
+- `shopping_identity_runtime.py`: v2 atomic checkpoint and binding guard.
+  Old v1 state is preserved and deliberately not used for v2 deletions.
+- `shopping_sync_worker.py`: invokes identity planner, validates selections,
+  re-reads remote snapshots and persists checkpoint only after convergence.
+- `shopping_sync_adapters.py`: ID-specific Grocy add/remove operations,
+  quantity/note preflight and unique Alexa deletion.
+- `shopping_match_queue.py`: per-entity SQLite review queue, preserves stale
+  choices so the worker can block instead of silently changing identity.
+- These modules must be mirrored into the add-on and included in Dockerfile.
+  No real production stock should be touched by exploratory tests. Do not
+  merge or bump release until CI, Grocy API and HA integration are validated.
