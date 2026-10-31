@@ -81,3 +81,22 @@ Este proyecto se distribuye bajo la **licencia MIT**. Consulta el archivo [LICEN
 - Antes de publicar el repositorio se debe completar la auditoría del historial para evitar exponer datos personales o credenciales.
 
 Documentación específica del complemento: [ha_grocy_ticket_importer/DOCS.md](ha_grocy_ticket_importer/DOCS.md).
+
+
+## Sincronización Alexa ↔ Grocy (experimental, v0.7.11)
+
+La integración **Alexa Devices** de Home Assistant debe estar configurada y mostrar una entidad de lista de compra. La sincronización trabaja exclusivamente con la lista principal de Alexa y la lista predeterminada de Grocy (ID 1). No sincroniza otras listas de Alexa, el historial completado ni las existencias del inventario.
+
+El complemento solicita `homeassistant_api: true` para utilizar el token de Supervisor y comunicarse con Home Assistant internamente; no es necesario copiar tokens a GitHub. La configuración `shopping_sync_enabled` está **desactivada por defecto**. El proceso de sincronización se inicia al arrancar el complemento solo cuando esta opción está activada y revisa los cambios cada 120 segundos.
+
+**No activar aún en producción:** la integración de escritura de Grocy y el formato de respuesta del servicio de listas de Home Assistant requieren una prueba de extremo a extremo. La PR #2 es experimental y no se ha desplegado. La versión instalada puede seguir siendo 0.7.10.
+
+### Comportamiento previsto
+
+- Primer ciclo: combina los artículos pendientes de ambas listas sin borrar los existentes.
+- Ciclos posteriores: detecta altas y eliminaciones mediante un registro de nombres normalizados; evita duplicados por mayúsculas, espacios y tildes.
+- Un artículo de Alexa sin producto en el catálogo de Grocy se añade como nota de compra, sin generar stock ni crear un producto.
+- Si una escritura falla, no se avanza el registro persistente; se vuelve a comprobar el estado remoto en el siguiente intento.
+- **Limitaciones actuales:** la identidad es por nombre, no por ID; no se sincronizan cantidades, unidades, compras completadas ni renombrados. Los nombres duplicados equivalentes producen error de validación para evitar pérdidas. El borrado propagado elimina la entrada de la lista, no el producto del catálogo.
+
+El estado se guarda en `/data/shopping-sync.json`. Conservar este archivo durante las actualizaciones; eliminarlo provoca una nueva unión inicial y puede reintroducir artículos. Ver [DOCS.md](ha_grocy_ticket_importer/DOCS.md) y [ROADMAP.md](ROADMAP.md) antes de activar la función.
