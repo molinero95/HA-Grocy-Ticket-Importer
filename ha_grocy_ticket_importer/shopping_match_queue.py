@@ -4,11 +4,15 @@ Queue entries are advisory. No code here modifies Alexa, Grocy, stock,
 shopping notes, or sync checkpoints. Manual selection is stored separately.
 """
 import json
+import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 
 from shopping_sync import normalize, suggest_catalog_matches
+
+DEFAULT_PATH = Path(os.environ.get("ALEXA_MATCH_QUEUE_DB", "/config/alexa-match-queue.sqlite3"
+    if os.environ.get("HA_INGRESS_MODE") == "1" else str(Path(__file__).resolve().parent / "runtime" / "alexa-match-queue.sqlite3")))
 
 def connect(path):
     path = Path(path)
