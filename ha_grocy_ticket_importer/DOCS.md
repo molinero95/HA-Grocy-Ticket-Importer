@@ -40,3 +40,20 @@ The state file `/data/shopping-sync.json` is persistent across restarts. Preserv
 
 
 **Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.
+
+## Generic product variants (development)
+
+A canonical Grocy product owns all inventory and shopping references. The
+product sheet can add supermarket-specific variants (barcode, brand, store,
+display name and purchase factor) after auditing barcode ownership in Grocy.
+No product consolidation or stock migration happens automatically.
+
+Variant metadata is persisted at `/config/generic_catalog.sqlite3` in the
+existing `app_config` mount. Back it up together with the receipt ledger.
+The read-only catalog audit download under **Acciones → Detectar duplicados**
+includes product IDs, stock, units, barcodes, shopping references and variants.
+Review this before proposing any explicit merge.
+
+Purchase factors stored on variants are informational; Grocy's stock unit
+and receipt import conversions are not changed. Alexa ambiguous matches
+remain unresolved and require further integration work and validation.
