@@ -9,6 +9,69 @@ import product_images
 PRODUCTS = [{"id": 5, "name": "Leche", "qu_id_stock": 2},
             {"id": 8, "name": "Pasta", "qu_id_stock": 2}]
 
+class ProductCreationTests(unittest.TestCase):
+    @patch("barcode_stock.grocy")
+    def test_existing_name_or_barcode_returns_edit_target_without_writes(self, api):
+        def fake(method, path, body=None):
+            self.assertEqual(method, "GET")
+            return {
+                "objects/quantity_units": [{"id": 2, "name": "Piece"}],
+                "objects/products": [{"id": 5, "name": "  Leche  "}, {"id": 7, "name": "Agua"}],
+                "objects/product_barcodes": [{"product_id": 7, "barcode": "1234567890123"}],
+            }[path]
+        api.side_effect = fake
+        by_name = barcode_stock.create_catalog_product("leche", "", 2, "3")
+        self.assertEqual(by_name["product_id"], 5)
+        self.assertFalse(by_name["created"])
+        by_barcode = barcode_stock.create_catalog_product("Producto distinto", "1234567890123", 2, "3")
+        self.assertEqual(by_barcode["product_id"], 7)
+        self.assertFalse(by_barcode["created"])
+        self.assertFalse(any(c.args[0] != "GET" for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_new_product_zero_stock_never_creates_stock_movement(self, api):
+        posts = []
+        def fake(method, path, body=None):
+            if method == "GET":
+                return {
+                    "objects/quantity_units": [{"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}],
+                    "objects/products": [], "objects/product_barcodes": [],
+                }[path]
+            posts.append((path, body))
+            return {"created_object_id": 17}
+        api.side_effect = fake
+        result = barcode_stock.create_catalog_product("Tomate", "", 4, "0")
+        self.assertTrue(result["created"])
+        self.assertEqual(result["product_id"], 17)
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0][1]["qu_id_stock"], 4)
+        self.assertEqual(posts[0][1]["qu_id_purchase"], 4)
+
+    @patch("barcode_stock.grocy")
+    def test_new_product_initial_stock_uses_selected_unit(self, api):
+        posts = []
+        def fake(method, path, body=None):
+            if method == "GET":
+                return {
+                    "objects/quantity_units": [{"id": 4, "name": "Kilogram"}],
+                    "objects/products": [], "objects/product_barcodes": [],
+                }[path]
+            posts.append((path, body))
+            return {"created_object_id": 17}
+        api.side_effect = fake
+        barcode_stock.create_catalog_product("Tomate", "1234567890123", 4, "0,50")
+        self.assertEqual([p for p, _ in posts], [
+            "objects/products", "objects/product_barcodes", "stock/products/17/add"])
+        self.assertEqual(posts[-1][1]["amount"], 0.5)
+
+    @patch("barcode_stock.grocy")
+    def test_invalid_creation_never_writes(self, api):
+        for qty in ("-1", "1.123", "NaN"):
+            with self.assertRaises(barcode_stock.BarcodeError):
+                barcode_stock.create_catalog_product("Tomate", "", 4, qty)
+        api.assert_not_called()
+
+
 class BarcodeTests(unittest.TestCase):
     @patch("barcode_stock.grocy")
     def test_link_existing_product_does_not_write_stock(self, api):
