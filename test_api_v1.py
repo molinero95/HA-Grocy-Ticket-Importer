@@ -54,6 +54,19 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertFalse(response.json["created"])
         create.assert_called_once()
 
+    def test_catalog_edit_requires_csrf(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "update_product_info") as edit:
+            response = self.client.patch("/api/v1/catalog/products/3", json={"name": "Arroz integral"})
+        self.assertEqual(response.status_code, 403)
+        edit.assert_not_called()
+
+    def test_catalog_edit_preserves_stock(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "update_product_info", return_value={"id": 3, "name": "Arroz integral", "unit_id": 1}) as edit:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.patch("/api/v1/catalog/products/3", json={"name": "Arroz integral"}, headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 200)
+        edit.assert_called_once_with(3, "Arroz integral", "1", None)
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
