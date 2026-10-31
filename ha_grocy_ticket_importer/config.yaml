@@ -1,5 +1,5 @@
 name: "Grocy Ticket Importer"
-version: "0.2.2"
+version: "0.3.0"
 slug: "ha_grocy_ticket_importer"
 description: "Import receipts and manage Grocy stock via Home Assistant"
 url: "https://github.com/molinero95/HA-Grocy-Ticket-Importer"
@@ -16,3 +16,12 @@ map:
   - type: app_config
     read_only: false
     path: /config
+
+options:
+  grocy_url: "http://a0d7b954-grocy:80"
+  grocy_location_id: 2
+schema:
+  grocy_url: "url"
+  grocy_api_key: "password"
+  openai_api_key: "password"
+  grocy_location_id: "int(1,)"
