@@ -71,3 +71,21 @@ Last reviewed: 2026-10-31. This records the user's explicitly requested behavior
   quantities, stock or synchronization checkpoints by themselves.
 - No automatic note-to-product conversion until identity-aware sync and
   integration tests are implemented.
+
+## Identity-aware Alexa reconciliation (PR #5, pending release validation)
+
+- The v2 planner keys Grocy products by canonical product ID and notes by
+  normalized free text. Exact unique catalog matches and explicitly chosen
+  ambiguous matches may share a product identity without renaming Alexa text.
+- A manual choice may add a missing canonical product to the Grocy shopping
+  list, but it never rewrites/deletes an existing Grocy note or touches stock.
+  Existing notes matching the Alexa original or canonical product name block
+  the cycle rather than being silently converted.
+- Each selected Alexa entity has separate v2 checkpoints and review queues.
+  The v1 checkpoint and old unscoped queue remain intact; v2 starts with a
+  non-destructive union and old choices must be reviewed again.
+- Persist the v2 checkpoint only after verifying both remote snapshots.
+  Previously verified bindings cannot silently change identity. Before
+  deleting a Grocy shopping entry, revalidate its ID, product, note and amount.
+- Implementation and network-free tests are on PR #5, not yet a production
+  release. Real API behavior, mobile UX and persistence still require validation.
