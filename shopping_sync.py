@@ -98,7 +98,7 @@ def suggest_catalog_matches(name, products, *, limit=5):
         # Require substantive common words: string similarity alone can match
         # unrelated short grocery names.
         if not exact and (not query_words & label_words or
-                          (overlap < 0.5 and similarity < 0.9)):
+                          (overlap < 0.5 and similarity < 0.9 and not query_words.issubset(label_words))):
             continue
         incompatible = False
         for variants in _VARIANTS:
@@ -114,7 +114,7 @@ def suggest_catalog_matches(name, products, *, limit=5):
                        "score": round(score, 4), "exact": exact})
     ranked.sort(key=lambda row: (-row["score"], row["name"], row["id"]))
     exact_matches = [row for row in ranked if row["exact"]]
-    if len(exact_matches) == 1:
+    if len(exact_matches) == 1 and len(ranked) == 1:
         return "exact", exact_matches
     if ranked:
         return "review", ranked[:limit]
