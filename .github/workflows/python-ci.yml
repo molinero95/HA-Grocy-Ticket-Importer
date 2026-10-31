@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Upgrade npm for TypeScript 7 compatibility trial
+        run: npm install --global npm@11
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
         working-directory: frontend
