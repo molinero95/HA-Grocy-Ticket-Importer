@@ -79,3 +79,23 @@ export async function commitReceipt(id: string): Promise<{ status: string; outpu
   if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo confirmar la importación');
   return result;
 }
+
+export type CatalogUnit = { id: number; name: string };
+export async function getCatalogUnits(): Promise<CatalogUnit[]> {
+  const response = await fetch(base + 'catalog/units', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se pudieron cargar las unidades');
+  const result = await response.json() as { units: CatalogUnit[] };
+  return result.units;
+}
+export type CatalogProductInput = { name: string; barcode: string; unit_id: number; initial_stock: string; pack_size: string };
+export async function createCatalogProduct(value: CatalogProductInput): Promise<{ product_id: number; created: boolean }> {
+  const response = await fetch(base + 'catalog/products', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify(value) });
+  const result = await response.json() as { product_id: number; created: boolean; error?: string; details?: string };
+  if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo crear el producto');
+  return result;
+}
+export async function editCatalogProduct(id: number, name: string, unitId: number): Promise<void> {
+  const response = await fetch(base + 'catalog/products/' + id, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify({ name, unit_id: unitId }) });
+  const result = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(result.error ?? 'No se pudo actualizar el producto');
+}
