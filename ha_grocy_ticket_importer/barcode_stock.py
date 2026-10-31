@@ -73,6 +73,53 @@ def inventory_snapshot():
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))
 
 
+PACK_MARKER = re.compile(r"(?:\\n|^)[[]Despensa: unidades_por_envase=(\\d+)[]]\\s*")
+
+def product_detail(product_id):
+    """Get one product's editable metadata and known barcodes."""
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
+        raise BarcodeError("Producto inexistente")
+    description = str(product.get("description") or "")
+    marker = PACK_MARKER.search(description)
+    codes = [str(item["barcode"]) for item in grocy("GET", "objects/product_barcodes")
+             if int(item["product_id"]) == pid]
+    return {
+        "id": pid, "name": str(product["name"]),
+        "pack_size": int(marker.group(1)) if marker else 1,
+        "description": PACK_MARKER.sub("", description).strip(),
+        "barcodes": codes,
+    }
+
+
+def update_product_info(product_id, name, pack_size):
+    """Edit name and package metadata only. No stock units are changed."""
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    name = (name or "").strip()
+    if not name or len(name) > 200:
+        raise BarcodeError("Indica un nombre de 1 a 200 caracteres")
+    try:
+        pack_size = int(pack_size)
+    except (TypeError, ValueError) as exc:
+        raise BarcodeError("Unidades por envase no válidas") from exc
+    if not 1 <= pack_size <= 1000:
+        raise BarcodeError("Las unidades por envase deben estar entre 1 y 1000")
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
+        raise BarcodeError("Producto inexistente")
+    description = PACK_MARKER.sub("", str(product.get("description") or "")).strip()
+    if pack_size != 1:
+        description = (description + "\\n" if description else "") + (
+            f"[Despensa: unidades_por_envase={pack_size}]")
+    grocy("PUT", f"objects/products/{pid}", {"name": name, "description": description})
+    return {"id": pid, "name": name, "pack_size": pack_size}
+
+
 def associate_barcode(barcode, product_id):
     """Link barcode to an existing product. Does not create stock movements."""
     barcode = validate_barcode(barcode)
