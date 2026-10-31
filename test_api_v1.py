@@ -29,6 +29,25 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.json["items"], items)
         self.assertEqual(response.json["pending_matches"], matches)
 
+    def test_inventory_returns_combined_stock_and_shopping(self):
+        rows = [{"id": 8, "name": "Leche", "amount": "2", "unit": "ud.", "shopping_amount": "1"}]
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "inventory_with_shopping", return_value=rows):
+            response = self.client.get("/api/v1/inventory")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"], rows)
+
+    def test_barcode_lookup_filters_by_product_id_without_redirect(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "find_product", return_value={"id": 8}):
+            response = self.client.get("/api/v1/barcodes/8412345678901")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["product_id"], 8)
+
+    def test_shopping_step_requires_csrf(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "change_shopping_quantity") as update:
+            response = self.client.post("/api/v1/shopping/products/8/step", json={"direction": "plus"})
+        self.assertEqual(response.status_code, 403)
+        update.assert_not_called()
+
     def test_write_requires_csrf_and_never_mutates_without_it(self):
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "update_shopping_list_item") as update:
             response = self.client.post("/api/v1/shopping/7/toggle", json={"done": True})
