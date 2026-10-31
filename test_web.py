@@ -120,7 +120,7 @@ class WebTests(unittest.TestCase):
                 "unit_id": "4", "initial_stock": "0.5"})
         self.assertEqual(r.status_code, 302)
         self.assertIn("product_id=18", r.headers["Location"])
-        create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2, image_url=None)
+        create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2, image_url=None, pack_size="1")
 
     def test_consume_form_has_amount_and_shopping_checkbox(self):
         self.login()
@@ -209,6 +209,39 @@ class WebTests(unittest.TestCase):
             response = self.client.post("/shopping/step/5/minus", data={"csrf": token})
             self.assertEqual(response.status_code, 302)
             self.assertEqual(change.call_count, 2)
+
+    def test_shopping_step_json_updates_without_redirect(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "change_shopping_quantity",
+                          return_value={"name": "Tomate", "amount": "0.4"}) as change:
+            response = self.client.post(
+                "/shopping/step/5/plus", data={"csrf": token},
+                headers={"Accept": "application/json"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json, {"amount": "0.4", "product_id": 5})
+            change.assert_called_once_with(5, "plus")
+
+    def test_shopping_step_json_error_is_not_html(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "change_shopping_quantity",
+                          side_effect=web.barcode_stock.BarcodeError("Sin stock")):
+            response = self.client.post(
+                "/shopping/step/5/minus", data={"csrf": token},
+                headers={"Accept": "application/json"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json["error"], "Sin stock")
+
+    def test_shopping_stepper_has_in_place_controls(self):
+        self.login()
+        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=[{
+                "id": 5, "name": "Tomate", "amount": "1.3", "unit": "Kilogram",
+                "shopping_amount": "0.3", "shopping_unit": "kg",
+                "shopping_step": "0.10", "shopping_can_subtract": True}]):
+            response = self.client.get("/?view=inventory")
+        self.assertIn(b'class="shopping-amount"', response.data)
+        self.assertIn(b'class="shopping-stepper-message"', response.data)
+        self.assertIn(b'0.3', response.data)
+        self.assertIn(b'view=inventory', response.data)
 
     def test_shopping_toggle_and_remove(self):
         token = self.login()
