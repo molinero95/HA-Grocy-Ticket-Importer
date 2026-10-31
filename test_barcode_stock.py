@@ -164,6 +164,53 @@ class BarcodeTests(unittest.TestCase):
         api.assert_not_called()
 
     @patch("barcode_stock.grocy")
+    def test_inventory_inline_shopping_quantities(self, api):
+        def fake(method, path, body=None):
+            if method != "GET":
+                raise AssertionError((method, path))
+            if path == "objects/products":
+                return [{"id": 7, "name": "Tomate", "qu_id_stock": 4},
+                        {"id": 8, "name": "Leche", "qu_id_stock": 2}]
+            if path == "objects/quantity_units":
+                return [{"id": 4, "name": "Kilogram"}, {"id": 2, "name": "Piece"}]
+            if path == "stock":
+                return [{"product_id": 7, "amount": "1.2"}]
+            if path == "objects/shopping_list":
+                return [{"id": 1, "product_id": 7, "amount": "0.3", "done": 0},
+                        {"id": 2, "product_id": 8, "amount": "2", "done": 0}]
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        rows = barcode_stock.inventory_with_shopping()
+        self.assertEqual(rows[0]["shopping_step"], "1")
+        self.assertEqual(rows[0]["shopping_amount"], "2")
+        self.assertEqual(rows[1]["shopping_step"], "0.10")
+        self.assertEqual(rows[1]["shopping_amount"], "0.3")
+
+    @patch("barcode_stock.grocy")
+    def test_shopping_step_add_and_remove_with_correct_units(self, api):
+        calls = []
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products":
+                return [{"id": 7, "name": "Tomate", "qu_id_stock": 4}]
+            if method == "GET" and path == "objects/quantity_units":
+                return [{"id": 4, "name": "Kilogram"}]
+            if method == "GET" and path == "objects/shopping_list":
+                return [{"id": 1, "product_id": 7, "amount": "0.3", "done": 0}]
+            if method == "POST":
+                calls.append((path, body))
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        barcode_stock.change_shopping_quantity(7, "plus")
+        barcode_stock.change_shopping_quantity(7, "minus")
+        self.assertEqual(calls[0], ("stock/shoppinglist/add-product",
+            {"product_id": 7, "list_id": 1, "product_amount": 0.1, "qu_id": 4}))
+        self.assertEqual(calls[1], ("stock/shoppinglist/remove-product",
+            {"product_id": 7, "list_id": 1, "product_amount": 0.1}))
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.change_shopping_quantity(7, "invalid")
+
+    @patch("barcode_stock.grocy")
     def test_shopping_list_snapshot_reads_default_list(self, api):
         def fake(method, path, body=None):
             if path == "objects/shopping_list":
