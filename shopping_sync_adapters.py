@@ -15,9 +15,9 @@ ALEXA_LIST = os.environ.get("ALEXA_SHOPPING_LIST_ENTITY", "").strip()
 
 def ha_service(service, body, *, url=None, token=None):
     url = (url or os.environ.get("HA_URL") or "http://supervisor/core").rstrip("/")
-    token = token or os.environ.get("HA_TOKEN") or os.environ.get("SUPERVISOR_TOKEN")
+    token = token or os.environ.get("HA_TOKEN") or os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HASSIO_TOKEN")
     if not token:
-        raise RuntimeError("Home Assistant API token unavailable")
+        raise RuntimeError("Home Assistant API token unavailable (HA_TOKEN, SUPERVISOR_TOKEN, HASSIO_TOKEN absent)")
     request = urllib.request.Request(
         url + "/api/services/todo/" + service + ("?return_response" if service == "get_items" else ""),
         data=json.dumps(body).encode("utf-8"), method="POST",
