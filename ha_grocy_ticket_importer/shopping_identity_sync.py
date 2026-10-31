@@ -62,6 +62,13 @@ def identities(alexa_names, grocy_rows, products, choices=None):
                       "entry_id": int(entry["id"]),
                       "amount": entry.get("amount"),
                       "note": entry.get("note") or ""}
+    # A note with the canonical product name is still a note, not a product.
+    # Otherwise the first sync could add a duplicate catalog item while
+    # retaining the existing shopping note with its original quantity.
+    canonical_names = {normalize(by_id[row["product_id"]]["name"])
+                       for row in alexa.values() if row["product_id"]}
+    if canonical_names & grocy_notes:
+        raise IdentityConflict("A Grocy note conflicts with a canonical product")
     # A free-text Grocy note must never be silently replaced by a product.
     # Even an explicit Alexa choice is not permission to delete that note.
     for row in alexa.values():
