@@ -72,6 +72,42 @@ class BarcodeTests(unittest.TestCase):
         with self.assertRaises(barcode_stock.BarcodeError):
             barcode_stock.remove_one("1234567890123")
 
+    @patch("barcode_stock.grocy")
+    def test_inventory_snapshot_reads_actual_stock(self, api):
+        def fake(method, path, body=None):
+            self.assertEqual(method, "GET")
+            if path == "objects/products":
+                return PRODUCTS
+            if path == "objects/quantity_units":
+                return [{"id": 2, "name": "Unidad"}]
+            if path == "stock/products/5":
+                return {"stock_amount": 3}
+            if path == "stock/products/8":
+                return {"stock_amount": 1.5}
+            raise AssertionError(path)
+        api.side_effect = fake
+        result = barcode_stock.inventory_snapshot()
+        self.assertEqual([(p["name"], p["amount"], p["unit"]) for p in result],
+                         [("Leche", "3", "Unidad"), ("Pasta", "1.5", "Unidad")])
+        self.assertFalse(any(call.args[0] != "GET" for call in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_inventory_snapshot_marks_unavailable_stock(self, api):
+        def fake(method, path, body=None):
+            if path == "objects/products":
+                return PRODUCTS
+            if path == "objects/quantity_units":
+                return []
+            if path == "stock/products/5":
+                return {"stock_amount": 0}
+            if path == "stock/products/8":
+                raise RuntimeError("Service unavailable")
+            raise AssertionError(path)
+        api.side_effect = fake
+        result = barcode_stock.inventory_snapshot()
+        self.assertEqual(result[0]["amount"], "0")
+        self.assertIsNone(result[1]["amount"])
+
     def test_reject_non_numeric_barcodes(self):
         with self.assertRaises(barcode_stock.BarcodeError):
             barcode_stock.validate_barcode("abc")
