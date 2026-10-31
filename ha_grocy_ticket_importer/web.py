@@ -237,7 +237,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% elif view == 'actions' %}
 <div class="hero"><strong>¿Qué quieres hacer?</strong><p>Elige una operación. Cada una tiene su propia pantalla.</p>
 <nav class="action-grid" aria-label="Acciones de Despensa">
-<a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Guardar producto</strong><small>Añadir al stock</small></a>
+<a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Añadir producto</strong><small>Crear artículo nuevo</small></a>
 <a class="action-link" href="{{ url_for('index', view='remove') }}"><span aria-hidden="true">➖</span><strong>Consumir producto</strong><small>Quitar del stock</small></a>
 <a class="action-link" href="{{ url_for('index', view='associate') }}"><span aria-hidden="true">🔗</span><strong>Asociar código</strong><small>Producto existente</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
@@ -307,13 +307,30 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </section>
 {% endif %}
 {% if view == 'add' %}
-<section id="entrada"><p class="section-eyebrow">Entrada de productos</p><h2>Guardar producto en despensa</h2>
+<section id="entrada"><p class="section-eyebrow">Catálogo</p><h2>Añadir producto nuevo</h2>
+<p>Solo se crea si no existe ya en Grocy. Si coincide el nombre o el código de barras, podrás abrir su ficha para editarlo.</p>
+{% if existing_product %}
+<div class="status-message" role="status">
+<strong>Este producto ya existe: {{ existing_product.name }}</strong>
+<p>No se ha creado ningún duplicado ni modificado el stock.</p>
+<a class="back-link" href="{{ url_for('index', view='product', product_id=existing_product.id) }}">✏️ Ir a editar producto →</a>
+</div>
+{% endif %}
 <form method="post" action="{{ url_for('barcode_add') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código de barras (EAN/UPC) <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
-<label>Nombre (solo si es nuevo) <input name="name" maxlength="200" placeholder="Leche entera 1 L"></label>
-<button type="submit">Añadir 1 al stock</button></form>
-<p>Si el código no está registrado, indica un nombre para crear el producto. Si existe, se reutiliza.</p></section>
+<label for="new-product-name">Nombre del producto</label>
+<input id="new-product-name" name="name" maxlength="200" placeholder="Tomate en rama" required>
+<label>Código de barras (opcional) <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" placeholder="Escanear o escribir"><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
+<label for="new-product-unit">Unidad de medida</label>
+<select id="new-product-unit" name="unit_id" required>
+{% for u in new_product_units %}<option value="{{ u.id }}" {% if u.name|lower in ('piece','unidad','unidades') %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
+</select>
+<label for="new-product-stock">Cantidad inicial en despensa</label>
+<input id="new-product-stock" name="initial_stock" type="number" min="0" step="0.01" inputmode="decimal" value="0" required>
+<p class="helper">Puedes dejarlo en 0 y añadir existencias más adelante. Máximo dos decimales, por ejemplo 1,50 kg.</p>
+<button type="submit">Crear producto</button>
+</form>
+</section>
 {% endif %}
 {% if view == 'associate' %}
 <section id="asociar"><p class="section-eyebrow">Catálogo</p><h2>Asociar código a producto existente</h2>
@@ -604,11 +621,17 @@ def current_view():
         candidate = POST_VIEWS.get(request.endpoint, "shopping")
     return candidate if candidate in VIEWS else "shopping"
 
-def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None):
+def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None, existing_product=None):
     view = current_view()
     inventory, inventory_error = [], False
     shopping, shopping_error = [], False
     shopping_product = None
+    new_product_units = []
+    if view == "add" and (INGRESS_MODE or session.get("auth")):
+        try:
+            new_product_units = barcode_stock.new_product_units()
+        except Exception:
+            pass
     if view == "shopping_add" and (INGRESS_MODE or session.get("auth")):
         try:
             shopping_product = barcode_stock.shopping_product_options(request.args.get("product_id"))
@@ -639,6 +662,8 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   view=view, inventory=inventory, inventory_error=inventory_error,
                                   shopping=shopping, shopping_error=shopping_error,
                                   shopping_product=shopping_product,
+                                  new_product_units=new_product_units,
+                                  existing_product=existing_product,
                                   product=product,
                                   app_version=os.environ.get("DESPENSA_VERSION", "dev"),
                                   app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
@@ -835,20 +860,24 @@ def barcode_photo():
 
 @app.post("/barcode/add")
 def barcode_add():
-    barcode = request.form.get("barcode", "")
-    name = request.form.get("name", "")
     if not LOCK.acquire(blocking=False):
         abort(409, "Otra operación está en marcha")
     try:
-        result = barcode_stock.add_one(barcode, name,
-                                      location_id=int(os.getenv("GROCY_LOCATION_ID", "2")))
+        result = barcode_stock.create_catalog_product(
+            request.form.get("name"), request.form.get("barcode", ""),
+            request.form.get("unit_id"), request.form.get("initial_stock", "0"),
+            location_id=int(os.getenv("GROCY_LOCATION_ID", "2")))
     except (barcode_stock.BarcodeError, ValueError) as exc:
-        return render("No se pudo añadir: " + str(exc)), 400
+        return render("No se pudo crear: " + str(exc)), 400
     except Exception:
-        return render("Error de Grocy. Comprueba el stock antes de volver a intentarlo."), 502
+        return render("Error de Grocy. Comprueba el catálogo antes de intentarlo otra vez."), 502
     finally:
         LOCK.release()
-    return render("Añadida 1 unidad al stock" + (" (producto nuevo)" if result["created"] else ""))
+    if not result["created"]:
+        return render("El producto ya existe.", existing_product={
+            "id": result["product_id"], "name": result["name"]})
+    return redirect(url_for("index", view="product", product_id=result["product_id"]))
+
 
 @app.post("/barcode/remove-preview")
 def barcode_remove_preview():
