@@ -1,0 +1,13 @@
+configuration:
+  grocy_url:
+    name: URL de Grocy
+    description: Dirección de Grocy accesible desde Home Assistant.
+  grocy_api_key:
+    name: Clave API de Grocy
+    description: Clave de acceso a la API de Grocy. No la publiques.
+  openai_api_key:
+    name: Clave API de OpenAI
+    description: Clave usada para extraer productos de los tickets.
+  grocy_location_id:
+    name: Ubicación de Grocy
+    description: Identificador numérico de la ubicación donde añadir existencias.
