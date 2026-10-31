@@ -195,7 +195,7 @@ def register_catalog_routes(app, barcode_stock, lock):
             target_variants = variants_for_product(target_id)
             blockers = []
             if source["unit_id"] != target["unit_id"]:
-                blockers.append("Unidades de stock diferentes: no se pueden sumar directamente")
+                blockers.append("Las unidades de stock son diferentes: no se pueden sumar directamente")
             if source["pack_size"] != target["pack_size"] or source.get("purchase_unit_id") != target.get("purchase_unit_id"):
                 blockers.append("Configuración de envases o unidades de compra diferente")
             if source_variants or target_variants:
