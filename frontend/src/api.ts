@@ -143,7 +143,7 @@ export async function getDuplicateCandidates(): Promise<DuplicateGroup[]> {
 }
 
 export type MergeProduct = { id: number; name: string; stock_amount: string; unit_id: number; purchase_unit_id: number; pack_size: number; barcodes: string[] };
-export type MergePreview = { source: MergeProduct; target: MergeProduct; source_variants: unknown[]; target_variants: unknown[]; blockers: string[]; can_merge: false };
+export type MergePreview = { source: MergeProduct; target: MergeProduct; source_variants: unknown[]; target_variants: unknown[]; blockers: string[]; audit?: { collections: { collection: string; label: string; status: string; count: number | null; references: { id: number | null; product_id: number | null; field: string }[] }[] }; can_merge: false };
 export async function getMergePreview(sourceId: number, targetId: number): Promise<MergePreview> {
   const params = new URLSearchParams({ source_id: String(sourceId), target_id: String(targetId) });
   const response = await fetch(base + 'catalog/merge-preview?' + params, { credentials: 'same-origin' });
