@@ -28,7 +28,18 @@ class GenericCatalogTests(unittest.TestCase):
             self.assertEqual(resolve_barcode(db, "8480000000001")["grocy_product_id"], 1)
             db.close()
 
-    def test_requires_grocy_audit_and_rejects_other_owner(self):\n        with tempfile.TemporaryDirectory() as tmp:\n            db = connect(Path(tmp) / "catalog.db")\n            gid = register_generic(db, 42, "Leche")\n            with self.assertRaisesRegex(ValueError, "audit required"):\n                register_variant(db, gid, "8480000000001", "Leche")\n            with self.assertRaisesRegex(ValueError, "another Grocy"):\n                register_variant(db, gid, "8480000000001", "Leche", grocy_barcode_owners=[99])\n            self.assertIsNone(resolve_barcode(db, "8480000000001"))\n            db.close()\n\n    def test_idempotent_schema_and_unmatched_barcode(self):
+    def test_requires_grocy_audit_and_rejects_other_owner(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = connect(Path(tmp) / "catalog.db")
+            gid = register_generic(db, 42, "Leche")
+            with self.assertRaisesRegex(ValueError, "audit required"):
+                register_variant(db, gid, "8480000000001", "Leche")
+            with self.assertRaisesRegex(ValueError, "another Grocy"):
+                register_variant(db, gid, "8480000000001", "Leche", grocy_barcode_owners=[99])
+            self.assertIsNone(resolve_barcode(db, "8480000000001"))
+            db.close()
+
+    def test_idempotent_schema_and_unmatched_barcode(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "catalog.db"
             connect(path).close()
