@@ -1179,6 +1179,50 @@ def load_receipt(rid):
         abort(404)
     return json.loads(path.read_text(encoding="utf-8"))
 
+@app.get("/api/v1/inventory")
+def api_v1_inventory():
+    """Single read-only inventory response; no per-product Grocy requests."""
+    try:
+        return jsonify({"items": barcode_stock.inventory_with_shopping()})
+    except Exception:
+        app.logger.exception("api_v1_inventory_failed")
+        return jsonify({"error": "inventory_unavailable"}), 503
+
+
+@app.get("/api/v1/barcodes/<barcode>")
+def api_v1_barcode_lookup(barcode):
+    """Resolve a scanned code without navigating away from the list."""
+    try:
+        product = barcode_stock.find_product(barcode)
+        if product is None:
+            return jsonify({"product_id": None})
+        return jsonify({"product_id": int(product["id"])})
+    except barcode_stock.BarcodeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("api_v1_barcode_lookup_failed")
+        return jsonify({"error": "barcode_lookup_failed"}), 502
+
+
+@app.post("/api/v1/shopping/products/<int:product_id>/step")
+def api_v1_shopping_step(product_id):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or payload.get("direction") not in ("plus", "minus"):
+        return jsonify({"error": "invalid_direction"}), 400
+    if not LOCK.acquire(blocking=False):
+        return jsonify({"error": "operation_in_progress"}), 409
+    try:
+        result = barcode_stock.change_shopping_quantity(product_id, payload["direction"])
+    except barcode_stock.BarcodeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("api_v1_shopping_step_failed")
+        return jsonify({"error": "shopping_step_failed"}), 502
+    finally:
+        LOCK.release()
+    return jsonify({"product_id": product_id, "amount": result["amount"]})
+
+
 @app.get("/api/v1/session")
 def api_v1_session():
     if not (INGRESS_MODE or session.get("auth")):
