@@ -10,7 +10,7 @@ import urllib.request
 from importer import grocy
 from shopping_sync import normalize
 
-ALEXA_LIST = "todo.jaimolas95_gmail_com_lista_de_la_compra"
+ALEXA_LIST = os.environ.get("ALEXA_SHOPPING_LIST_ENTITY", "").strip()
 
 
 def ha_service(service, body, *, url=None, token=None):
@@ -29,6 +29,8 @@ def ha_service(service, body, *, url=None, token=None):
 
 
 def alexa_items():
+    if not ALEXA_LIST.startswith("todo."):
+        raise ValueError("Alexa shopping list entity is not configured")
     response = ha_service("get_items", {"entity_id": ALEXA_LIST})
     data = response.get("service_response", response)
     if ALEXA_LIST not in data or not isinstance(data[ALEXA_LIST].get("items"), list):
