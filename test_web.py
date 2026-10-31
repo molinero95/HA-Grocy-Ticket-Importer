@@ -61,6 +61,23 @@ class WebTests(unittest.TestCase):
         self.assertIn(b"catalog_product_create_failed", response.data)
         self.assertIn("simulated backend failure", "\\n".join(logs.output))
 
+    def test_lookup_name_without_photo(self):
+        self.login()
+        with patch.object(web.product_images, "lookup_image", return_value={
+            "name": "Salsa ranchera", "image_url": None}):
+            response = self.client.get("/photo/lookup?barcode=8412345678901")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["name"], "Salsa ranchera")
+        self.assertIsNone(response.json["image_url"])
+
+    def test_new_product_form_autofill_script(self):
+        self.login()
+        with patch.object(web.barcode_stock, "new_product_units", return_value=[{"id": 2, "name": "Piece"}]):
+            response = self.client.get("/?view=add")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"data.name", response.data)
+        self.assertIn(b"new-product-name", response.data)
+
     def test_configuration_needed(self):
         with patch.dict(os.environ, {"WEB_PASSWORD": ""}):
             self.assertEqual(self.client.get("/").status_code, 503)
