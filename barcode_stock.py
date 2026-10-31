@@ -341,7 +341,11 @@ def update_product_info(product_id, name, pack_size, unit_id=None):
     is_pack = "pack" in unit_names.get(unit_id, "").casefold()
     if not is_pack:
         pack_size = 1
-    description = PACK_MARKER.sub("", str(product.get("description") or "")).strip()
+    photo_url = saved_photo(product)
+    description = PHOTO_MARKER.sub("", PACK_MARKER.sub(
+        "", str(product.get("description") or ""))).strip()
+    if photo_url:
+        description += ("\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
     if is_pack and pack_size != 1:
         description = (description + "\n" if description else "") + (
             f"[Despensa: unidades_por_envase={pack_size}]")
