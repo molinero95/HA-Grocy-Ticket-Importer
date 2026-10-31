@@ -286,12 +286,17 @@ def product_detail(product_id):
         [{"id": int(unit["id"]), "name": str(unit["name"])}
          for unit in grocy("GET", "objects/quantity_units")],
         key=lambda unit: unit["name"].casefold())
-    is_pack = any(u["id"] == int(product["qu_id_stock"]) and "pack" in u["name"].casefold()
+    purchase_unit_id = int(product.get("qu_id_purchase") or product["qu_id_stock"])
+    is_pack = any(u["id"] == purchase_unit_id and "pack" in u["name"].casefold()
                   for u in units)
+    pack_factor = int(product.get("qu_factor_purchase_to_stock") or 0)
+    if pack_factor < 1:
+        pack_factor = int(marker.group(1)) if marker else 1
     return {
         "id": pid, "name": str(product["name"]),
         "is_pack": is_pack,
-        "pack_size": int(marker.group(1)) if marker else 1,
+        "pack_size": pack_factor,
+        "purchase_unit_id": purchase_unit_id,
         "description": PHOTO_MARKER.sub("", PACK_MARKER.sub("", description)).strip(),
         "image_url": saved_photo(product),
         "barcodes": codes,
@@ -337,19 +342,40 @@ def update_product_info(product_id, name, pack_size, unit_id=None):
                 "haya existencias. Primero deja el stock a cero en la ficha y "
                 "después cambia la unidad; convierte luego la cantidad manualmente "
                 "para evitar contar piezas como packs.")
-    unit_names = {int(u["id"]): str(u["name"]) for u in grocy("GET", "objects/quantity_units")}
-    is_pack = "pack" in unit_names.get(unit_id, "").casefold()
-    if not is_pack:
-        pack_size = 1
+    units = {int(u["id"]): str(u["name"]) for u in grocy("GET", "objects/quantity_units")}
+    piece_ids = {uid for uid, label in units.items() if label.casefold().strip() in ("piece", "pieces", "unidad", "unidades")}
+    pack_ids = {uid for uid, label in units.items() if "pack" in label.casefold()}
+    purchase_id = int(product.get("qu_id_purchase") or current_unit)
+    changes = {"name": name}
     photo_url = saved_photo(product)
     description = PHOTO_MARKER.sub("", PACK_MARKER.sub(
         "", str(product.get("description") or ""))).strip()
     if photo_url:
-        description += ("\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
-    if is_pack and pack_size != 1:
-        description = (description + "\n" if description else "") + (
+        description += ("\\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
+    if unit_id in pack_ids and unit_id != current_unit:
+        if not piece_ids:
+            raise BarcodeError("Crea primero la unidad Piece en Grocy para poder consumir piezas")
+        # Selecting Pack means *purchase* packs, not stock packs.
+        unit_id = sorted(piece_ids)[0]
+        if current_unit != unit_id:
+            current_stock = Decimal(str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
+            if not current_stock.is_finite() or current_stock != 0:
+                raise BarcodeError("La unidad actual tiene existencias. Debes migrarlas a Piece manualmente antes de cambiar a Pack de compra.")
+        purchase_id = next(iter(sorted(pack_ids)))
+    elif purchase_id in pack_ids and unit_id in piece_ids:
+        # Keep the purchasing-unit choice when the stock unit is Piece.
+        purchase_id = purchase_id
+    else:
+        purchase_id = unit_id
+    if purchase_id in pack_ids and unit_id in piece_ids:
+        changes["qu_id_purchase"] = purchase_id
+        changes["qu_factor_purchase_to_stock"] = pack_size
+        description += ("\\n" if description else "") + (
             f"[Despensa: unidades_por_envase={pack_size}]")
-    changes = {"name": name, "description": description}
+    else:
+        pack_size = 1
+        changes["qu_id_purchase"] = unit_id
+        changes["qu_factor_purchase_to_stock"] = 1
     if unit_id != current_unit:
         changes["qu_id_stock"] = unit_id
     grocy("PUT", f"objects/products/{pid}", changes)
@@ -473,7 +499,7 @@ def _new_product_match(name, barcode, products, barcodes):
     return None
 
 
-def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", location_id=2, image_url=None):
+def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", location_id=2, image_url=None, pack_size="1"):
     """Create only new products; an existing match is returned without any writes."""
     name = (name or "").strip()
     if not name or len(name) > 200:
@@ -492,6 +518,25 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
     units = new_product_units()
     if unit_id not in {u["id"] for u in units}:
         raise BarcodeError("Selecciona una unidad de medida válida de Grocy")
+    product_units = {u["id"]: u["name"].casefold() for u in units}
+    pack_ids = {i for i, label in product_units.items() if "pack" in label}
+    piece_ids = {i for i, label in product_units.items()
+                 if label.strip() in ("piece", "pieces", "unidad", "unidades")}
+    purchase_id = unit_id
+    if unit_id in pack_ids:
+        if not piece_ids:
+            raise BarcodeError("No existe la unidad Piece en Grocy")
+        purchase_id = unit_id
+        unit_id = sorted(piece_ids)[0]
+        try:
+            pack_size = int(pack_size)
+        except (ValueError, TypeError) as exc:
+            raise BarcodeError("Indica cuántas piezas contiene el pack") from exc
+        if not 1 <= pack_size <= 1000:
+            raise BarcodeError("El pack debe contener entre 1 y 1000 piezas")
+        amount *= pack_size
+    else:
+        pack_size = 1
     products = grocy("GET", "objects/products")
     barcodes = grocy("GET", "objects/product_barcodes")
     if not isinstance(products, list) or not isinstance(barcodes, list):
@@ -503,8 +548,10 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
     safe_url = safe_image_url(image_url)
     result = grocy("POST", "objects/products", {
         "name": name, "location_id": location_id, "qu_id_stock": unit_id,
-        "qu_id_purchase": unit_id, "min_stock_amount": 0,
-        "description": "[Despensa: imagen=" + safe_url + "]" if safe_url else "",
+        "qu_id_purchase": purchase_id,
+        "qu_factor_purchase_to_stock": pack_size, "min_stock_amount": 0,
+        "description": (("[Despensa: imagen=" + safe_url + "]\\n") if safe_url else "") +
+                       (f"[Despensa: unidades_por_envase={pack_size}]" if pack_size > 1 else ""),
     })
     pid = int(result["created_object_id"])
     if barcode:
