@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.24] — 2026-10-31
+
+### Added
+- Shopping list button to delete all completed items in one action, with confirmation and count.
+- Operates only on completed entries in Grocy's default shopping list; pending entries and inventory stock remain untouched.
+
+### Validation
+- Pending GitHub Actions and mobile smoke test.
+
+
 ## [0.7.23] — 2026-10-31
 
 ### Fixed
