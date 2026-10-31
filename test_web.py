@@ -67,6 +67,8 @@ class WebTests(unittest.TestCase):
                          "ticket": (io.BytesIO(b"%PDF-1.4"), "receipt.pdf")},
                          content_type="multipart/form-data")
         self.assertEqual(r.status_code, 200)
+        self.assertIn(b"1 l\xc3\xadneas", r.data)
+        self.assertIn(b"Milk", r.data)
         mock_extract.assert_called_once()
         with self.client.session_transaction() as session:
             rid = session["receipt_id"]
