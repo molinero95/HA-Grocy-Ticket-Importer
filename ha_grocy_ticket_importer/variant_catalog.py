@@ -5,6 +5,7 @@ No stock movements, product merges or shopping-list writes occur here.
 """
 import os
 from decimal import Decimal, InvalidOperation
+from contextlib import closing
 from pathlib import Path
 
 import barcode_stock
@@ -18,7 +19,7 @@ CATALOG_DB = Path(os.environ.get("GENERIC_CATALOG_DB", "/config/generic_catalog.
 
 def variants_for_product(product_id):
     """Return local variants for one Grocy product, without changing Grocy."""
-    with connect(CATALOG_DB) as db:
+    with closing(connect(CATALOG_DB)) as db:
         rows = db.execute(
             "SELECT v.barcode, v.display_name, v.supermarket, v.brand, v.units_per_purchase "
             "FROM product_variants v JOIN generic_products g ON g.id=v.generic_id "
@@ -52,7 +53,7 @@ def save_variant(product_id, barcode, name, *, supermarket="", brand="", units_p
     if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
         raise ValueError("El producto genérico no existe en Grocy")
 
-    with connect(CATALOG_DB) as db:
+    with closing(connect(CATALOG_DB)) as db:
         local = resolve_barcode(db, barcode)
         if local and int(local["grocy_product_id"]) != pid:
             raise ValueError("Este código ya pertenece a otro genérico")
