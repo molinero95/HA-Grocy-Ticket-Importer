@@ -22,6 +22,7 @@ import barcode_stock
 import product_images
 import variant_catalog
 import catalog_audit
+import shopping_match_queue
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(os.environ.get("GROCY_ENV_FILE", str(ROOT / ".env")))
@@ -288,9 +289,29 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Añadir producto</strong><small>Crear artículo nuevo</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
 <a class="action-link" href="{{ url_for('index', view='duplicates') }}"><span aria-hidden="true">🔎</span><strong>Detectar duplicados</strong><small>Revisar artículos similares</small></a>
+<a class="action-link" href="{{ url_for('index', view='alexa_matches') }}"><span aria-hidden="true">🗣️</span><strong>Coincidencias Alexa</strong><small>Revisar nombres ambiguos</small></a>
 </nav></div>
 {% else %}
 <p><a class="back-link" href="{{ url_for('index', view='inventory') if view == 'product' else url_for('index', view='actions') }}">← {{ 'Volver a mi despensa' if view == 'product' else 'Volver a acciones' }}</a></p>
+{% endif %}
+{% if view == 'alexa_matches' %}
+<section><p class="section-eyebrow">Alexa · Revisión segura</p><h2>Coincidencias pendientes</h2>
+<p class="helper">Se conservan los nombres originales de Alexa y las notas de Grocy. Elegir un producto solo guarda una propuesta: todavía no convierte notas ni modifica existencias.</p>
+{% if pending_matches_error %}<p role="alert">No se pudo leer la cola de coincidencias.</p>
+{% elif not pending_matches %}<p>No hay coincidencias ambiguas pendientes. La lista se analiza cuando está activa la sincronización con Alexa.</p>
+{% else %}
+{% for match in pending_matches %}
+<div class="ticket-review-item"><strong>{{ match.name }}</strong>
+<form method="post" action="{{ url_for('alexa_match_choose') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ match.key }}">
+<label>Producto genérico propuesto<select name="product_id" required>
+<option value="">Selecciona manualmente</option>
+{% for candidate in match.candidates %}<option value="{{ candidate.id }}" {% if candidate.id == match.selected_product_id %}selected{% endif %}>{{ candidate.name }}</option>{% endfor %}
+</select></label><button type="submit">Guardar propuesta sin cambiar listas</button></form>
+{% if match.selected_product_id %}<p class="helper">Propuesta guardada. La asociación automática sigue desactivada.</p>{% endif %}
+</div>
+{% endfor %}{% endif %}
+</section>
 {% endif %}
 {% if view == 'about' %}
 <section><p class="section-eyebrow">Información</p><h2>Acerca de Despensa</h2>
@@ -967,7 +988,7 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-VIEWS = {"shopping", "shopping_add", "inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about", "duplicates"}
+VIEWS = {"shopping", "shopping_add", "inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about", "duplicates", "alexa_matches"}
 POST_VIEWS = {
     "barcode_add": "add",
     "barcode_associate": "associate",
@@ -979,6 +1000,7 @@ POST_VIEWS = {
     "product_photo": "product",
     "product_barcode_add": "product",
     "product_variant_add": "product",
+    "alexa_match_choose": "alexa_matches",
     "product_stock_save": "product",
     "shopping_add": "shopping",
     "shopping_toggle": "shopping",
@@ -1062,6 +1084,12 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             pass
         except Exception:
             pass
+    pending_matches, pending_matches_error = [], False
+    if view == "alexa_matches" and (INGRESS_MODE or session.get("auth")):
+        try:
+            pending_matches = shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
+        except Exception:
+            pending_matches_error = True
     variants, variants_error = [], False
     if product:
         try:
@@ -1100,6 +1128,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   new_product_units=new_product_units,
                                   existing_product=existing_product,
                                   product=product, variants=variants, variants_error=variants_error,
+                                  pending_matches=pending_matches, pending_matches_error=pending_matches_error,
                                   app_version=os.environ.get("DESPENSA_VERSION", "dev"),
                                   app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
                                   grocy_configured=bool(os.environ.get("GROCY_URL") and os.environ.get("GROCY_API_KEY")),
@@ -1146,6 +1175,20 @@ def product_choices():
         return barcode_stock.list_products()
     except Exception:
         return []
+
+@app.post("/alexa/match/choose")
+def alexa_match_choose():
+    try:
+        shopping_match_queue.choose(
+            shopping_match_queue.DEFAULT_PATH,
+            request.form.get("key", ""), request.form.get("product_id", ""))
+    except (ValueError, TypeError):
+        return render("La propuesta ya no es válida. Actualiza y vuelve a elegir."), 409
+    except Exception:
+        app.logger.exception("alexa_match_choice_failed")
+        return render("No se pudo guardar la propuesta; las listas no se han modificado."), 502
+    return redirect(url_for("index", view="alexa_matches"))
+
 
 @app.get("/catalog/audit")
 def download_catalog_audit():
