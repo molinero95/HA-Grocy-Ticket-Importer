@@ -72,3 +72,10 @@ export async function previewReceipt(id: string, items: { name: string; purchase
   if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo simular la importación');
   return result;
 }
+
+export async function commitReceipt(id: string): Promise<{ status: string; output: string }> {
+  const response = await fetch(base + 'receipts/' + encodeURIComponent(id) + '/commit', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': await token() } });
+  const result = await response.json() as { status: string; output: string; error?: string; details?: string };
+  if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo confirmar la importación');
+  return result;
+}
