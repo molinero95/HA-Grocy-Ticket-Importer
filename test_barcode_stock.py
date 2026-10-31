@@ -122,6 +122,66 @@ class BarcodeTests(unittest.TestCase):
         self.assertFalse(any("DELETE" == c.args[0] for c in api.call_args_list))
 
     @patch("barcode_stock.grocy")
+    def test_consume_quantity_and_replenish_purchase_list(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/product_barcodes":
+                return [{"product_id": 5, "barcode": "1234567890123"}]
+            if method == "GET" and path == "objects/products":
+                return PRODUCTS
+            if method == "GET" and path == "stock/products/5":
+                return {"stock_amount": "2"}
+            if method == "GET" and path == "objects/products/5":
+                return {"id": 5, "name": "Leche", "qu_id_stock": 2}
+            if method == "POST":
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        result = barcode_stock.consume_quantity("1234567890123", "0,50", True)
+        self.assertTrue(result["shopping_added"])
+        api.assert_any_call("POST", "stock/products/5/consume", {"amount": 0.5, "spoiled": False})
+        api.assert_any_call("POST", "stock/shoppinglist/add-product",
+                            {"product_id": 5, "list_id": 1, "product_amount": 0.5, "qu_id": 2})
+
+    @patch("barcode_stock.grocy")
+    def test_consumption_rejects_more_than_stock_and_three_decimals(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/product_barcodes":
+                return [{"product_id": 5, "barcode": "1234567890123"}]
+            if method == "GET" and path == "objects/products":
+                return PRODUCTS
+            if method == "GET" and path == "stock/products/5":
+                return {"stock_amount": "1"}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        for qty in ("1.01", "0.001", "-1", "NaN"):
+            with self.assertRaises(barcode_stock.BarcodeError):
+                barcode_stock.consume_quantity("1234567890123", qty)
+        self.assertFalse(any(c.args[0] == "POST" for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_replenish_failure_does_not_repeat_consumption(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/product_barcodes":
+                return [{"product_id": 5, "barcode": "1234567890123"}]
+            if method == "GET" and path == "objects/products":
+                return PRODUCTS
+            if method == "GET" and path == "stock/products/5":
+                return {"stock_amount": "2"}
+            if method == "GET" and path == "objects/products/5":
+                return {"id": 5, "qu_id_stock": 2}
+            if method == "POST" and path == "stock/shoppinglist/add-product":
+                raise RuntimeError("Grocy shopping-list failure")
+            if method == "POST" and path == "stock/products/5/consume":
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        result = barcode_stock.consume_quantity("1234567890123", "1", True)
+        self.assertTrue(result["shopping_error"])
+        self.assertFalse(result["shopping_added"])
+        self.assertEqual(sum(c.args[0] == "POST" and c.args[1] == "stock/products/5/consume"
+                             for c in api.call_args_list), 1)
+
+    @patch("barcode_stock.grocy")
     def test_no_stock_no_consumption(self, api):
         def fake(method, path, body=None):
             if path == "objects/product_barcodes":
