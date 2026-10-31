@@ -5,6 +5,7 @@ import { getDuplicateCandidates, getMergePreview } from './api';
 export function Duplicates() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['duplicates'], queryFn: getDuplicateCandidates });
   const [pair, setPair] = useState<[number, number] | null>(null);
+  const preview = useQuery({ queryKey: ['merge-preview', pair], queryFn: () => getMergePreview(pair![0], pair![1]), enabled: pair !== null });
   return <main><div className="heading"><div><span className="eyebrow">REVISIÓN DEL CATÁLOGO</span><h2>Posibles duplicados</h2><p>Coincidencias por nombre o código. No se fusiona ni elimina ningún producto automáticamente.</p></div><button onClick={() => void refetch()}>Volver a analizar</button></div>
     {isLoading && <p>Cargando candidatos…</p>}{isError && <p role="alert" className="notice">No se pudo analizar el catálogo. <button onClick={() => void refetch()}>Reintentar</button></p>}
     {data?.length === 0 && <p>No se han detectado posibles duplicados.</p>}
