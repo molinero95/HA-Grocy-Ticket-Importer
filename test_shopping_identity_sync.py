@@ -56,6 +56,16 @@ class IdentityPlannerTests(unittest.TestCase):
             plan_identity(["Arroz"], [], PRODUCTS, None,
                           {"arroz": {"product_id": 999}})
 
+    def test_unrelated_manual_selection_is_rejected(self):
+        with self.assertRaisesRegex(IdentityConflict, "valid candidate"):
+            plan_identity(["Arroz"], [], PRODUCTS, None,
+                          {"arroz": {"product_id": 3}})
+
+    def test_exact_name_cannot_be_overridden_by_manual_choice(self):
+        with self.assertRaisesRegex(IdentityConflict, "valid candidate"):
+            plan_identity(["Leche entera"], [], PRODUCTS, None,
+                          {"leche entera": {"product_id": 2}})
+
     def test_first_sync_preserves_existing_product_and_quantity(self):
         p = plan_identity([], [entry(2, amount=5)], PRODUCTS)
         self.assertEqual(p["add_alexa"][0]["name"], "Arroz basmati")
