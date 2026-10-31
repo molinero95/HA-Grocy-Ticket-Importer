@@ -19,11 +19,25 @@ import product_images
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env")
-DATA = ROOT / "runtime" / "receipts"
+DATA = Path(os.environ.get("RECEIPT_DATA_DIR", str(ROOT / "runtime" / "receipts")))
 ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
 LOCK = threading.Lock()
+INGRESS_MODE = os.environ.get("HA_INGRESS_MODE") == "1"
+
+class IngressPrefixMiddleware:
+    """Use the ingress prefix for URL generation; proxy strips it from PATH_INFO."""
+    def __init__(self, wrapped):
+        self.wrapped = wrapped
+
+    def __call__(self, environ, start_response):
+        prefix = environ.get("HTTP_X_INGRESS_PATH", "").rstrip("/")
+        if INGRESS_MODE and prefix.startswith("/api/hassio_ingress/"):
+            environ["SCRIPT_NAME"] = prefix
+        return self.wrapped(environ, start_response)
+
 
 app = Flask(__name__)
+app.wsgi_app = IngressPrefixMiddleware(app.wsgi_app)
 app.config.update(
     SECRET_KEY=os.environ.get("WEB_SESSION_SECRET", ""),
     MAX_CONTENT_LENGTH=12 * 1024 * 1024,
@@ -41,11 +55,11 @@ input,button{font:inherit;padding:10px;margin:5px 0;max-width:100%}
 button{cursor:pointer}table{border-collapse:collapse;width:100%}
 td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 .review{color:#a34b00}.error{color:#a40000}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
-<header><h1>Tickets → Grocy</h1>{% if session.get('auth') %}
+<header><h1>Tickets → Grocy</h1>{% if authenticated and not ingress_mode %}
 <form action="{{ url_for('logout') }}" method="post">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button>Salir</button></form>{% endif %}</header>
 {% if message %}<section><strong>{{ message }}</strong></section>{% endif %}
-{% if not session.get('auth') %}<section><form method="post" action="{{ url_for('login') }}">
+{% if not authenticated %}<section><form method="post" action="{{ url_for('login') }}">
 <input type="password" name="password" placeholder="Contraseña" required>
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="submit">Entrar</button></form></section>
@@ -116,7 +130,7 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 {% endif %}</html>"""
 
 def configured():
-    return bool(app.secret_key and os.environ.get("WEB_PASSWORD"))
+    return bool(app.secret_key and (INGRESS_MODE or os.environ.get("WEB_PASSWORD")))
 
 @app.before_request
 def protect():
@@ -126,7 +140,7 @@ def protect():
         token = session.get("csrf")
         if not token or not hmac.compare_digest(request.form.get("csrf", ""), token):
             abort(403)
-    if request.endpoint not in ("index", "login", "static") and not session.get("auth"):
+    if request.endpoint not in ("index", "login", "static") and not (INGRESS_MODE or session.get("auth")):
         abort(401)
 
 def csrf_token():
@@ -138,7 +152,8 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
     return render_template_string(PAGE, csrf=csrf_token(), message=message,
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
-                                  products=product_choices())
+                                  products=product_choices(), authenticated=INGRESS_MODE or bool(session.get("auth")),
+                                  ingress_mode=INGRESS_MODE)
 
 def receipt_path(rid):
     if len(rid) != 32 or any(c not in "0123456789abcdef" for c in rid):
@@ -169,7 +184,7 @@ def logout():
     return redirect(url_for("index"))
 
 def product_choices():
-    if not session.get("auth"):
+    if not (INGRESS_MODE or session.get("auth")):
         return []
     try:
         return barcode_stock.list_products()
