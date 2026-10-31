@@ -1,5 +1,7 @@
 # Despensa — Grocy Ticket Importer para Home Assistant
 
+[![Licencia MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
 > **Estado:** versión de desarrollo. La instalación desde repositorio y la configuración nativa aún requieren validación en Home Assistant.
@@ -15,7 +17,7 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 
 > «Unidades por envase» es una propiedad informativa de la ficha. Por ejemplo, indicar «4» en un pack de aromas de vainilla **no convierte automáticamente un envase en cuatro unidades de stock**. La vista previa de fotografía tampoco la guarda todavía en Grocy.
 
-## Instalar desde Home Assistant (una vez que el repositorio sea público)
+## Instalar desde Home Assistant (repositorio comunitario)
 
 El repositorio contiene `repository.yaml` y `ha_grocy_ticket_importer/config.yaml`, que Home Assistant utiliza para descubrir el complemento.
 
@@ -42,7 +44,7 @@ El complemento se ejecuta por **Ingress**, a través de la autenticación de Hom
 
 ## Actualizaciones automáticas de versiones
 
-Con el repositorio **público** y añadido a la tienda, Home Assistant puede detectar una versión nueva cuando cambia `ha_grocy_ticket_importer/config.yaml → version`.
+Con el repositorio público añadido a la tienda de complementos, Home Assistant puede detectar una versión nueva cuando cambia `ha_grocy_ticket_importer/config.yaml → version`.
 
 - Para comprobarlo, utiliza **Buscar actualizaciones** en la tienda.
 - Home Assistant debería ofrecer el botón **Actualizar** sin descargar ZIP ni copiar archivos.
@@ -63,6 +65,10 @@ python -m unittest discover -v -p 'test_*.py'
 ```
 
 No ejecuta llamadas reales a Grocy ni a OpenAI en los tests automatizados.
+
+## Licencia
+
+Este proyecto se distribuye bajo la **licencia MIT**. Consulta el archivo [LICENSE](LICENSE). Las bibliotecas y servicios externos mantienen sus propias licencias y condiciones de uso.
 
 ## Privacidad y seguridad
 
