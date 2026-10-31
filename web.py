@@ -280,10 +280,12 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <select id="edit-unit" name="unit_id" required>
 {% for u in product.units %}<option value="{{ u.id }}" {% if u.id == product.unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
 </select>
-<p class="helper">Si hay existencias ({{ product.stock_amount }}), cambiar la unidad requiere una conversión previa en Grocy para no tratar unidades como kg.</p>
-<label for="edit-pack-size">Unidades por envase</label>
+<p class="helper">Si hay existencias ({{ product.stock_amount }}), no se puede cambiar la unidad. Ajusta antes la cantidad a cero y luego establece la nueva unidad para evitar conversiones erróneas.</p>
+<div id="pack-size-fields" {% if not product.is_pack %}hidden{% endif %}>
+<label for="edit-pack-size">Piezas por pack</label>
 <input id="edit-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="{{ product.pack_size }}" required>
-<p class="helper">Ejemplo: si el aroma de vainilla contiene 4 botellitas, indica 4. Se seguirá contando como un envase hasta que configuremos otra unidad de stock.</p>
+<p class="helper">Solo se aplica a productos medidos en Pack. No cambia automáticamente las existencias.</p>
+</div>
 <button type="submit">Guardar cambios</button>
 </form>
 <h3>Ajustar cantidad disponible</h3>
@@ -539,6 +541,18 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         if (statusNode) statusNode.textContent = 'Imagen guardada desde Open Food Facts.';
       }
     }).catch(() => {});
+  }
+  const unitSelector = document.getElementById('edit-unit');
+  const packFields = document.getElementById('pack-size-fields');
+  if (unitSelector && packFields) {
+    const updatePackFields = () => {
+      const label = unitSelector.selectedOptions[0]?.textContent?.trim().toLowerCase() || '';
+      packFields.hidden = !label.includes('pack');
+      const packInput = document.getElementById('edit-pack-size');
+      if (packInput) packInput.required = !packFields.hidden;
+    };
+    unitSelector.addEventListener('change', updatePackFields);
+    updatePackFields();
   }
   // Scanning or typing a complete EAN/UPC previews an image automatically.
   document.querySelectorAll('form input[name="barcode"]').forEach(input => {
