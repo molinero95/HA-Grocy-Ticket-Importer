@@ -9,12 +9,17 @@ from pathlib import Path
 
 from shopping_sync_runtime import load_baseline, reconcile, save_baseline
 from shopping_sync import normalize
+import hashlib
 from shopping_sync_adapters import (
     ha_todo_items, grocy_shopping_names, add_alexa, add_grocy,
     remove_alexa, remove_grocy,
 )
 
-STATE = Path(os.environ.get("SHOPPING_SYNC_STATE", "/data/shopping-sync.json"))
+ENTITY = os.environ.get("ALEXA_SHOPPING_LIST_ENTITY", "")
+# Separate baselines by selected Alexa entity to avoid carrying deletion
+# history across list changes. The entity identifier is not logged.
+ENTITY_HASH = hashlib.sha256(ENTITY.encode("utf-8")).hexdigest()[:16]
+STATE = Path(os.environ.get("SHOPPING_SYNC_STATE", "/data/shopping-sync-" + ENTITY_HASH + ".json"))
 
 
 def run_once(*, dry_run=True):
