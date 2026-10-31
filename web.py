@@ -344,7 +344,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% elif not duplicates %}<p>Sin posibles duplicados detectados.</p>
 {% else %}<p>{{ duplicates|length }} grupos para revisar.</p>
 {% for group in duplicates %}<div class="ticket-review-item"><strong>{{ group.reason }}</strong>
-{% for item in group.items %}<p><a href="{{ url_for('index', view='product', product_id=item.id) }}">{{ item.name }}</a> <small>· ID {{ item.id }}{% if item.barcodes %} · {{ item.barcodes|join(', ') }}{% endif %}</small></p>{% endfor %}</div>{% endfor %}{% endif %}
+{% for item in group['items'] %}<p><a href="{{ url_for('index', view='product', product_id=item.id) }}">{{ item.name }}</a> <small>· ID {{ item.id }}{% if item.barcodes %} · {{ item.barcodes|join(', ') }}{% endif %}</small></p>{% endfor %}</div>{% endfor %}{% endif %}
 </section>
 {% endif %}
 {% if view == 'add' %}
