@@ -92,10 +92,16 @@ def product_detail(product_id):
         "pack_size": int(marker.group(1)) if marker else 1,
         "description": PACK_MARKER.sub("", description).strip(),
         "barcodes": codes,
+        "unit_id": int(product["qu_id_stock"]),
+        "units": sorted(
+            [{"id": int(unit["id"]), "name": str(unit["name"])}
+             for unit in grocy("GET", "objects/quantity_units")],
+            key=lambda unit: unit["name"].casefold()),
+        "stock_amount": str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)),
     }
 
 
-def update_product_info(product_id, name, pack_size):
+def update_product_info(product_id, name, pack_size, unit_id=None):
     """Edit name and package metadata only. No stock units are changed."""
     pid = int(product_id)
     if pid <= 0:
@@ -112,12 +118,33 @@ def update_product_info(product_id, name, pack_size):
     product = grocy("GET", f"objects/products/{pid}")
     if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
         raise BarcodeError("Producto inexistente")
+    current_unit = int(product["qu_id_stock"])
+    if unit_id in (None, ""):
+        unit_id = current_unit
+    try:
+        unit_id = int(unit_id)
+    except (TypeError, ValueError) as exc:
+        raise BarcodeError("Unidad de medida no válida") from exc
+    if unit_id != current_unit:
+        known_units = {int(unit["id"]) for unit in grocy("GET", "objects/quantity_units")}
+        if unit_id not in known_units:
+            raise BarcodeError("La unidad seleccionada no existe en Grocy")
+        current_stock = Decimal(str(
+            grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
+        if not current_stock.is_finite() or current_stock != 0:
+            raise BarcodeError(
+                "No se puede cambiar la unidad con existencias. "
+                "Primero hay que convertir o ajustar el stock en Grocy, "
+                "para no interpretar unidades como kilogramos.")
     description = PACK_MARKER.sub("", str(product.get("description") or "")).strip()
     if pack_size != 1:
         description = (description + "\n" if description else "") + (
             f"[Despensa: unidades_por_envase={pack_size}]")
-    grocy("PUT", f"objects/products/{pid}", {"name": name, "description": description})
-    return {"id": pid, "name": name, "pack_size": pack_size}
+    changes = {"name": name, "description": description}
+    if unit_id != current_unit:
+        changes["qu_id_stock"] = unit_id
+    grocy("PUT", f"objects/products/{pid}", changes)
+    return {"id": pid, "name": name, "pack_size": pack_size, "unit_id": unit_id}
 
 
 def associate_barcode(barcode, product_id):
@@ -140,6 +167,26 @@ def associate_barcode(barcode, product_id):
     grocy("POST", "objects/product_barcodes",
           {"product_id": product_id, "barcode": barcode})
     return {"product_id": product_id, "name": products[0]["name"], "already_linked": False}
+
+def associate_product_barcode(product_id, barcode):
+    """Attach barcode to an explicitly identified product; no stock movement."""
+    barcode = validate_barcode(barcode)
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
+        raise BarcodeError("Producto inexistente")
+    matches = [row for row in grocy("GET", "objects/product_barcodes")
+               if str(row["barcode"]) == barcode]
+    if matches:
+        ids = {int(row["product_id"]) for row in matches}
+        if ids == {pid}:
+            return {"name": str(product["name"]), "already_linked": True}
+        raise BarcodeError("Este código ya pertenece a otro producto. No se ha modificado nada")
+    grocy("POST", "objects/product_barcodes", {"product_id": pid, "barcode": barcode})
+    return {"name": str(product["name"]), "already_linked": False}
+
 
 def _get_name_and_id(barcode):
     product = find_product(barcode)
