@@ -51,3 +51,6 @@ export async function getProductVariants(productId: number): Promise<ProductVari
   if (!response.ok) throw new Error('No se han podido cargar las variantes');
   return response.json() as Promise<ProductVariantsResponse>;
 }
+
+export type VariantInput = { barcode: string; name: string; supermarket: string; brand: string; units_per_purchase: string };
+export const saveProductVariant = (productId: number, variant: VariantInput) => mutate('products/' + productId + '/variants', 'POST', variant);
