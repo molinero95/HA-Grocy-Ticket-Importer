@@ -72,3 +72,21 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
 - [ ] Consume explicit selections in an identity-aware reconciliation planner
   without changing/removing original notes until the full operation is verified.
 - [ ] Handle concurrent edits, quantity preservation and restart recovery.
+
+### Identity-aware Alexa v2 progress (PR #5)
+
+- [x] Implement ID-keyed planner with free-text notes, explicit choices and
+  collision detection for both original and canonical product names.
+- [x] Implement atomic v2 checkpoint and persisted Alexa name-to-product
+  bindings, with fail-closed checks for stale choices and changed identities.
+- [x] Add adapter guards against concurrent Grocy quantity/note edits and
+  duplicate Alexa removals, plus network-free regression coverage.
+- [x] Scope manual-choice queues and v2 checkpoints to the configured Alexa
+  entity; preserve legacy data without unsafe automatic migration.
+- [ ] Validate CI for the final PR head after all edits and inspect Docker build.
+- [ ] Verify live Home Assistant todo service and Grocy 4.7.1 shopping API
+  read/write semantics with disposable items, including restart recovery.
+- [ ] Validate mobile variant editor, camera, stock invariants and persistent
+  app_config metadata on the installed add-on before enabling sync.
+- [ ] Prepare a release version with identical root/add-on changelogs and
+  merge only after the above release gates pass.
