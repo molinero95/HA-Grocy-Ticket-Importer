@@ -103,3 +103,30 @@ El estado se guarda en `/data/shopping-sync.json`. Conservar este archivo durant
 
 
 **Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.
+
+## Productos genéricos y variantes (desarrollo, pendiente de publicación)
+
+Cada artículo de Grocy puede ser el **producto genérico** (por ejemplo, «Leche entera»).
+En su ficha se pueden registrar variantes por supermercado con nombre, marca,
+código EAN/UPC y unidades por compra. El escáner de cámara sirve para introducir
+el código. Todas las variantes se asocian al **mismo ID de producto en Grocy**:
+no se crea stock separado y registrar una variante no modifica las existencias.
+
+Antes de guardar, Despensa comprueba la propiedad del código en Grocy y en su
+catálogo local. Si otro producto ya lo tiene, se rechaza sin fusionar artículos.
+El catálogo auxiliar se conserva en `/config/generic_catalog.sqlite3` (volumen
+`app_config` del complemento); debe incluirse en las copias de seguridad.
+La ficha solo muestra variantes añadidas explícitamente: **no se migran ni
+consolidan productos existentes automáticamente**.
+
+En **Acciones → Detectar duplicados** hay una descarga de auditoría JSON de
+solo lectura con productos, códigos, unidades, stock, referencias de la lista
+de compra y variantes. Revisa y conserva esa exportación antes de cualquier
+consolidación manual. No subas exportaciones reales a GitHub.
+
+**Limitación actual:** el factor de unidades por compra de la variante es
+metadato; no modifica automáticamente la conversión de unidades ni la
+importación de tickets. La asociación de Alexa por identidad, los casos
+ambiguos y la validación de extremo a extremo siguen pendientes.
+No actives nuevas opciones de sincronización basándote únicamente en esta
+funcionalidad.
