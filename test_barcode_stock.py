@@ -11,6 +11,33 @@ PRODUCTS = [{"id": 5, "name": "Leche", "qu_id_stock": 2},
 
 class ProductCreationTests(unittest.TestCase):
     @patch("barcode_stock.grocy")
+    def test_delete_zero_stock_product(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/5":
+                return {"id": 5, "name": "Leche"}
+            if method == "GET" and path == "stock/products/5":
+                return {"stock_amount": 0}
+            if method == "DELETE" and path == "objects/products/5":
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        self.assertEqual(barcode_stock.delete_catalog_product(5, "Leche"), "Leche")
+        api.assert_any_call("DELETE", "objects/products/5")
+
+    @patch("barcode_stock.grocy")
+    def test_delete_rejects_stock(self, api):
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/5":
+                return {"id": 5, "name": "Leche"}
+            if method == "GET" and path == "stock/products/5":
+                return {"stock_amount": 2}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        with self.assertRaises(barcode_stock.BarcodeError):
+            barcode_stock.delete_catalog_product(5, "Leche")
+        self.assertFalse(any(c.args[0] == "DELETE" for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
     def test_existing_name_or_barcode_returns_edit_target_without_writes(self, api):
         def fake(method, path, body=None):
             self.assertEqual(method, "GET")
