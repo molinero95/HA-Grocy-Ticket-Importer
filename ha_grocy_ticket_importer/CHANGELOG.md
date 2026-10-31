@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0] — 2026-10-31
+
+### Changed
+- Adopt minor-version increments for new features; 0.8.0 consolidates inventory barcode lookup, shopping item product links and simplified unit editing.
+- Remove obsolete pack conversion prefill during receipt upload.
+
+### Fixed
+- Receipt upload/extraction failures now log an exception with a short reference and display a helpful error instead of an unhandled server error.
+- Prior missing barcode_stock.norm error was corrected in 0.7.26.
+
+### Validation
+- CI and real receipt smoke test pending.
+
+
 ## [0.7.27] — 2026-10-31
 
 ### Changed
