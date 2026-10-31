@@ -30,6 +30,16 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         extract.assert_not_called()
 
+    def test_receipt_commit_requires_preview(self):
+        from unittest.mock import Mock
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web, "run_import") as importer:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            with self.client.session_transaction() as session:
+                session["receipt_id"] = "a" * 32
+            response = self.client.post("/api/v1/receipts/" + "a" * 32 + "/commit", headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 403)
+        importer.assert_not_called()
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
