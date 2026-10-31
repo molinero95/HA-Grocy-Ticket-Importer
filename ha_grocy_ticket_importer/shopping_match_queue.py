@@ -105,6 +105,23 @@ def choose(path, key, product_id):
                    (pid, key))
 
 
+def keep_original(path, key):
+    """Explicitly clear a previously selected candidate, retaining Alexa's original item.
+
+    Refuse stale or inactive entries so a delayed UI action cannot affect another sync.
+    """
+    key = normalize(key)
+    with closing(connect(path)) as db, db:
+        row = db.execute(
+            "SELECT 1 FROM pending_matches WHERE normalized_name=? AND active=1",
+            (key,)).fetchone()
+        if row is None:
+            raise ValueError("La propuesta ya no está disponible; actualiza la lista")
+        db.execute(
+            "UPDATE pending_matches SET selected_product_id=NULL WHERE normalized_name=? AND active=1",
+            (key,))
+
+
 def resolved_choices(path, alexa_names, products):
     """Read-only, validated identity mapping for the next sync stage.
 
