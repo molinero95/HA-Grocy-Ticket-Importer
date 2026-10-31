@@ -34,6 +34,24 @@ jobs:
               py_compile.compile(str(path), doraise=True)
           print(f'Compiled {len(files)} Python files')
           PY
+      - name: Check embedded browser JavaScript syntax
+        run: |
+          python - <<'PY'
+          import re
+          import subprocess
+          import tempfile
+          from pathlib import Path
+          html_source = Path('web.py').read_text(encoding='utf-8')
+          blocks = re.findall(r'<script>(.*?)</script>', html_source, re.DOTALL)
+          if len(blocks) < 2:
+              raise SystemExit('Expected barcode scanner and product search scripts')
+          for script in blocks:
+              with tempfile.NamedTemporaryFile(suffix='.js', mode='w', encoding='utf-8') as temp:
+                  temp.write(script)
+                  temp.flush()
+                  subprocess.run(['node', '--check', temp.name], check=True)
+          print(f'Validated {len(blocks)} JavaScript blocks')
+          PY
       - name: Check Home Assistant packaged sources are synchronized
         run: |
           for file in extract.py importer.py barcode_stock.py product_images.py web.py; do
