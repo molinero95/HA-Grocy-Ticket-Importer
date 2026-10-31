@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.16] — 2026-10-31
+
+### Added
+- Optional `homeassistant_access_token` password field in the Home Assistant add-on settings for a user-generated long-lived access token when Supervisor credentials are unavailable.
+- When provided, the add-on uses the direct internal Home Assistant endpoint (`http://homeassistant:8123`) and passes the token privately to the shopping-sync worker. Existing Supervisor authentication remains the fallback when unset.
+
+### Security
+- Token values are never written to logs or release notes. Create and enter the token locally in Home Assistant; do not share it.
+
+### Validation
+- Requires configuring the token in Home Assistant and confirming Alexa-to-Grocy and Grocy-to-Alexa synchronization.
+
+
 ## [0.7.15] — 2026-10-31
 
 ### Fixed
