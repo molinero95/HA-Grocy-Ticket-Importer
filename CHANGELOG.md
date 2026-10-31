@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.3] — 2026-10-31
+
+### Changed
+- Replace the current barcode dropdown with an editable input in the product detail form.
+
+### Pending
+- User-uploaded product photos need durable local storage, image validation and a protected serving endpoint; not included in this patch.
+- CI and mobile verification pending.
+
+
 ## [0.8.2] — 2026-10-31
 
 ### Fixed
