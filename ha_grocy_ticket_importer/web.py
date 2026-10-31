@@ -118,6 +118,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .inventory-row small{display:block;color:var(--muted);font-size:.79rem;margin-top:3px}
 .inventory-quantity{text-align:right;min-width:80px}
 .quantity-unknown{color:#a34b00;font-size:.85rem}
+.version-label{border:1px solid var(--line);border-radius:999px;background:var(--soft);padding:6px 11px;text-decoration:none;font-size:.77rem;font-weight:750;white-space:nowrap}
+.about-list{display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:12px 8px;overflow-wrap:anywhere}
+.about-list dt{color:var(--muted);font-weight:650}
+.about-list dd{margin:0}
 .bottom-nav{display:none}
 @media(max-width:600px){
  body{padding:0 12px 96px;font-size:16px}
@@ -143,7 +147,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
-<header><div><h1>🌿 Despensa</h1><p>Tu inventario, sin complicaciones</p></div>{% if authenticated and not ingress_mode %}
+<header><div><h1>🌿 Despensa</h1><p>Tu inventario, sin complicaciones</p></div><a class="version-label" href="{{ url_for('index', view='about') }}" aria-label="Acerca de Despensa, versión {{ app_version }}">v{{ app_version }}</a>{% if authenticated and not ingress_mode %}
 <form action="{{ url_for('logout') }}" method="post">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button>Salir</button></form>{% endif %}</header>
 {% if message %}<section class="status-message" role="status"><strong>{{ message }}</strong></section>{% endif %}
@@ -178,6 +182,17 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </nav></div>
 {% else %}
 <p><a class="back-link" href="{{ url_for('index', view='inventory') if view == 'product' else url_for('index', view='actions') }}">← {{ 'Volver a mi despensa' if view == 'product' else 'Volver a acciones' }}</a></p>
+{% endif %}
+{% if view == 'about' %}
+<section><p class="section-eyebrow">Información</p><h2>Acerca de Despensa</h2>
+<dl class="about-list">
+<dt>Versión</dt><dd>v{{ app_version }}</dd>
+<dt>Instalación</dt><dd>{{ app_distribution }}</dd>
+<dt>Conexión con Grocy</dt><dd>{{ 'Configurada' if grocy_configured else 'Sin configurar' }} (no comprobada en tiempo real)</dd>
+<dt>Código fuente</dt><dd><a href="https://github.com/molinero95/HA-Grocy-Ticket-Importer" rel="noopener noreferrer" target="_blank">GitHub · HA-Grocy-Ticket-Importer</a></dd>
+</dl>
+<p class="helper">La versión identifica el complemento abierto. Para ver el estado real de Grocy, consulta Mi despensa.</p>
+</section>
 {% endif %}
 {% if view == 'product' %}
 <section class="product-sheet">
@@ -478,7 +493,7 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-VIEWS = {"inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product"}
+VIEWS = {"inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about"}
 POST_VIEWS = {
     "barcode_add": "add",
     "barcode_associate": "associate",
@@ -521,6 +536,9 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
                                   view=view, inventory=inventory, inventory_error=inventory_error,
                                   product=product,
+                                  app_version=os.environ.get("DESPENSA_VERSION", "dev"),
+                                  app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
+                                  grocy_configured=bool(os.environ.get("GROCY_URL") and os.environ.get("GROCY_API_KEY")),
                                   products=product_choices() if view == "associate" else [],
                                   authenticated=INGRESS_MODE or bool(session.get("auth")),
                                   ingress_mode=INGRESS_MODE)
