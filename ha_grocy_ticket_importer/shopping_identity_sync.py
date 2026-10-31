@@ -72,8 +72,12 @@ def identities(alexa_names, grocy_rows, products, choices=None):
     # A free-text Grocy note must never be silently replaced by a product.
     # Even an explicit Alexa choice is not permission to delete that note.
     for row in alexa.values():
-        if row["product_id"] and row["normalized"] in grocy_notes:
-            raise IdentityConflict("A Grocy note conflicts with a selected product")
+        if row["product_id"]:
+            if row["normalized"] in grocy_notes:
+                raise IdentityConflict("A Grocy note conflicts with a selected product")
+            canonical = normalize(by_id[row["product_id"]]["name"])
+            if canonical in grocy_notes:
+                raise IdentityConflict("A Grocy note conflicts with a canonical product")
     return alexa, grocy
 
 
