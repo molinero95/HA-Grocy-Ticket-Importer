@@ -52,3 +52,14 @@ Last reviewed: 2026-10-31. This records the user's explicitly requested behavior
 - Validate barcode ownership in both Grocy and local metadata; reject conflicts. Preserve shopping list entries and sync checkpoints.
 - Alexa ambiguity must retain original free-text entry pending selection. Identity-aware bidirectional sync and UI remain pending; do not activate feature before integration tests.
 - Generic metadata foundation is not yet connected to production routes or the Alexa worker. No installable release is claimed.
+
+## Generic variant staged implementation (PR #5)
+
+- Product-sheet variant registration writes only barcode association in Grocy
+  and additive metadata in the persistent add-on SQLite database.
+- Purchase factors on variants are descriptive until Grocy/receipt unit
+  conversion is explicitly implemented and tested.
+- The read-only JSON catalog audit must precede any consolidation proposal.
+  No automatic migration of existing product IDs, stock or shopping entries.
+- Alexa identity-aware matching and ambiguous-item review are still pending;
+  preserve original shopping notes and sync checkpoints.
