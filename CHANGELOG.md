@@ -1,6 +1,16 @@
 # Changelog
 
-## [0.7.11] — In development (not deployed)
+## [0.7.12] — 2026-10-31
+
+### Fixed
+- Improved diagnostics for Alexa ↔ Grocy shopping-list synchronization: logs now identify whether reading Alexa or Grocy failed, including safe exception type and HTTP status where available.
+- No change to shopping-list contents or stock during upgrade.
+
+### Known limitations
+- The real integration error is still under investigation; this release provides diagnostics, not a confirmed synchronization fix.
+
+
+## [0.7.11] — 2026-10-31
 
 ### Added
 - Experimental bidirectional synchronization between Alexa Devices' main shopping list and Grocy's default shopping list.
