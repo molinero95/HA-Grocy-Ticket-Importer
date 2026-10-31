@@ -99,3 +99,9 @@ export async function editCatalogProduct(id: number, name: string, unitId: numbe
   const result = await response.json() as { error?: string };
   if (!response.ok) throw new Error(result.error ?? 'No se pudo actualizar el producto');
 }
+
+export async function adjustCatalogStock(id: number, desiredAmount: string, expectedAmount: string): Promise<void> {
+  const response = await fetch(base + 'catalog/products/' + id + '/stock', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify({ desired_amount: desiredAmount, expected_amount: expectedAmount }) });
+  const result = await response.json() as { error?: string; details?: string };
+  if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo actualizar el stock');
+}
