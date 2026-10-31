@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.23] — 2026-10-31
+
+### Fixed
+- Close missing JavaScript script tag that prevented the shopping-list live refresh from running.
+- Add manual Refresh button and pull-down gesture at top of shopping page.
+- Preserve shopping list and scroll while refreshing; polling remains every 10 seconds when visible.
+
+### Validation
+- GitHub Actions and mobile testing pending.
+
+
 ## [0.7.22] — 2026-10-31
 
 ### Added
