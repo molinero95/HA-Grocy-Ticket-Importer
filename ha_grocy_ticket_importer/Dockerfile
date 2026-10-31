@@ -4,7 +4,7 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 COPY run.sh /run.sh
 COPY addon_bootstrap.py /app/addon_bootstrap.py
 COPY config.yaml /app/addon_config.yaml
-COPY extract.py importer.py barcode_stock.py product_images.py web.py /app/
+COPY extract.py importer.py barcode_stock.py product_images.py web.py shopping_sync.py shopping_sync_adapters.py shopping_sync_runtime.py shopping_sync_worker.py /app/
 WORKDIR /app
 RUN chmod 755 /run.sh && mkdir -p /data/receipts
 CMD ["/run.sh"]
