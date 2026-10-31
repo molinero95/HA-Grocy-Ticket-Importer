@@ -160,27 +160,30 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'step="0.01"', response.data)
         self.assertIn(b'/product/5/barcode', response.data)
 
-    def test_stock_change_requires_preview_and_confirm(self):
+    def test_stock_edit_saves_without_confirmation(self):
         token = self.login()
-        self.assertEqual(self.client.post("/product/5/stock-commit", data={
-            "csrf": token}).status_code, 403)
         with patch.object(web.barcode_stock, "prepare_stock_adjustment", return_value={
                 "product_id": 5, "before": "1.25", "after": "1.50",
-                "difference": "0.25", "direction": "add"}):
-            with patch.object(web.barcode_stock, "product_detail", return_value={
-                    "id": 5, "name": "Tomate", "pack_size": 1,
-                    "unit_id": 4, "units": [{"id": 4, "name": "Kilogramo"}],
-                    "stock_amount": "1.25", "barcodes": []}):
-                r = self.client.post("/product/5/stock-preview", data={
+                "difference": "0.25", "direction": "add"}) as preview:
+            with patch.object(web.barcode_stock, "apply_stock_adjustment", return_value={
+                    "after": "1.50"}) as commit:
+                r = self.client.post("/product/5/stock-save", data={
                     "csrf": token, "desired_amount": "1.50", "expected_amount": "1.25"})
                 self.assertEqual(r.status_code, 200)
-                self.assertIn(b'Confirmar cambio de existencias', r.data)
-                with patch.object(web.barcode_stock, "apply_stock_adjustment", return_value={
-                        "after": "1.50"}) as commit:
-                    r = self.client.post("/product/5/stock-commit", data={"csrf": token})
-                    self.assertEqual(r.status_code, 200)
-                    commit.assert_called_once()
-        self.assertEqual(self.client.post("/product/5/stock-commit", data={"csrf": token}).status_code, 403)
+                self.assertIn(b'Stock actualizado', r.data)
+                preview.assert_called_once_with(5, "1.50", "1.25")
+                commit.assert_called_once()
+        self.assertNotIn(b'Confirmar cambio de existencias', r.data)
+
+    def test_stock_edit_rejects_stale_values(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "prepare_stock_adjustment",
+                          side_effect=web.barcode_stock.BarcodeError("Stock actualizado por otro")):
+            with patch.object(web.barcode_stock, "apply_stock_adjustment") as commit:
+                r = self.client.post("/product/5/stock-save", data={
+                    "csrf": token, "desired_amount": "1.50", "expected_amount": "1.25"})
+                self.assertEqual(r.status_code, 409)
+                commit.assert_not_called()
 
     def test_camera_scanner_available_for_all_barcode_actions(self):
         self.login()
