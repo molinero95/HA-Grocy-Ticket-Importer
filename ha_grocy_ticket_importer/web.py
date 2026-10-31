@@ -262,7 +262,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section class="inventory-panel"><p class="section-eyebrow">Inventario actual</p><h2>Mi despensa</h2>
 {% if inventory_error %}<p role="alert">No se ha podido consultar el inventario de Grocy. Inténtalo más tarde.</p>{% else %}
 <p>{{ inventory|length }} productos registrados. Cantidades leídas de Grocy.</p>
-<label for="inventory-search">Buscar por nombre o código de barras</label><div class="barcode-input-row"><input id="inventory-search" type="search" autocomplete="off" placeholder="Nombre o código EAN / UPC"><button type="button" class="scan-trigger" data-scan-input="inventory-search">📷 Escanear</button></div><p id="inventory-barcode-status" role="status" aria-live="polite"></p><div class="inventory-list" id="inventory-list">
+<label for="inventory-search">Buscar por nombre o código de barras</label><div class="barcode-input-row"><input id="inventory-search" data-lookup-url="{{ url_for('inventory_barcode_lookup') }}" type="search" autocomplete="off" placeholder="Nombre o código EAN / UPC"><button type="button" class="scan-trigger" data-scan-input="inventory-search">📷 Escanear</button></div><p id="inventory-barcode-status" role="status" aria-live="polite"></p><div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
 <article class="inventory-row pantry-row" data-name="{{ p.name }}" data-product-id="{{ p.id }}">
 <div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ficha →</small></a></div>
@@ -828,9 +828,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   if (!section) return;
   let pending = false;
   let previous = section.innerHTML;
-  const button = document.getElementById('shopping-refresh');
   let touchStart = null;
-  button.addEventListener('click', refresh);
+  section.addEventListener('click', event => {
+    if (event.target.closest('#shopping-refresh')) refresh();
+  });
   document.addEventListener('touchstart', e => {
     if (window.scrollY <= 5 && e.touches.length === 1) touchStart = e.touches[0].clientY;
     else touchStart = null;
@@ -842,6 +843,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   async function refresh() {
     if (pending || document.hidden || section.querySelector('form:focus-within')) return;
     pending = true;
+    const button = section.querySelector('#shopping-refresh');
+    if (!button) { pending = false; return; }
     button.disabled = true;
     button.textContent = 'Actualizando…';
     try {
@@ -859,8 +862,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
       // Keep the current list on transient network errors.
     } finally {
       pending = false;
-      button.disabled = false;
-      button.textContent = '↻ Actualizar';
+      const currentButton = section.querySelector('#shopping-refresh');
+      if (currentButton) {
+        currentButton.disabled = false;
+        currentButton.textContent = '↻ Actualizar';
+      }
     }
   }
   setInterval(refresh, 10000);
@@ -883,7 +889,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
     if (/^\\d{8,14}$/.test(query)) {
       status.textContent = 'Buscando código…';
       try {
-        const response = await fetch('{{ url_for("inventory_barcode_lookup") }}?barcode=' + encodeURIComponent(query), {credentials:'same-origin'});
+        const response = await fetch(search.dataset.lookupUrl + '?barcode=' + encodeURIComponent(query), {credentials:'same-origin'});
         const result = await response.json();
         if (token !== lookupToken) return;
         if (response.ok && result.product_id) matchingId = String(result.product_id);
