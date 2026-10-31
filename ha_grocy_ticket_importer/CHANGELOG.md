@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.2] — 2026-10-31
+
+### Changed
+- Show pending Alexa product-match suggestions directly above the shopping list, with inline candidate selection and a visible pending count.
+- After saving a suggestion, return to the shopping list. The existing review screen remains available under Actions.
+- Choices are advisory and do not change stock or shopping lists directly; synchronization still performs identity and conflict checks.
+
+
 ## [0.16.1] — 2026-10-31
 
 ### Fixed
