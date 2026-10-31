@@ -54,7 +54,7 @@ jobs:
           PY
       - name: Check Home Assistant packaged sources are synchronized
         run: |
-          for file in extract.py importer.py barcode_stock.py product_images.py web.py; do
+          for file in extract.py importer.py barcode_stock.py product_images.py web.py generic_catalog.py variant_catalog.py; do
             cmp "$file" "ha_grocy_ticket_importer/$file"
           done
       - name: Build Home Assistant add-on container
