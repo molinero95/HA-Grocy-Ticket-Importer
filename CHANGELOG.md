@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.19] — 2026-10-31
+
+### Fixed
+- Connect the Home Assistant event listener directly to the Core WebSocket endpoint, with optional `HA_WS_URL` override.
+- Validate subscription acknowledgements by request ID and ignore unrelated todo events.
+- Remove the redundant worker wait and distinguish event-triggered synchronization from polling in logs.
+- Keep polling fallback, persisted checkpoints, and existing configuration intact.
+
+### Validation
+- Python CI passes for the underlying correction PR; final release pipeline and real Home Assistant WebSocket connectivity still require verification.
+
+
 ## [0.7.18] — 2026-10-31
 
 ### Added
