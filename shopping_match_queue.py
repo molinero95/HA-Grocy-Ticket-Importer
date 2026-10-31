@@ -34,7 +34,9 @@ def refresh(path, alexa_names, products):
     """Refresh advisory suggestions, preserving original names and selections.
 
     Only ambiguous matches are queued. Exact matches are not reclassified.
-    Disappearing Alexa entries become inactive rather than being deleted.\n    Stale selections remain for explicit conflict detection; they cannot be\n    silently reset while a verified checkpoint may still reference them.
+    Disappearing Alexa entries become inactive rather than being deleted.
+    Stale selections remain for explicit conflict detection; they cannot be
+    silently reset while a verified checkpoint may still reference them.
     """
     pending = {}
     for name in alexa_names:
