@@ -437,11 +437,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="ticket-camera">📷 Hacer foto del ticket</label>
-<input id="ticket-camera" type="file" name="ticket" accept="image/jpeg,image/png" capture="environment">
-<label for="ticket-file">📁 Elegir PDF o imagen existente</label>
-<input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png">
-<p class="helper" id="ticket-selection-status" role="status">Elige una de las dos opciones. En móviles compatibles, la primera abre la cámara trasera.</p>
+<label for="ticket-camera" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📷 Hacer foto del ticket</label>
+<input id="ticket-camera" type="file" name="ticket" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
+<label for="ticket-file" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📁 Elegir PDF o imagen existente</label>
+<input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
+<p class="helper" id="ticket-selection-status" role="status">Pulsa «Hacer foto» para abrir la cámara del móvil o «Elegir archivo» para adjuntar un documento.</p>
 <button type="submit">Extraer y revisar</button></form></section>
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
