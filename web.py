@@ -241,7 +241,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="scan-trigger">✕ Quitar</button></form>
 </div>
 
-{% if item.alexa_match %}<details class="ticket-review-item alexa-inline-match"><summary>🔔 Elegir producto para «{{ item.alexa_item.alexa_match.name }}»</summary>
+{% if item.alexa_match %}<details class="ticket-review-item alexa-inline-match"><summary>🔔 Elegir producto para «{{ item.alexa_match.name }}»</summary>
 <form method="post" action="{{ url_for('alexa_match_choose') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ item.alexa_match.key }}">
 <label>Producto genérico propuesto<select name="product_id" required>
