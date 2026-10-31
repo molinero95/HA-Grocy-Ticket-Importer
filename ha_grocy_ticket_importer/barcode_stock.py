@@ -436,6 +436,25 @@ def replace_product_barcode(product_id, old_barcode, new_barcode):
     return {"already_linked": False, "replaced": True}
 
 
+def delete_catalog_product(product_id, expected_name):
+    """Delete a product only if it still matches and has no stock."""
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
+        raise BarcodeError("El artículo ya no existe")
+    name = str(product["name"])
+    if name != expected_name:
+        raise BarcodeError("El nombre del artículo ha cambiado. Recarga la ficha antes de eliminarlo")
+    stock = grocy("GET", f"stock/products/{pid}")
+    amount = Decimal(str(stock.get("stock_amount", 0)))
+    if not amount.is_finite() or amount != 0:
+        raise BarcodeError("No se puede eliminar un artículo con existencias. Deja el stock a cero primero")
+    grocy("DELETE", f"objects/products/{pid}")
+    return name
+
+
 def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
     """Validate a deliberate stock correction without writing to Grocy."""
     pid = int(product_id)
