@@ -73,6 +73,72 @@ def inventory_snapshot():
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))
 
 
+def inventory_with_shopping():
+    """Combine pantry and current Grocy shopping list in stock units."""
+    rows = inventory_snapshot()
+    entries = grocy("GET", "objects/shopping_list")
+    if not isinstance(entries, list):
+        raise BarcodeError("No se pudo consultar la lista de compra")
+    quantities = {}
+    for item in entries:
+        if int(item.get("shopping_list_id") or 1) != 1 or item.get("done"):
+            continue
+        pid = int(item.get("product_id") or 0)
+        qty = Decimal(str(item.get("amount") if item.get("amount") is not None else 1))
+        if not qty.is_finite() or qty < 0:
+            raise BarcodeError("Cantidad inválida en la lista de compra")
+        quantities[pid] = quantities.get(pid, Decimal("0")) + qty
+    for row in rows:
+        unit = row["unit"].casefold().strip()
+        is_kg = unit in ("kg", "kilogram", "kilograms", "kilogramo", "kilogramos")
+        qty = quantities.get(row["id"], Decimal("0"))
+        row["shopping_amount"] = format(qty.quantize(Decimal("0.01")), "f").rstrip("0").rstrip(".") if qty else "0"
+        row["shopping_step"] = "0.10" if is_kg else "1"
+        row["shopping_unit"] = "kg" if is_kg else row["unit"]
+        row["shopping_can_subtract"] = qty > 0
+    return rows
+
+
+def change_shopping_quantity(product_id, direction):
+    """One-tap increase/decrease in Grocy stock units; never modify pantry stock."""
+    try:
+        pid = int(product_id)
+    except (ValueError, TypeError) as exc:
+        raise BarcodeError("Producto no válido") from exc
+    if pid <= 0 or direction not in ("plus", "minus"):
+        raise BarcodeError("Operación de lista de compra no válida")
+    products = grocy("GET", "objects/products")
+    units = grocy("GET", "objects/quantity_units")
+    entries = grocy("GET", "objects/shopping_list")
+    if not all(isinstance(x, list) for x in (products, units, entries)):
+        raise BarcodeError("No se pudo consultar Grocy")
+    product = next((p for p in products if int(p["id"]) == pid), None)
+    if product is None:
+        raise BarcodeError("El producto ya no existe")
+    unit_id = int(product["qu_id_stock"])
+    unit = next((str(u["name"]) for u in units if int(u["id"]) == unit_id), "")
+    kg = unit.casefold().strip() in ("kg", "kilogram", "kilograms", "kilogramo", "kilogramos")
+    step = Decimal("0.10") if kg else Decimal("1")
+    current = Decimal("0")
+    for entry in entries:
+        if (int(entry.get("shopping_list_id") or 1) == 1
+                and int(entry.get("product_id") or 0) == pid and not entry.get("done")):
+            amount = Decimal(str(entry.get("amount") if entry.get("amount") is not None else 1))
+            if not amount.is_finite() or amount < 0:
+                raise BarcodeError("Cantidad inválida en la lista")
+            current += amount
+    if direction == "minus" and current == 0:
+        return {"name": str(product["name"]), "amount": "0"}
+    amount = step if direction == "plus" else min(step, current)
+    path = "stock/shoppinglist/add-product" if direction == "plus" else "stock/shoppinglist/remove-product"
+    body = {"product_id": pid, "list_id": 1, "product_amount": float(amount)}
+    if direction == "plus":
+        body["qu_id"] = unit_id
+    grocy("POST", path, body)
+    updated = current + amount if direction == "plus" else current - amount
+    return {"name": str(product["name"]), "amount": format(updated, "f")}
+
+
 def shopping_list_snapshot():
     """Read Grocy's default shopping list and resolve catalog names."""
     entries = grocy("GET", "objects/shopping_list")
