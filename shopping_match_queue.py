@@ -34,7 +34,7 @@ def refresh(path, alexa_names, products):
     """Refresh advisory suggestions, preserving original names and selections.
 
     Only ambiguous matches are queued. Exact matches are not reclassified.
-    Disappearing Alexa entries become inactive rather than being deleted.
+    Disappearing Alexa entries become inactive rather than being deleted.\n    Stale selections remain for explicit conflict detection; they cannot be\n    silently reset while a verified checkpoint may still reference them.
     """
     pending = {}
     for name in alexa_names:
@@ -53,8 +53,6 @@ def refresh(path, alexa_names, products):
                 "INSERT INTO pending_matches(normalized_name,original_name,candidates_json,active) "
                 "VALUES (?,?,?,1) ON CONFLICT(normalized_name) DO UPDATE SET "
                 "original_name=excluded.original_name, active=1, "
-                "selected_product_id=CASE WHEN candidates_json=excluded.candidates_json "
-                "THEN selected_product_id ELSE NULL END, "
                 "candidates_json=excluded.candidates_json",
                 (key, original, candidates))
 
