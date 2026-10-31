@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.25] — 2026-10-31
+
+### Improved
+- Receipt upload now offers a clearly labeled camera capture option and a separate existing-file picker.
+- Selecting a photo clears any previously selected file and vice versa, avoiding ambiguous uploads.
+- Shows the selected photo or file name before extraction; stock is not changed by uploading.
+
+### Validation
+- CI and mobile camera behavior pending verification.
+
+
 ## [0.7.24] — 2026-10-31
 
 ### Added
