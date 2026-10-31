@@ -296,19 +296,20 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% endif %}
 {% if view == 'alexa_matches' %}
 <section><p class="section-eyebrow">Alexa · Revisión segura</p><h2>Coincidencias pendientes</h2>
-<p class="helper">Se conservan los nombres originales de Alexa y las notas de Grocy. Elegir un producto solo guarda una propuesta: todavía no convierte notas ni modifica existencias.</p>
+<p class="helper">Se conservan los nombres originales de Alexa y las notas de Grocy. Elegir un producto guarda una propuesta. Si la sincronización está activada, se usará solo cuando no haya conflictos; nunca convierte notas existentes ni modifica existencias.</p>
 {% if pending_matches_error %}<p role="alert">No se pudo leer la cola de coincidencias.</p>
 {% elif not pending_matches %}<p>No hay coincidencias ambiguas pendientes. La lista se analiza cuando está activa la sincronización con Alexa.</p>
 {% else %}
 {% for match in pending_matches %}
 <div class="ticket-review-item"><strong>{{ match.name }}</strong>
+{% if match.selection_stale %}<p role="alert">La propuesta anterior ya no es válida. Selecciona de nuevo un producto antes de sincronizar.</p>{% endif %}
 <form method="post" action="{{ url_for('alexa_match_choose') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ match.key }}">
 <label>Producto genérico propuesto<select name="product_id" required>
 <option value="">Selecciona manualmente</option>
 {% for candidate in match.candidates %}<option value="{{ candidate.id }}" {% if candidate.id == match.selected_product_id %}selected{% endif %}>{{ candidate.name }}</option>{% endfor %}
 </select></label><button type="submit">Guardar propuesta sin cambiar listas</button></form>
-{% if match.selected_product_id %}<p class="helper">Propuesta guardada. La asociación automática sigue desactivada.</p>{% endif %}
+{% if match.selected_product_id %}<p class="helper">Propuesta guardada. Se conserva el nombre original de Alexa; la sincronización aplicará la identidad solo si supera las comprobaciones.</p>{% endif %}
 </div>
 {% endfor %}{% endif %}
 </section>
