@@ -440,7 +440,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="ticket-camera" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📷 Hacer foto del ticket</label>
+<button type="button" id="ticket-live-camera">📷 Abrir cámara</button>
+<div id="ticket-camera-panel" hidden><video id="ticket-video" autoplay playsinline muted style="width:100%;max-height:420px"></video><button type="button" id="ticket-snapshot">Capturar foto</button><button type="button" id="ticket-camera-close">Cancelar</button></div>
+<label for="ticket-camera" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📷 Cámara del sistema (alternativa)</label>
 <input id="ticket-camera" type="file" name="ticket" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
 <label for="ticket-file" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📁 Elegir PDF o imagen existente</label>
 <input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
@@ -724,6 +726,39 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </script>
 <script>
 (() => {
+  const open = document.getElementById('ticket-live-camera');
+  const panel = document.getElementById('ticket-camera-panel');
+  const video = document.getElementById('ticket-video');
+  let stream = null;
+  function stop() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; if(panel) panel.hidden = true; }
+  if (open && panel && video) {
+    open.addEventListener('click', async () => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Cámara web no disponible');
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+        video.srcObject = stream;
+        panel.hidden = false;
+      } catch(e) { stop(); const status = document.getElementById('ticket-selection-status'); if(status) status.textContent = 'No se pudo abrir la cámara aquí. Usa Cámara del sistema o el navegador externo.'; }
+    });
+    document.getElementById('ticket-camera-close').addEventListener('click', stop);
+    document.getElementById('ticket-snapshot').addEventListener('click', () => {
+      if (!stream || !video.videoWidth) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video,0,0);
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const input = document.getElementById('ticket-camera');
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'ticket.jpg', {type:'image/jpeg'}));
+        input.files = dt.files;
+        const existing = document.getElementById('ticket-file'); if(existing) existing.value = '';
+        const status = document.getElementById('ticket-selection-status'); if(status) status.textContent = 'Foto capturada. Pulsa Extraer y revisar.';
+        stop();
+      },'image/jpeg',0.88);
+    });
+    window.addEventListener('pagehide', stop);
+  }
   const camera = document.getElementById('ticket-camera');
   const file = document.getElementById('ticket-file');
   if (!camera || !file) return;
