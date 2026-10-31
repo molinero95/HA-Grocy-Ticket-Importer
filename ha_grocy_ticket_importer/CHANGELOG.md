@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.16.1] — 2026-10-31
+
+### Fixed
+- When an Alexa shopping-list entity is configured, the background worker now
+  populates and refreshes the local **Coincidencias Alexa** review queue even
+  with shopping synchronization disabled. This is a read-only preview: no
+  Alexa/Grocy shopping-list writes or inventory changes are performed until
+  `shopping_sync_enabled` is explicitly enabled.
+- Parse Grocy shopping-list completion flags safely across boolean, numeric,
+  and string representations. An active entry with `done="0"` is no longer
+  mistaken for completed; unexpected flags stop synchronization instead of
+  silently dropping items from the snapshot.
+
+### Safety and validation
+- Synchronization remains disabled by default. Existing Grocy products,
+  stock, shopping entries, variants, checkpoints and receipt history are not
+  migrated or modified by this update.
+- Added regression tests for read-only worker startup and Grocy completion
+  flags. GitHub Actions must pass before release; real mobile camera, Alexa
+  write behavior and persistence still require validation in Home Assistant.
+
 ## [0.16.0] — 2026-10-31
 
 ### Added

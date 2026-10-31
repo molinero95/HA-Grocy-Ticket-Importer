@@ -1,5 +1,14 @@
 # ROADMAP.md — Despensa backlog and validation checklist
 
+## 0.16.1 follow-up (2026-10-31)
+- [x] PR #5 was merged and 0.16.0 installed in Home Assistant; read-only app inventory confirmed the add-on was started.
+- [x] Fixed the disabled-sync preview gap: configuring the Alexa entity now starts a dry-run worker to populate the local ambiguity queue without remote writes.
+- [x] Fixed Grocy `done="0"` handling so active shopping entries cannot disappear from the snapshot due to string truthiness.
+- [ ] Verify the new 0.16.1 workflow run, then merge its maintenance PR.
+- [ ] On installed 0.16.1, validate the read-only Alexa review queue and camera/variant persistence with a disposable product and no stock changes.
+- [ ] Validate live Alexa/Grocy writes and checkpoint recovery before enabling sync by default. The existing user's real lists and stock must remain untouched by automated validation.
+
+
 Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release date.
 
 ## P0 — Validate before claiming a release is ready

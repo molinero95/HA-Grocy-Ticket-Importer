@@ -11,6 +11,7 @@ from shopping_identity_runtime import (
 )
 from shopping_sync_adapters import (
     add_grocy_identity, remove_grocy_identity, remove_alexa_identity,
+    grocy_entries,
 )
 
 PRODUCTS = [{"id": 2, "name": "Arroz basmati", "qu_id_stock": 1}]
@@ -60,6 +61,27 @@ class IdentityRuntimeTests(unittest.TestCase):
 
 
 class IdentityAdapterTests(unittest.TestCase):
+    def test_grocy_active_entries_include_string_zero_completion(self):
+        entries = [
+            {"id": 11, "product_id": 2, "shopping_list_id": 1, "done": "0"},
+            {"id": 12, "product_id": 2, "shopping_list_id": 1, "done": False},
+            {"id": 13, "product_id": 2, "shopping_list_id": 1, "done": "false"},
+            {"id": 14, "product_id": 2, "shopping_list_id": 1, "done": "1"},
+            {"id": 15, "product_id": 2, "shopping_list_id": 1, "done": True},
+            {"id": 16, "product_id": 2, "shopping_list_id": 2, "done": "0"},
+        ]
+        with patch("shopping_sync_adapters.grocy", side_effect=[PRODUCTS, entries]) as remote:
+            active = grocy_entries()
+        self.assertEqual([row[1]["id"] for row in active], [11, 12, 13])
+        self.assertEqual(remote.call_count, 2)
+
+    def test_invalid_grocy_completion_flag_fails_closed(self):
+        entries = [{"id": 11, "product_id": 2, "done": "unknown"}]
+        with patch("shopping_sync_adapters.grocy", side_effect=[PRODUCTS, entries]) as remote:
+            with self.assertRaisesRegex(ValueError, "completion flag"):
+                grocy_entries()
+        self.assertEqual(remote.call_count, 2)
+
     def test_add_selected_product_uses_id_not_alexa_text(self):
         with patch("shopping_sync_adapters.grocy_entries", return_value=[]), \
              patch("shopping_sync_adapters.grocy", side_effect=[

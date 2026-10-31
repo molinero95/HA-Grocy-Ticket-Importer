@@ -45,7 +45,7 @@ Check syntax and tests before reporting any stage fixed. GitHub API commit combi
 Check both desktop and narrow mobile layouts. Product-name length must not change the column/position of action buttons.
 
 ## Status / handoff
-As of 2026-10-31 the repository's declared add-on version is **0.15.0** (verify before working); version visibility in Home Assistant can lag GitHub. Recent work includes shopping cart-to-stepper UI, no-scroll updates, Pack/Piece purchase conversion, image previews and fixed raw-Jinja-in-JavaScript syntax. CI success and end-to-end Grocy conversion behavior have **not** been conclusively confirmed from this agent environment. See `ROADMAP.md` for validation work.
+As of 2026-10-31 PR #5 has been merged as **0.16.0** and Home Assistant confirmed that version started. A **0.16.1** maintenance candidate adds read-only Alexa review startup and Grocy completion-flag parsing (verify branch and CI before working); version visibility in Home Assistant can lag GitHub. Recent work includes shopping cart-to-stepper UI, no-scroll updates, Pack/Piece purchase conversion, image previews and fixed raw-Jinja-in-JavaScript syntax. CI success and end-to-end Grocy conversion behavior have **not** been conclusively confirmed from this agent environment. See `ROADMAP.md` for validation work.
 
 ## Working style
 Favor actionable fixes, tests and concise Spanish summaries with commit/version links. Do not invent successful builds, deployments or real Grocy state. Favor defensive operations that cannot silently corrupt inventory.

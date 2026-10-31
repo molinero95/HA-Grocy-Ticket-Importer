@@ -55,6 +55,27 @@ def remove_alexa(name):
                                        "item": item.get("uid") or item["summary"]})
 
 
+def _grocy_done(value):
+    """Grocy may serialize its completion flag as JSON bool, int or text.
+
+    A string "0" is active (truthy in Python). Unknown states must fail closed
+    rather than silently dropping active items from a sync snapshot.
+    """
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if type(value) is int and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        flag = value.strip().lower()
+        if flag in ("", "0", "false"):
+            return False
+        if flag in ("1", "true"):
+            return True
+    raise ValueError("Invalid Grocy shopping completion flag")
+
+
 def grocy_entries():
     products = grocy("GET", "objects/products")
     entries = grocy("GET", "objects/shopping_list")
@@ -63,7 +84,7 @@ def grocy_entries():
     by_id = {int(p["id"]): str(p["name"]) for p in products}
     result = []
     for entry in entries:
-        if int(entry.get("shopping_list_id") or 1) != 1 or entry.get("done"):
+        if int(entry.get("shopping_list_id") or 1) != 1 or _grocy_done(entry.get("done")):
             continue
         pid = int(entry.get("product_id") or 0)
         name = by_id.get(pid) if pid else str(entry.get("note") or "").strip()

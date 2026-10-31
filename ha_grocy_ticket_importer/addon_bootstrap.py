@@ -56,6 +56,11 @@ def ensure_ledger(path=LEDGER):
     os.chmod(path, 0o600)
 
 
+def should_start_shopping_worker(config):
+    """Populate local Alexa suggestions in read-only mode before enabling sync."""
+    return bool(config.get("ALEXA_SHOPPING_LIST_ENTITY"))
+
+
 def main():
     try:
         config = load_config()
@@ -73,7 +78,10 @@ def main():
     )
     os.environ["DESPENSA_DISTRIBUTION"] = "Repositorio comunitario de GitHub"
     subprocess.run(["nginx"], check=True)
-    if os.environ.get("SHOPPING_SYNC_ENABLED") == "1":
+    # With an Alexa list configured, keep the local review queue current even
+    # while shopping_sync_enabled=false. The worker then runs in dry-run mode:
+    # it reads both lists but never writes to Grocy or Alexa.
+    if should_start_shopping_worker(config):
         subprocess.Popen(["/venv/bin/python", "/app/shopping_sync_worker.py"], env=os.environ,
                          stdout=sys.stdout, stderr=sys.stderr)
     os.execvpe(

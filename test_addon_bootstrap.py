@@ -41,6 +41,26 @@ class BootstrapTests(unittest.TestCase):
                 rows = db.execute("SELECT receipt_hash, state FROM receipt_items").fetchall()
             self.assertEqual(rows, [("old-receipt", "imported")])
 
+    def test_read_only_alexa_review_starts_without_enabling_remote_sync(self):
+        config = {"ALEXA_SHOPPING_LIST_ENTITY": "todo.alexa_shopping",
+                  "SHOPPING_SYNC_ENABLED": "0"}
+        self.assertTrue(boot.should_start_shopping_worker(config))
+        self.assertFalse(boot.should_start_shopping_worker({
+            "ALEXA_SHOPPING_LIST_ENTITY": "", "SHOPPING_SYNC_ENABLED": "0"}))
+        with patch.object(boot, "load_config", return_value=config), \
+             patch.object(boot, "ensure_ledger"), \
+             patch.object(boot.subprocess, "run") as nginx, \
+             patch.object(boot.subprocess, "Popen") as worker, \
+             patch.object(boot.Path, "read_text", return_value='version: "0.16.1"'), \
+             patch.object(boot.os, "execvpe", side_effect=RuntimeError("intercepted")), \
+             patch.dict(boot.os.environ, {}, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "intercepted"):
+                boot.main()
+            self.assertEqual(worker.call_args.kwargs["env"]["SHOPPING_SYNC_ENABLED"], "0")
+        nginx.assert_called_once_with(["nginx"], check=True)
+        worker.assert_called_once()
+        self.assertEqual(worker.call_args.args[0][1], "/app/shopping_sync_worker.py")
+
     def test_bootstrap_does_not_run_services_when_config_missing(self):
         with patch.object(boot, "load_config", side_effect=ValueError("missing")), \
              patch.object(boot.subprocess, "run") as run:
