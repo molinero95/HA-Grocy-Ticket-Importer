@@ -38,7 +38,7 @@ def list_products():
         key=lambda p: (p["name"].casefold(), p["id"]),
     )
 
-PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://images\.openfoodfacts\.org/[^\]\s]+)\]\s*")
+PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://images\.(?:openfoodfacts|openproductsfacts)\.org/[^\]\s]+)\]\s*")
 
 
 def saved_photo(product):
