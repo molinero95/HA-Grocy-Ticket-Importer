@@ -154,7 +154,8 @@ class WebTests(unittest.TestCase):
             self.assertIn(endpoint, result.data, view)
             self.assertIn(b'Volver a acciones', result.data)
             self.assertIn(b'class="bottom-nav"', result.data)
-        self.assertIn(b'class="ticket-table"', web.PAGE.encode("utf-8"))
+        self.assertIn(b'class="ticket-review-item"', web.PAGE.encode("utf-8"))
+        self.assertIn(b'name="pieces_per_pack_{{ loop.index0 }}"', web.PAGE.encode("utf-8"))
         self.assertNotIn(b'class="ticket-table"', self.client.get("/?view=ticket").data)
 
     def test_inventory_backend_failure_has_no_fake_zeroes(self):
