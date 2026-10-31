@@ -11,6 +11,8 @@ from pathlib import Path
 
 from shopping_sync_runtime import load_baseline, reconcile, save_baseline
 from shopping_sync import normalize
+from shopping_match_queue import DEFAULT_PATH as MATCH_QUEUE, refresh as refresh_matches
+from importer import grocy
 import hashlib
 from shopping_sync_adapters import (
     ha_todo_items, grocy_shopping_names, add_alexa, add_grocy,
@@ -33,6 +35,12 @@ def run_once(*, dry_run=True):
         grocy = grocy_shopping_names()
     except Exception as exc:
         raise RuntimeError("Grocy read failed: " + type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else "")) from None
+    # Suggestions are advisory only: keep the original Alexa/Grocy text
+    # unchanged until a separate identity-aware migration is approved.
+    products = grocy("GET", "objects/products")
+    if not isinstance(products, list):
+        raise RuntimeError("Grocy catalog unavailable for Alexa review")
+    refresh_matches(MATCH_QUEUE, alexa, products)
     baseline = load_baseline(STATE)
     result = reconcile(
         alexa, grocy, baseline, dry_run=dry_run,
