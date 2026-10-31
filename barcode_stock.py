@@ -437,7 +437,7 @@ def replace_product_barcode(product_id, old_barcode, new_barcode):
 
 
 def delete_catalog_product(product_id, expected_name):
-    """Delete a product only if it still matches and has no stock."""
+    """Consume remaining stock, verify zero, then delete the confirmed product."""
     pid = int(product_id)
     if pid <= 0:
         raise BarcodeError("Producto no válido")
@@ -449,8 +449,14 @@ def delete_catalog_product(product_id, expected_name):
         raise BarcodeError("El nombre del artículo ha cambiado. Recarga la ficha antes de eliminarlo")
     stock = grocy("GET", f"stock/products/{pid}")
     amount = Decimal(str(stock.get("stock_amount", 0)))
-    if not amount.is_finite() or amount != 0:
-        raise BarcodeError("No se puede eliminar un artículo con existencias. Deja el stock a cero primero")
+    if not amount.is_finite() or amount < 0:
+        raise BarcodeError("No se puede determinar el stock actual con seguridad")
+    if amount > 0:
+        grocy("POST", f"stock/products/{pid}/consume",
+              {"amount": float(amount), "spoiled": False})
+        remaining = Decimal(str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
+        if not remaining.is_finite() or remaining != 0:
+            raise BarcodeError("Se descontaron existencias, pero el stock no quedó a cero. No se ha eliminado el artículo")
     grocy("DELETE", f"objects/products/{pid}")
     return name
 
