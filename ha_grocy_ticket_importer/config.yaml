@@ -13,6 +13,6 @@ panel_icon: mdi:barcode-scan
 panel_title: "Despensa"
 panel_admin: true
 map:
-  - type: homeassistant_config
+  - type: app_config
     read_only: false
-    path: /ha_config
+    path: /config
