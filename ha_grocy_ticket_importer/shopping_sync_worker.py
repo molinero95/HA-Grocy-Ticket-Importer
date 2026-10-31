@@ -93,8 +93,10 @@ def main():
                           "add_alexa", "add_grocy", "remove_alexa", "remove_grocy")),
                       flush=True)
             except Exception as exc:
-                # Do not log exception bodies: remote APIs may include sensitive data.
-                print("Shopping sync failed: " + str(exc)[:180], flush=True)
+                # Only our own fixed conflict messages are safe to print.
+                # Remote exception strings can contain tokens or private data.
+                reason = str(exc) if isinstance(exc, IdentityConflict) else type(exc).__name__
+                print("Shopping sync failed: " + reason, flush=True)
             triggered = wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
             wake.clear()
             trigger = "event" if triggered else "polling"
