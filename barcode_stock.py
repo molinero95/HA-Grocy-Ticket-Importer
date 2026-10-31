@@ -104,8 +104,8 @@ def shopping_list_snapshot():
     return sorted(rows, key=lambda r: (r["done"], r["name"].casefold(), r["id"]))
 
 
-def add_to_shopping_list(product_id):
-    """Add one stock unit to Grocy's default shopping list, without touching inventory."""
+def shopping_product_options(product_id):
+    """Offer stock unit and purchasing unit only when Grocy defines a safe factor."""
     try:
         pid = int(product_id)
     except (TypeError, ValueError) as exc:
@@ -115,10 +115,41 @@ def add_to_shopping_list(product_id):
     product = grocy("GET", f"objects/products/{pid}")
     if not isinstance(product, dict) or int(product.get("id") or 0) != pid:
         raise BarcodeError("Producto inexistente")
+    units = {int(u["id"]): str(u["name"]) for u in grocy("GET", "objects/quantity_units")}
+    stock_id = int(product["qu_id_stock"])
+    available = [{"id": stock_id, "name": units.get(stock_id, "Unidad de stock"), "factor": "1"}]
+    purchase_id = int(product.get("qu_id_purchase") or stock_id)
+    factor = Decimal(str(product.get("qu_factor_purchase_to_stock") or 0))
+    if purchase_id != stock_id and factor.is_finite() and factor > 0:
+        available.append({"id": purchase_id, "name": units.get(purchase_id, "Unidad de compra"),
+                          "factor": str(factor)})
+    return {"id": pid, "name": str(product["name"]), "units": available}
+
+
+def add_to_shopping_list(product_id, amount="1", unit_id=None):
+    """Add a chosen quantity to Grocy, converting purchasing units into stock units."""
+    product = shopping_product_options(product_id)
+    try:
+        qty = Decimal(str(amount).strip().replace(",", "."))
+    except (TypeError, ValueError, ArithmeticError) as exc:
+        raise BarcodeError("Cantidad de compra no válida") from exc
+    if not qty.is_finite() or qty <= 0 or qty.as_tuple().exponent < -2:
+        raise BarcodeError("Introduce una cantidad positiva con máximo dos decimales")
+    if unit_id in (None, ""):
+        unit_id = product["units"][0]["id"]
+    try:
+        chosen = next(u for u in product["units"] if u["id"] == int(unit_id))
+    except (ValueError, TypeError, StopIteration) as exc:
+        raise BarcodeError("Unidad de compra no compatible con el producto") from exc
+    stock_amount = qty * Decimal(chosen["factor"])
+    if not stock_amount.is_finite() or stock_amount <= 0:
+        raise BarcodeError("La conversión de cantidad no es válida")
     grocy("POST", "stock/shoppinglist/add-product", {
-        "product_id": pid, "list_id": 1, "product_amount": 1,
+        "product_id": product["id"], "qu_id": chosen["id"],
+        "list_id": 1, "product_amount": float(stock_amount),
     })
-    return str(product["name"])
+    return product["name"]
+
 
 
 def update_shopping_list_item(item_id, done):
