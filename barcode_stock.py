@@ -365,6 +365,7 @@ def update_product_info(product_id, name, pack_size, unit_id=None):
         changes["qu_factor_purchase_to_stock"] = 1
     if unit_id != current_unit:
         changes["qu_id_stock"] = unit_id
+    changes["description"] = description
     grocy("PUT", f"objects/products/{pid}", changes)
     return {"id": pid, "name": name, "pack_size": pack_size, "unit_id": unit_id}
 
