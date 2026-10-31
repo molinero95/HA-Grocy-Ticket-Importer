@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Local-only prototype UI. NOT a Home Assistant ingress add-on."""
 import hmac
+import io
+import urllib.request
 import json
 import os
 import secrets
@@ -10,7 +12,7 @@ import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, render_template_string, request, session, url_for
+from flask import Flask, abort, jsonify, redirect, render_template_string, request, session, url_for, send_file
 from werkzeug.utils import secure_filename
 
 import extract
@@ -21,6 +23,7 @@ ROOT = Path(__file__).resolve().parent
 load_dotenv(os.environ.get("GROCY_ENV_FILE", str(ROOT / ".env")))
 DATA = Path(os.environ.get("RECEIPT_DATA_DIR", str(ROOT / "runtime" / "receipts")))
 ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
+PHOTO_DIR = Path(os.environ.get("PRODUCT_IMAGE_DIR", str(ROOT / "runtime" / "product_images")))
 LOCK = threading.Lock()
 INGRESS_MODE = os.environ.get("HA_INGRESS_MODE") == "1"
 
@@ -295,7 +298,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if product %}
 <p class="section-eyebrow">Ficha del artículo</p>
 <h2>{{ product.name }}</h2>
-<div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
+<form method="post" action="{{ url_for('product_photo_upload', product_id=product.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ csrf }}"><label for="product-photo-upload">📷 Subir foto o hacer una foto</label><input id="product-photo-upload" name="photo" type="file" accept="image/*" required><button type="submit">Guardar fotografía</button></form><div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
 {% if not product.image_url and product.barcodes %}<div id="product-photo-autoload" data-barcode="{{ product.barcodes[0] }}" data-save-url="{{ url_for('product_photo_save', product_id=product.id) }}" data-csrf="{{ csrf }}"></div>{% endif %}
 <p>Gestiona el producto por unidades o kilogramos. Los packs existentes no se convertirán automáticamente.</p>
 <form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
@@ -938,6 +941,8 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             pass
         except Exception:
             pass
+    if product and (PHOTO_DIR / (str(product["id"]) + ".jpg")).is_file():
+        product["image_url"] = url_for("local_product_photo", product_id=product["id"])
     if view == "inventory" and (INGRESS_MODE or session.get("auth")):
         try:
             inventory = barcode_stock.inventory_with_shopping()
@@ -1191,6 +1196,49 @@ def product_stock_save(product_id):
     finally:
         LOCK.release()
     return render("Stock actualizado: " + applied["after"] + ".")
+
+
+@app.get("/product/<int:product_id>/photo/local")
+def local_product_photo(product_id):
+    if not (INGRESS_MODE or session.get("auth")):
+        abort(401)
+    path = PHOTO_DIR / (str(product_id) + ".jpg")
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="image/jpeg", max_age=3600)
+
+
+@app.post("/product/<int:product_id>/photo/upload")
+def product_photo_upload(product_id):
+    if not (INGRESS_MODE or session.get("auth")):
+        abort(401)
+    uploaded = request.files.get("photo")
+    if not uploaded or not uploaded.filename:
+        return render("Selecciona una fotografía."), 400
+    if not LOCK.acquire(blocking=False):
+        abort(409)
+    try:
+        barcode_stock.product_detail(product_id)
+        from PIL import Image, ImageOps
+        data = uploaded.read(8 * 1024 * 1024 + 1)
+        if len(data) > 8 * 1024 * 1024:
+            raise ValueError("Imagen demasiado grande")
+        image = Image.open(io.BytesIO(data))
+        if image.format not in ("JPEG", "PNG", "WEBP"):
+            raise ValueError("Formato no admitido")
+        image = ImageOps.exif_transpose(image)
+        image.thumbnail((1200, 1200))
+        image = image.convert("RGB")
+        PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+        temp = PHOTO_DIR / (str(product_id) + ".tmp")
+        image.save(temp, format="JPEG", quality=85)
+        temp.replace(PHOTO_DIR / (str(product_id) + ".jpg"))
+    except Exception:
+        app.logger.exception("Product image upload failed for %s", product_id)
+        return render("No se pudo guardar la fotografía. Usa JPG, PNG o WebP (máximo 8 MiB)."), 400
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="product", product_id=product_id))
 
 
 @app.post("/product/<int:product_id>/photo")
