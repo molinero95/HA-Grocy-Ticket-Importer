@@ -205,7 +205,7 @@ class WebTests(unittest.TestCase):
         self.assertIn(b"Posibles duplicados", result.data)
         self.assertIn(b"product_id=5", result.data)
         self.assertIn(b"product_id=8", result.data)
-        self.assertNotIn(b"<h2>🛒 Lista de la compra</h2>", result.data)
+        self.assertNotIn("<h2>🛒 Lista de la compra</h2>".encode("utf-8"), result.data)
 
     def test_action_forms_are_separate(self):
         self.login()
