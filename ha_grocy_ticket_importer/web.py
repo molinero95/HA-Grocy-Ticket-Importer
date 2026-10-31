@@ -1338,26 +1338,16 @@ def upload():
     DATA.mkdir(parents=True, exist_ok=True, mode=0o700)
     rid = secrets.token_hex(16)
     source = DATA / (rid + Path(upload.filename).suffix.lower())
-    upload.save(source)
     try:
+        upload.save(source)
         receipt = extract.extract(source)
         receipt_path(rid).write_text(json.dumps(receipt, ensure_ascii=False, indent=2),
                                     encoding="utf-8")
+    except Exception:
+        app.logger.exception("Receipt upload/extraction failed (request_id=%s)", rid)
+        return render("No se pudo procesar el ticket. Comprueba que la imagen sea legible o prueba con un PDF/JPG/PNG diferente. Referencia: " + rid[:8]), 502
     finally:
         source.unlink(missing_ok=True)
-    # Prefill known purchase conversions; no stock mutation during upload.
-    try:
-        products = barcode_stock.grocy("GET", "objects/products")
-        known = {str(p["name"]).strip().casefold(): p for p in products}
-        for item in receipt["items"]:
-            p = known.get(str(item["name"]).strip().casefold())
-            if p and int(p.get("qu_id_stock") or 0) == 2 and int(p.get("qu_id_purchase") or 0) != 2:
-                factor = int(p.get("qu_factor_purchase_to_stock") or 1)
-                if factor > 1:
-                    item["pieces_per_pack"] = factor
-        receipt_path(rid).write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
-    except (ValueError, KeyError, TypeError, OSError):
-        pass
     session["receipt_id"] = rid
     session.pop("previewed", None)
     return render("Revisa el ticket antes de importarlo", receipt, rid)
