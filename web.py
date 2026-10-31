@@ -216,7 +216,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="inventory-list">
 {% for item in shopping %}
 <article class="inventory-row shopping-list-row">
-<div class="product-name-with-photo shopping-list-product">{% if item.image_url %}<img class="product-thumb" src="{{ item.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{{ item.name }}</strong><small>{{ item.amount }} {{ item.unit }}</small></div></div>
+<div class="product-name-with-photo shopping-list-product">{% if item.image_url %}<img class="product-thumb" src="{{ item.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{% if item.product_id %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=item.product_id) }}">{{ item.name }} →</a>{% else %}{{ item.name }}{% endif %}</strong><small>{{ item.amount }} {{ item.unit }}</small></div></div>
 <div class="shopping-controls">
 <form method="post" action="{{ url_for('shopping_toggle', item_id=item.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="done" value="{{ '0' if item.done else '1' }}">
@@ -250,7 +250,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if inventory_error %}<p role="alert">No se ha podido consultar el inventario de Grocy. Inténtalo más tarde.</p>{% else %}
 <p>{{ inventory|length }} productos registrados. Cantidades leídas de Grocy.</p>
 <label for="inventory-search">Buscar en mi despensa</label><input id="inventory-search" type="search" autocomplete="off" placeholder="Busca leche, arroz, tomate…">
-<div class="inventory-list" id="inventory-list">
+<div class="barcode-input-row"><input id="inventory-barcode" inputmode="numeric" placeholder="Código EAN / UPC" aria-label="Código de barras para buscar"><button type="button" class="scan-trigger" data-scan-input="inventory-barcode">📷 Escanear</button><button type="button" id="inventory-barcode-search" class="scan-trigger">Buscar código</button></div><p id="inventory-barcode-status" role="status"></p><div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
 <article class="inventory-row pantry-row" data-name="{{ p.name }}">
 <div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ficha →</small></a></div>
@@ -297,17 +297,17 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <h2>{{ product.name }}</h2>
 <div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
 {% if not product.image_url and product.barcodes %}<div id="product-photo-autoload" data-barcode="{{ product.barcodes[0] }}" data-save-url="{{ url_for('product_photo_save', product_id=product.id) }}" data-csrf="{{ csrf }}"></div>{% endif %}
-<p>Pack es la unidad de compra; Piece es la unidad de stock que se consume. La conversión solo se aplica a nuevas entradas de stock.</p>
+<p>Gestiona el producto por unidades o kilogramos. Los packs existentes no se convertirán automáticamente.</p>
 <form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label for="edit-product-name">Nombre del artículo</label>
 <input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
-<label for="edit-unit">Unidad de compra</label>
+<label for="edit-unit">Unidad de medida</label>
 <select id="edit-unit" name="unit_id" required>
-{% for u in product.units %}<option value="{{ u.id }}" {% if u.id == product.purchase_unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
+{% for u in product.units if u.name|lower in ("piece", "pieces", "unidad", "unidades", "kg", "kilogram", "kilogramo", "kilogramos") %}<option value="{{ u.id }}" {% if u.id == product.purchase_unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
 </select>
-<p class="helper">El stock se cuenta en piezas cuando compras packs. Un pack de 5 añade 5 piezas; consumir 1 descuenta una pieza. No se convierten automáticamente las existencias antiguas configuradas como Pack.</p>
-<div id="pack-size-fields" {% if not product.is_pack %}hidden{% endif %}>
+<p class="helper">No se convierten automáticamente las existencias ni las unidades históricas.</p>
+<div id="pack-size-fields" hidden>
 <label for="edit-pack-size">Piezas por pack</label>
 <input id="edit-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="{{ product.pack_size }}" required>
 <p class="helper">1 Pack equivale a este número de Piece. No cambia automáticamente las existencias anteriores.</p>
@@ -735,6 +735,29 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </script>
 <script>
 (() => {
+  const input = document.getElementById('inventory-barcode');
+  const button = document.getElementById('inventory-barcode-search');
+  if (input && button) {
+    const status = document.getElementById('inventory-barcode-status');
+    async function lookup() {
+      const code = input.value.trim();
+      if (!/^\\d{8,14}$/.test(code)) { status.textContent = 'Introduce o escanea un código EAN/UPC válido.'; return; }
+      status.textContent = 'Buscando…';
+      try {
+        const response = await fetch('{{ url_for("inventory_barcode_lookup") }}?barcode=' + encodeURIComponent(code), {credentials:'same-origin'});
+        const result = await response.json();
+        if (!response.ok || !result.product_id) { status.textContent = result.error || 'Producto no encontrado en tu despensa.'; return; }
+        window.location.href = '{{ url_for("index", view="product") }}&product_id=' + encodeURIComponent(result.product_id);
+      } catch (_) { status.textContent = 'No se pudo consultar el código.'; }
+    }
+    button.addEventListener('click', lookup);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup(); } });
+    input.addEventListener('input', () => { if (/^\\d{8,14}$/.test(input.value.trim())) lookup(); });
+  }
+})();
+</script>
+<script>
+(() => {
   const section = document.getElementById('shopping-live-section');
   if (!section) return;
   let pending = false;
@@ -974,6 +997,19 @@ def product_choices():
     except Exception:
         return []
 
+@app.get("/inventory/barcode-lookup")
+def inventory_barcode_lookup():
+    try:
+        product = barcode_stock.find_product(request.args.get("barcode", ""))
+        if not product:
+            return jsonify({"error": "Producto no encontrado en tu despensa."}), 404
+        return jsonify({"product_id": int(product["id"])})
+    except barcode_stock.BarcodeError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        return jsonify({"error": "No se pudo buscar el código."}), 502
+
+
 @app.post("/shopping/step/<int:product_id>/<direction>")
 def shopping_step(product_id, direction):
     wants_json = request.accept_mimetypes.best_match(
@@ -1084,7 +1120,7 @@ def product_update(product_id):
         abort(409, "Otra operación está en marcha")
     try:
         result = barcode_stock.update_product_info(
-            product_id, request.form.get("name"), request.form.get("pack_size"), request.form.get("unit_id"))
+            product_id, request.form.get("name"), "1", request.form.get("unit_id"))
     except barcode_stock.BarcodeError as exc:
         return render(str(exc)), 400
     except Exception:
@@ -1310,9 +1346,9 @@ def upload():
     # Prefill known purchase conversions; no stock mutation during upload.
     try:
         products = barcode_stock.grocy("GET", "objects/products")
-        known = {barcode_stock.norm(p["name"]): p for p in products}
+        known = {str(p["name"]).strip().casefold(): p for p in products}
         for item in receipt["items"]:
-            p = known.get(barcode_stock.norm(item["name"]))
+            p = known.get(str(item["name"]).strip().casefold())
             if p and int(p.get("qu_id_stock") or 0) == 2 and int(p.get("qu_id_purchase") or 0) != 2:
                 factor = int(p.get("qu_factor_purchase_to_stock") or 1)
                 if factor > 1:
