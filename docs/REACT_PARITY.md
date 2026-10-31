@@ -16,7 +16,7 @@ The stable Home Assistant UI must remain available until the React frontend repl
 | Product photos | `/product/*/photo*`, `/photo/lookup`, `/barcode/photo` | Upload implemented; display/lookup parity incomplete | Upload, fetch and persistence tests |
 | Catalog audit | `/catalog/audit` | Read-only audit and JSON export implemented | Expose audit read-only and review UI |
 | Clear completed shopping | `/shopping/clear-completed` | Implemented in React with confirmation | Confirm bulk-operation semantics |
-| Login/logout outside HA ingress | `/login`, `/logout` | **Missing** | Preserve standalone authentication |
+| Login/logout outside HA ingress | `/login`, `/logout` | Implemented in v1 API and React; HA ingress bypass preserved | Test CSRF, session expiry, failed password and logout |
 
 ## Release criteria
 
