@@ -124,3 +124,11 @@ export async function removeCatalogBarcode(id: number, barcode: string): Promise
   const result = await response.json() as { error?: string; details?: string };
   if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo eliminar el código');
 }
+
+export async function uploadCatalogPhoto(id: number, file: File): Promise<void> {
+  const form = new FormData();
+  form.append('photo', file);
+  const response = await fetch(base + 'catalog/products/' + id + '/photo', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': await token() }, body: form });
+  const result = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar la fotografía');
+}
