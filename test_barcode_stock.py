@@ -111,6 +111,36 @@ class BarcodeTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             barcode_stock.inventory_snapshot()
 
+    @patch("barcode_stock.grocy")
+    def test_edit_product_pack_preserves_stock_and_description(self, api):
+        existing = {"id": 7, "name": "Vainilla", "description": "Uso repostería"}
+        def fake(method, path, body=None):
+            if method == "GET" and path == "objects/products/7":
+                return existing
+            if method == "PUT" and path == "objects/products/7":
+                self.assertEqual(body["name"], "Aroma vainilla")
+                self.assertIn("Uso repostería", body["description"])
+                self.assertIn("unidades_por_envase=4", body["description"])
+                existing.update(body)
+                return {}
+            if method == "GET" and path == "objects/product_barcodes":
+                return [{"product_id": 7, "barcode": "1234567890123"}]
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        result = barcode_stock.update_product_info(7, "Aroma vainilla", "4")
+        self.assertEqual(result["pack_size"], 4)
+        detail = barcode_stock.product_detail(7)
+        self.assertEqual(detail["pack_size"], 4)
+        self.assertEqual(detail["description"], "Uso repostería")
+        self.assertFalse(any(c.args[0] == "POST" for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_invalid_pack_count_never_writes(self, api):
+        for invalid in ("0", "-1", "1001", "not-a-number"):
+            with self.assertRaises(barcode_stock.BarcodeError):
+                barcode_stock.update_product_info(7, "Vainilla", invalid)
+        api.assert_not_called()
+
     def test_reject_non_numeric_barcodes(self):
         with self.assertRaises(barcode_stock.BarcodeError):
             barcode_stock.validate_barcode("abc")
