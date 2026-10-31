@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.15.0] — 2026-10-31
+
+### Changed
+- Replace separate pantry name and barcode inputs with a single searchable field and camera scan button.
+- Barcode matches now filter inventory rows in place instead of redirecting to a product sheet.
+- Preserve product sheet navigation through the matching inventory row.
+
+### Validation
+- CI and Home Assistant verification pending.
+
+
 ## [0.14.2] — 2026-10-31
 
 ### Fixed
