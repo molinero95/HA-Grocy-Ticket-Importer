@@ -1127,7 +1127,7 @@ def photo_lookup():
         return jsonify({"image_url": None}), 400
     except Exception:
         return jsonify({"image_url": None}), 503
-    return jsonify({"image_url": found["image_url"] if found else None, "name": found["name"] if found else ""})
+    return jsonify({"image_url": found["image_url"] if found else None, "name": found.get("name", "") if found else ""})
 
 
 @app.post("/barcode/photo")
