@@ -38,6 +38,36 @@ def list_products():
         key=lambda p: (p["name"].casefold(), p["id"]),
     )
 
+def inventory_snapshot():
+    """Read-only stock overview, including zero-stock catalog entries.
+
+    Each product's stock endpoint is used for its authoritative quantity.
+    If one quantity cannot be read, show it as unavailable rather than zero.
+    """
+    products = grocy("GET", "objects/products")
+    try:
+        units = {int(unit["id"]): str(unit["name"]) for unit in grocy("GET", "objects/quantity_units")}
+    except Exception:
+        units = {}
+    rows = []
+    for product in products:
+        pid = int(product["id"])
+        amount = None
+        try:
+            details = grocy("GET", f"stock/products/{pid}")
+            quantity = Decimal(str(details.get("stock_amount", 0)))
+            amount = format(quantity.normalize(), "f")
+        except Exception:
+            pass
+        rows.append({
+            "id": pid,
+            "name": str(product["name"]),
+            "amount": amount,
+            "unit": units.get(int(product.get("qu_id_stock") or 0), "ud. stock"),
+        })
+    return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))
+
+
 def associate_barcode(barcode, product_id):
     """Link barcode to an existing product. Does not create stock movements."""
     barcode = validate_barcode(barcode)
