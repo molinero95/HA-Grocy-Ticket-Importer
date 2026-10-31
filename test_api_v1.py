@@ -40,6 +40,20 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         importer.assert_not_called()
 
+    def test_catalog_create_requires_csrf(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "create_catalog_product") as create:
+            response = self.client.post("/api/v1/catalog/products", json={"name": "Arroz", "unit_id": 1})
+        self.assertEqual(response.status_code, 403)
+        create.assert_not_called()
+
+    def test_catalog_create_returns_existing_product_without_duplication(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "create_catalog_product", return_value={"created": False, "product_id": 7, "name": "Arroz"}) as create:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.post("/api/v1/catalog/products", json={"name": "Arroz", "unit_id": 1}, headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json["created"])
+        create.assert_called_once()
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
