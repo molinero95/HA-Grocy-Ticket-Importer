@@ -56,10 +56,10 @@ class BootstrapTests(unittest.TestCase):
              patch.dict(boot.os.environ, {}, clear=False):
             with self.assertRaisesRegex(RuntimeError, "intercepted"):
                 boot.main()
+            self.assertEqual(worker.call_args.kwargs["env"]["SHOPPING_SYNC_ENABLED"], "0")
         nginx.assert_called_once_with(["nginx"], check=True)
         worker.assert_called_once()
         self.assertEqual(worker.call_args.args[0][1], "/app/shopping_sync_worker.py")
-        self.assertEqual(worker.call_args.kwargs["env"]["SHOPPING_SYNC_ENABLED"], "0")
 
     def test_bootstrap_does_not_run_services_when_config_missing(self):
         with patch.object(boot, "load_config", side_effect=ValueError("missing")), \
