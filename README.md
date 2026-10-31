@@ -130,3 +130,15 @@ importación de tickets. La asociación de Alexa por identidad, los casos
 ambiguos y la validación de extremo a extremo siguen pendientes.
 No actives nuevas opciones de sincronización basándote únicamente en esta
 funcionalidad.
+
+### Coincidencias ambiguas de Alexa (desarrollo)
+
+Cuando la sincronización Alexa está activada, se calculan sugerencias de
+catálogo para los nombres no exactos. Las coincidencias dudosas se guardan
+en `/config/alexa-match-queue.sqlite3` y aparecen en
+**Acciones → Coincidencias Alexa**. Se puede seleccionar explícitamente
+un candidato, pero **esa selección es una propuesta**: todavía no
+transforma una nota en un artículo de Grocy, no cambia existencias y no
+modifica el registro de sincronización. Los nombres originales se conservan.
+Las propuestas desaparecen de la vista cuando el artículo ya no está
+pendiente en Alexa, sin borrar el historial de revisión.
