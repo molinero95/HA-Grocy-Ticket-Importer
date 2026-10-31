@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 import extract
 import barcode_stock
 import product_images
+import variant_catalog
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(os.environ.get("GROCY_ENV_FILE", str(ROOT / ".env")))
@@ -325,6 +326,24 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <label for="edit-barcode">Nuevo código (opcional)</label><span class="barcode-input-row"><input id="edit-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" placeholder="Escanear o escribir"><button class="scan-trigger" type="button" data-scan-input="edit-barcode" aria-label="Escanear nuevo código de barras con la cámara">📷 Escanear</button></span>
 <p class="helper">Solo se modificará el código de barras si introduces uno nuevo.</p>
 <button id="product-save-all" type="submit">Guardar cambios</button>
+</form>
+<h3>Variantes por supermercado</h3>
+<p class="helper">Todas las variantes comparten las existencias de este producto genérico en Grocy. No se fusionan artículos ni se modifican cantidades.</p>
+{% if variants_error %}<p role="alert">No se pudieron consultar las variantes guardadas.</p>{% endif %}
+{% if variants %}
+<div class="inventory-list">{% for v in variants %}
+<div class="inventory-row"><div class="pantry-info"><strong>{{ v.name }}</strong><small>{{ v.brand }}{% if v.brand and v.supermarket %} · {% endif %}{{ v.supermarket }}</small><small>Código: {{ v.barcode }} · Unidades por compra: {{ v.units_per_purchase }}</small></div></div>
+{% endfor %}</div>
+{% else %}<p class="helper">Aún no hay variantes asociadas.</p>{% endif %}
+<form method="post" action="{{ url_for('product_variant_add', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label for="variant-name">Nombre de la variante</label><input id="variant-name" name="name" maxlength="200" required placeholder="Leche entera Hacendado">
+<label for="variant-barcode">Código de barras</label><span class="barcode-input-row"><input id="variant-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required autocomplete="off"><button type="button" class="scan-trigger" data-scan-input="variant-barcode">📷 Escanear</button></span>
+<label for="variant-supermarket">Supermercado</label><input id="variant-supermarket" name="supermarket" maxlength="120" placeholder="Mercadona">
+<label for="variant-brand">Marca</label><input id="variant-brand" name="brand" maxlength="120" placeholder="Hacendado">
+<label for="variant-factor">Unidades por compra (solo metadatos)</label><input id="variant-factor" name="units_per_purchase" type="number" min="0.01" max="999999" step="0.01" value="1" required>
+<p class="helper">Se comprobará que el código no pertenezca a otro producto de Grocy. El factor no cambia las conversiones de stock existentes.</p>
+<button type="submit">Guardar variante sin cambiar stock</button>
 </form>
 <details class="product-danger-zone"><summary>Opciones avanzadas · Eliminar artículo</summary><h3>Eliminar artículo</h3>
 <p class="helper">Al confirmar, las existencias se descontarán hasta cero y después se eliminará el artículo definitivamente. Esta operación no se puede deshacer.</p>
@@ -951,6 +970,7 @@ POST_VIEWS = {
     "product_delete": "product",
     "product_photo": "product",
     "product_barcode_add": "product",
+    "product_variant_add": "product",
     "product_stock_save": "product",
     "shopping_add": "shopping",
     "shopping_toggle": "shopping",
@@ -1034,6 +1054,12 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             pass
         except Exception:
             pass
+    variants, variants_error = [], False
+    if product:
+        try:
+            variants = variant_catalog.variants_for_product(product["id"])
+        except Exception:
+            variants_error = True
     if product and (PHOTO_DIR / (str(product["id"]) + ".jpg")).is_file():
         product["image_url"] = url_for("local_product_photo", product_id=product["id"])
     if view == "inventory" and (INGRESS_MODE or session.get("auth")):
@@ -1065,7 +1091,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   shopping_product=shopping_product,
                                   new_product_units=new_product_units,
                                   existing_product=existing_product,
-                                  product=product,
+                                  product=product, variants=variants, variants_error=variants_error,
                                   app_version=os.environ.get("DESPENSA_VERSION", "dev"),
                                   app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
                                   grocy_configured=bool(os.environ.get("GROCY_URL") and os.environ.get("GROCY_API_KEY")),
@@ -1288,6 +1314,26 @@ def product_barcode_add(product_id):
     return render("Código sin cambios." if result["already_linked"] else
                   ("Código sustituido correctamente sin modificar existencias." if result.get("replaced")
                    else "Código asociado sin modificar existencias."))
+
+
+@app.post("/product/<int:product_id>/variant")
+def product_variant_add(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = variant_catalog.save_variant(
+            product_id, request.form.get("barcode"), request.form.get("name"),
+            supermarket=request.form.get("supermarket"),
+            brand=request.form.get("brand"),
+            units_per_purchase=request.form.get("units_per_purchase", "1"))
+    except (ValueError, barcode_stock.BarcodeError) as exc:
+        return render("❌ Variante no guardada: " + str(exc)), 409
+    except Exception:
+        app.logger.exception("variant_save_failed")
+        return render("No se pudo guardar la variante. Comprueba el código en Grocy antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="product", product_id=result["product_id"]))
 
 
 @app.post("/product/<int:product_id>/stock-save")
