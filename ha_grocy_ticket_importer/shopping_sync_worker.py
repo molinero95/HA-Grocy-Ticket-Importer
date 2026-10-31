@@ -64,7 +64,7 @@ def main():
             except Exception as exc:
                 # Do not log exception bodies: remote APIs may include sensitive data.
                 print("Shopping sync failed: " + str(exc)[:180], flush=True)
-            time.sleep(120)
+            time.sleep(max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
 
 
 if __name__ == "__main__":
