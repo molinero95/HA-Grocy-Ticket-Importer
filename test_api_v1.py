@@ -29,6 +29,16 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.json["items"], items)
         self.assertEqual(response.json["pending_matches"], matches)
 
+    def test_variants_read_only_and_product_must_exist(self):
+        catalog = [{"id": 3, "name": "Leche"}]
+        variants = [{"barcode": "8412345678901", "name": "Leche A", "supermarket": "A", "brand": "", "units_per_purchase": 1}]
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "list_products", return_value=catalog), patch.object(web.variant_catalog, "variants_for_product", return_value=variants) as get_variants:
+            self.assertEqual(self.client.get("/api/v1/products/9/variants").status_code, 404)
+            response = self.client.get("/api/v1/products/3/variants")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["variants"], variants)
+        get_variants.assert_called_once_with(3)
+
     def test_inventory_returns_combined_stock_and_shopping(self):
         rows = [{"id": 8, "name": "Leche", "amount": "2", "unit": "ud.", "shopping_amount": "1"}]
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "inventory_with_shopping", return_value=rows):
