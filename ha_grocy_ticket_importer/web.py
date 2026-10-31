@@ -208,7 +208,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% else %}
 <nav class="main-tabs" aria-label="Secciones principales"><a href="{{ url_for('index', view='shopping') }}" {% if view == 'shopping' %}aria-current="page"{% endif %}>🛒 Lista de la compra</a><a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' or view == 'product' %}aria-current="page"{% endif %}>📦 Mi despensa</a><a href="{{ url_for('index', view='actions') }}" {% if view not in ('shopping','inventory','product','shopping_add') %}aria-current="page"{% endif %}>⚡ Acciones</a></nav>
 {% if view == 'shopping' %}
-<section id="shopping-live-section"><p class="section-eyebrow">Sincronizada con Grocy</p><h2>🛒 Lista de la compra</h2>
+<section id="shopping-live-section"><button type="button" id="shopping-refresh" class="scan-trigger" style="float:right">↻ Actualizar</button><p class="section-eyebrow">Sincronizada con Grocy</p><h2>🛒 Lista de la compra</h2>
 {% if shopping_error %}<p role="alert">No se pudo cargar la lista desde Grocy.</p>{% else %}
 <p>{{ shopping|length }} artículos en la lista. Marcarlos como comprados no añade stock automáticamente.</p>
 {% if not shopping %}<p>Tu lista está vacía. Añade un artículo desde Mi despensa.</p>{% endif %}
@@ -724,9 +724,22 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   if (!section) return;
   let pending = false;
   let previous = section.innerHTML;
+  const button = document.getElementById('shopping-refresh');
+  let touchStart = null;
+  button.addEventListener('click', refresh);
+  document.addEventListener('touchstart', e => {
+    if (window.scrollY <= 5 && e.touches.length === 1) touchStart = e.touches[0].clientY;
+    else touchStart = null;
+  }, {passive: true});
+  document.addEventListener('touchend', e => {
+    if (touchStart !== null && window.scrollY <= 5 && e.changedTouches[0].clientY - touchStart > 90) refresh();
+    touchStart = null;
+  }, {passive: true});
   async function refresh() {
     if (pending || document.hidden || section.querySelector('form:focus-within')) return;
     pending = true;
+    button.disabled = true;
+    button.textContent = 'Actualizando…';
     try {
       const response = await fetch(window.location.href, {credentials: 'same-origin', cache: 'no-store', headers: {'Accept': 'text/html'}});
       if (!response.ok) return;
@@ -742,11 +755,14 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
       // Keep the current list on transient network errors.
     } finally {
       pending = false;
+      button.disabled = false;
+      button.textContent = '↻ Actualizar';
     }
   }
   setInterval(refresh, 10000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 })();
+</script>
 <script>
 (() => {
   const search = document.getElementById('inventory-search');
