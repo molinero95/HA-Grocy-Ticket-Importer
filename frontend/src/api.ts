@@ -1,4 +1,4 @@
-import type { ShoppingResponse, InventoryResponse } from './types';
+import type { ShoppingResponse, InventoryResponse, ProductVariantsResponse } from './types';
 
 /** Relative paths preserve the Home Assistant ingress prefix. */
 const base = 'api/v1/';
@@ -44,4 +44,10 @@ export async function lookupBarcode(code: string): Promise<number | null> {
 }
 export async function stepShopping(productId: number, direction: 'plus' | 'minus'): Promise<void> {
   await mutate('shopping/products/' + productId + '/step', 'POST', { direction });
+}
+
+export async function getProductVariants(productId: number): Promise<ProductVariantsResponse> {
+  const response = await fetch(base + 'products/' + productId + '/variants', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se han podido cargar las variantes');
+  return response.json() as Promise<ProductVariantsResponse>;
 }
