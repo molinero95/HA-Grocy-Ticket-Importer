@@ -541,7 +541,7 @@ class WebTests(unittest.TestCase):
 
 class AlexaInlineShoppingTests(unittest.TestCase):
     def test_shopping_view_renders_pending_alexa_choices(self):
-        self.assertIn('id="alexa-pending-alert"', web.PAGE)
+        self.assertIn('class="ticket-review-item alexa-inline-match"', web.PAGE)
         self.assertIn('Coincidencias pendientes ({{ pending_matches|length }})', web.PAGE)
         self.assertIn('if view in ("alexa_matches", "shopping")',
                       __import__("inspect").getsource(web.render))
