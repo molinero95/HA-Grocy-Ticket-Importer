@@ -69,9 +69,11 @@ class WebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         for marker in (b'class="action-grid"', b'class="bottom-nav"',
                        b'id="entrada"', b'id="salida"', b'id="ticket"',
-                       b'id="asociar"', b'id="scanner-dialog"',
-                       b'class="ticket-table"'):
+                       b'id="asociar"', b'id="scanner-dialog"'):
             self.assertIn(marker, response.data)
+        # The ticket table renders only after a receipt has been uploaded.
+        self.assertIn(b'class="ticket-table"', web.PAGE.encode("utf-8"))
+        self.assertNotIn(b'class="ticket-table"', response.data)
         self.assertIn(b'name="barcode"', response.data)
         self.assertIn(b'Confirmar: quitar 1 unidad', web.PAGE.encode("utf-8"))
         self.assertNotIn(b'<form method="get" action="/barcode/add"', response.data)
