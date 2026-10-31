@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.22] — 2026-10-31
+
+### Added
+- The open shopping-list view refreshes automatically every 10 seconds and on return to the tab, without a full page reload or scroll reset.
+- Pause background refresh while the tab is hidden or a shopping-list form is focused; keep existing list on transient errors.
+
+### Validation
+- Pending GitHub Actions and Home Assistant mobile smoke test after installation.
+
+
 ## [0.7.21] — 2026-10-31
 
 ### Fixed
