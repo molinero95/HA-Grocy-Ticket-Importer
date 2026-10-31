@@ -122,6 +122,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .shopping-stepper output{text-align:center;white-space:nowrap;font-size:.85rem;font-weight:750;color:var(--primary-dark)}
 .shopping-stepper output small{display:block;font-size:.66rem;font-weight:500}
 .shopping-stepper[data-busy="true"]{opacity:.65}
+.shopping-stepper[hidden],.shopping-cart-form[hidden]{display:none!important}
+.shopping-cart-form{margin:0;width:100%}
+.shopping-cart-form button{width:100%;margin:0;min-height:41px;background:var(--soft);color:var(--primary-dark);border:1px solid #b9d8c6;border-radius:11px;font-weight:750;padding:7px 9px}
+.shopping-cart-form button:hover{background:#d3e9dc;color:var(--primary-dark)}
+.shopping-quick[data-busy="true"]{opacity:.65}
+.shopping-quick{display:flex;flex-direction:column;gap:3px}
+.shopping-quick .shopping-stepper{width:100%}
 .shopping-stepper-message{grid-column:1/-1;font-size:.7rem;color:var(--danger);margin:0;line-height:1.3}
 .shopping-stepper-message:empty{display:none}
 .inventory-row[hidden]{display:none}
@@ -236,11 +243,14 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
 <div class="pantry-side">
 <div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
-<div class="shopping-stepper" aria-label="Cantidad de {{ p.name }} en lista de compra" data-busy="false">
-<form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='minus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="minus" type="submit" aria-label="Quitar {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}" {% if not p.shopping_can_subtract %}disabled{% endif %}>−</button></form>
+<div class="shopping-quick" data-busy="false">
+<form class="shopping-cart-form" method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='plus') }}" {% if p.shopping_can_subtract %}hidden{% endif %}>
+<input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" aria-label="Añadir {{ p.name }} a la lista de la compra">🛒 Añadir</button></form>
+<div class="shopping-stepper" aria-label="Cantidad de {{ p.name }} en lista de compra" {% if not p.shopping_can_subtract %}hidden{% endif %}>
+<form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='minus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="minus" type="submit" aria-label="Quitar {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}">−</button></form>
 <output><span class="shopping-amount">{{ p.shopping_amount }}</span><small>{{ p.shopping_unit }}</small></output>
 <form method="post" action="{{ url_for('shopping_step', product_id=p.id, direction='plus') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" aria-label="Añadir {{ p.shopping_step }} {{ p.shopping_unit }} de {{ p.name }}">+</button></form>
-<p class="shopping-stepper-message" role="status" aria-live="polite"></p></div></div>
+</div><p class="shopping-stepper-message" role="status" aria-live="polite"></p></div></div>
 </article>
 {% endfor %}
 </div><p id="inventory-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
@@ -531,19 +541,29 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         : 'No ha sido posible abrir la cámara. Usa el código manual o prueba desde Chrome.';
     }
   }
-  // Update shopping quantities in place; keep the current scroll position.
-  document.querySelectorAll('.shopping-stepper').forEach(stepper => {
-    const buttons = Array.from(stepper.querySelectorAll('button[type="submit"]'));
-    const minus = stepper.querySelector('button.minus');
-    const value = stepper.querySelector('.shopping-amount');
-    const message = stepper.querySelector('.shopping-stepper-message');
-    stepper.querySelectorAll('form').forEach(form => {
+  // The cart becomes a +/- control on the first successful addition.
+  // Reverting to zero restores the cart without navigation or scroll jumps.
+  document.querySelectorAll('.shopping-quick').forEach(control => {
+    const cart = control.querySelector('.shopping-cart-form');
+    const stepper = control.querySelector('.shopping-stepper');
+    const buttons = Array.from(control.querySelectorAll('button[type="submit"]'));
+    const value = control.querySelector('.shopping-amount');
+    const message = control.querySelector('.shopping-stepper-message');
+    function showQuantity(amount) {
+      const quantity = Number(amount);
+      if (!Number.isFinite(quantity) || quantity < 0) return;
+      if (value) value.textContent = amount;
+      const inList = quantity > 0;
+      if (cart) cart.hidden = inList;
+      if (stepper) stepper.hidden = !inList;
+    }
+    control.querySelectorAll('form').forEach(form => {
       form.addEventListener('submit', async event => {
-        if (!window.fetch || !window.FormData) return; // normal form fallback
+        if (!window.fetch || !window.FormData) return; // Regular form fallback
         event.preventDefault();
-        if (stepper.dataset.busy === 'true') return;
-        stepper.dataset.busy = 'true';
-        buttons.forEach(b => { b.disabled = true; });
+        if (control.dataset.busy === 'true') return;
+        control.dataset.busy = 'true';
+        buttons.forEach(button => { button.disabled = true; });
         if (message) message.textContent = '';
         try {
           const response = await fetch(form.action, {
@@ -551,14 +571,15 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
             headers: {'Accept': 'application/json'},
             body: new FormData(form)
           });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || 'No se pudo modificar la lista.');
-          if (value) value.textContent = data.amount;
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'No se pudo modificar la lista.');
+          showQuantity(result.amount);
         } catch (error) {
-          if (message) message.textContent = error.message || 'Error de conexión. Revisa la lista antes de reintentar.';
+          if (message) message.textContent =
+            error.message || 'Error de conexión. Comprueba la lista antes de reintentar.';
         } finally {
-          stepper.dataset.busy = 'false';
-          buttons.forEach(b => { b.disabled = b === minus && Number(value?.textContent || '0') <= 0; });
+          control.dataset.busy = 'false';
+          buttons.forEach(button => { button.disabled = false; });
         }
       });
     });
