@@ -552,7 +552,7 @@ class AlexaInlineShoppingTests(unittest.TestCase):
                     {"id": 3, "name": "Arroz integral"}],
                     "selected_product_id": None}
             }], shopping_error=False, pending_matches=[], shopping_match_keys={"arroz"},
-                csrf="test", ingress_mode=True)
+                csrf="test", ingress_mode=True, authenticated=True)
             self.assertIn("Arroz basmati", rendered)
             self.assertIn("Arroz integral", rendered)
             self.assertIn("Elegir producto para", rendered)
