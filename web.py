@@ -277,7 +277,6 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <div class="hero"><strong>¿Qué quieres hacer?</strong><p>Elige una operación. Cada una tiene su propia pantalla.</p>
 <nav class="action-grid" aria-label="Acciones de Despensa">
 <a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Añadir producto</strong><small>Crear artículo nuevo</small></a>
-<a class="action-link" href="{{ url_for('index', view='remove') }}"><span aria-hidden="true">➖</span><strong>Consumir producto</strong><small>Quitar del stock</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
 </nav></div>
 {% else %}
@@ -416,26 +415,6 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">{{ photo.attribution }}</a></p>
 <p>Esta foto se muestra como vista previa. Todavía no se guarda en la ficha de Grocy.</p>
 {% endif %}</section>
-{% endif %}
-{% if view == 'remove' %}
-<section id="salida"><p class="section-eyebrow">Salida de productos</p><h2>Consumir producto</h2>
-<form method="post" action="{{ url_for('barcode_remove_preview') }}">
-<input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
-<button type="submit">Buscar producto</button></form>
-<p>Selecciona cuánto quieres consumir. El producto no se elimina del catálogo.</p></section>
-{% if remove_candidate %}
-<section id="confirmar-salida" class="status-message"><h3>Confirmar salida de stock</h3>
-<p>Producto: <strong>{{ remove_candidate.name }}</strong> ({{ remove_candidate.barcode }})</p>
-<p>Stock disponible: {{ remove_candidate.available }} {{ remove_candidate.unit }}</p>
-<form method="post" action="{{ url_for('barcode_remove') }}">
-<input type="hidden" name="csrf" value="{{ csrf }}">
-<input type="hidden" name="barcode" value="{{ remove_candidate.barcode }}">
-<label for="consume-amount">Cantidad a consumir ({{ remove_candidate.unit }})</label>
-<input id="consume-amount" name="amount" type="number" min="0.01" step="0.01" max="{{ remove_candidate.available }}" value="1" inputmode="decimal" required>
-<label class="consume-replenish"><input type="checkbox" name="add_to_list" value="1"> Añadir esta cantidad a la lista de la compra</label>
-<button type="submit">Consumir cantidad</button></form></section>
-{% endif %}
 {% endif %}
 {% if view == 'ticket' %}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
