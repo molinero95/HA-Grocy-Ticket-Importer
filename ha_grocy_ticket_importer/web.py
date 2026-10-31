@@ -131,6 +131,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .inventory-quantity form{margin-top:7px}
 .inventory-quantity button{min-height:36px;padding:6px 10px;font-size:.8rem}
 .shopping-add-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 10px;font-size:.8rem;text-decoration:none;margin-top:8px}
+.consume-replenish{display:flex;align-items:center;gap:10px}
+.consume-replenish input{width:22px;height:22px;flex-shrink:0}
 .shopping-controls{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .shopping-controls button{min-height:38px;padding:7px 10px;font-size:.82rem}
 .quantity-unknown{color:#a34b00;font-size:.85rem}
@@ -239,7 +241,6 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <nav class="action-grid" aria-label="Acciones de Despensa">
 <a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Añadir producto</strong><small>Crear artículo nuevo</small></a>
 <a class="action-link" href="{{ url_for('index', view='remove') }}"><span aria-hidden="true">➖</span><strong>Consumir producto</strong><small>Quitar del stock</small></a>
-<a class="action-link" href="{{ url_for('index', view='associate') }}"><span aria-hidden="true">🔗</span><strong>Asociar código</strong><small>Producto existente</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
 </nav></div>
 {% else %}
@@ -364,19 +365,23 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% endif %}</section>
 {% endif %}
 {% if view == 'remove' %}
-<section id="salida"><p class="section-eyebrow">Salida de productos</p><h2>Consumir un producto</h2>
+<section id="salida"><p class="section-eyebrow">Salida de productos</p><h2>Consumir producto</h2>
 <form method="post" action="{{ url_for('barcode_remove_preview') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
-<button type="submit">Buscar unidad para descontar</button></form>
-<p>Esta opción consume una unidad; nunca elimina el producto de la base de datos.</p></section>
+<button type="submit">Buscar producto</button></form>
+<p>Selecciona cuánto quieres consumir. El producto no se elimina del catálogo.</p></section>
 {% if remove_candidate %}
 <section id="confirmar-salida" class="status-message"><h3>Confirmar salida de stock</h3>
 <p>Producto: <strong>{{ remove_candidate.name }}</strong> ({{ remove_candidate.barcode }})</p>
+<p>Stock disponible: {{ remove_candidate.available }} {{ remove_candidate.unit }}</p>
 <form method="post" action="{{ url_for('barcode_remove') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <input type="hidden" name="barcode" value="{{ remove_candidate.barcode }}">
-<button type="submit">Confirmar: quitar 1 unidad</button></form></section>
+<label for="consume-amount">Cantidad a consumir ({{ remove_candidate.unit }})</label>
+<input id="consume-amount" name="amount" type="number" min="0.01" step="0.01" max="{{ remove_candidate.available }}" value="1" inputmode="decimal" required>
+<label class="consume-replenish"><input type="checkbox" name="add_to_list" value="1"> Añadir esta cantidad a la lista de la compra</label>
+<button type="submit">Consumir cantidad</button></form></section>
 {% endif %}
 {% endif %}
 {% if view == 'ticket' %}
@@ -890,8 +895,17 @@ def barcode_remove_preview():
         return render(str(exc)), 400
     except Exception:
         return render("No se pudo consultar Grocy"), 502
+    try:
+        details = barcode_stock.grocy("GET", f"stock/products/{int(product['id'])}")
+        unit_id = int(product["qu_id_stock"])
+        units = barcode_stock.grocy("GET", "objects/quantity_units")
+        unit = next((str(u["name"]) for u in units if int(u["id"]) == unit_id), "unidad")
+        available = str(details.get("stock_amount", 0))
+    except Exception:
+        return render("No se pudo consultar el stock disponible."), 502
     session["remove_barcode"] = barcode
-    return render(remove_candidate={"barcode": barcode, "name": product["name"]})
+    return render(remove_candidate={"barcode": barcode, "name": product["name"],
+                                    "available": available, "unit": unit})
 
 @app.post("/barcode/remove")
 def barcode_remove():
@@ -901,14 +915,20 @@ def barcode_remove():
     if not LOCK.acquire(blocking=False):
         abort(409, "Otra operación está en marcha")
     try:
-        result = barcode_stock.remove_one(barcode)
+        result = barcode_stock.consume_quantity(
+            barcode, request.form.get("amount"), request.form.get("add_to_list") == "1")
     except barcode_stock.BarcodeError as exc:
         return render(str(exc)), 400
     except Exception:
         return render("Error de Grocy. Comprueba el stock antes de reintentar."), 502
     finally:
         LOCK.release()
-    return render("Descontada 1 unidad de " + result["name"] + ". El producto sigue en el catálogo.")
+    message = "Consumidos " + result["amount"] + " de " + result["name"] + "."
+    if result["shopping_added"]:
+        message += " Añadida la misma cantidad a la lista de la compra."
+    elif result["shopping_error"]:
+        message += " No se pudo añadir a la lista; el consumo SÍ se ha registrado. No repitas el consumo."
+    return render(message)
 
 @app.post("/upload")
 def upload():
