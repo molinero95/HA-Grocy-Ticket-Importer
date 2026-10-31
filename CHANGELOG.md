@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.26] — 2026-10-31
+
+### Fixed
+- Receipt upload no longer calls nonexistent barcode_stock.norm (observed in addon logs).
+- Shopping list entries linked to catalog products open their product details.
+
+### Added
+- Barcode camera scanning and manual EAN/UPC lookup from Mi despensa, opening existing product details.
+- Simplified product editing form to show piece/kg choices and hide pack conversion fields; existing Grocy stock and historical pack metadata are not migrated.
+
+### Validation
+- CI and end-to-end mobile editing/scanning tests pending.
+
+
 ## [0.7.25] — 2026-10-31
 
 ### Improved
