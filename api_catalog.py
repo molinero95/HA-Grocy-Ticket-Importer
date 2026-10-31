@@ -209,3 +209,34 @@ def register_catalog_routes(app, barcode_stock, lock):
         except Exception:
             app.logger.exception("api_v1_catalog_merge_preview_failed")
             return jsonify({"error": "merge_preview_unavailable"}), 503
+
+    @app.get("/api/v1/catalog/merge-preview")
+    def api_v1_catalog_merge_preview():
+        try:
+            source_id = int(request.args.get("source_id", "0"))
+            target_id = int(request.args.get("target_id", "0"))
+            if source_id <= 0 or target_id <= 0 or source_id == target_id:
+                return jsonify({"error": "Selecciona dos productos distintos"}), 400
+            from variant_catalog import variants_for_product
+            source = barcode_stock.product_detail(source_id)
+            target = barcode_stock.product_detail(target_id)
+            source_variants = variants_for_product(source_id)
+            target_variants = variants_for_product(target_id)
+            blockers = []
+            if source["unit_id"] != target["unit_id"]:
+                blockers.append("Unidades de stock diferentes: no se pueden sumar directamente")
+            if source["pack_size"] != target["pack_size"] or source["purchase_unit_id"] != target["purchase_unit_id"]:
+                blockers.append("Configuración de envases o unidades de compra diferente")
+            if source_variants or target_variants:
+                blockers.append("Hay variantes de supermercado que requieren migración de referencias")
+            if source["stock_amount"] != "0" or target["stock_amount"] != "0":
+                blockers.append("Las existencias requieren conciliación y verificación de movimientos")
+            blockers.append("Falta auditar referencias en listas de compra, historial y recetas antes de fusionar")
+            return jsonify({"source": source, "target": target,
+                            "source_variants": source_variants, "target_variants": target_variants,
+                            "blockers": blockers, "can_merge": False})
+        except (ValueError, TypeError, barcode_stock.BarcodeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception:
+            app.logger.exception("api_v1_catalog_merge_preview_failed")
+            return jsonify({"error": "merge_preview_unavailable"}), 503
