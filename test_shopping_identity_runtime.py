@@ -77,6 +77,15 @@ class IdentityAdapterTests(unittest.TestCase):
                 add_grocy_identity({"name": "Arroz", "product_id": 2})
         grocy.assert_not_called()
 
+    def test_concurrent_canonical_name_note_blocks_product_add(self):
+        note = ("Arroz basmati", {"id": 8, "product_id": None,
+                                  "note": "Arroz basmati", "amount": 1})
+        with patch("shopping_sync_adapters.grocy_entries", return_value=[note]), \
+             patch("shopping_sync_adapters.grocy", return_value=PRODUCTS) as grocy:
+            with self.assertRaises(IdentityConflict):
+                add_grocy_identity({"name": "Arroz", "product_id": 2})
+        grocy.assert_called_once_with("GET", "objects/products")
+
     def test_changed_quantity_prevents_deletion(self):
         item = ("Arroz basmati", {"id": 9, "product_id": 2, "note": "", "amount": 3})
         with patch("shopping_sync_adapters.grocy_entries", return_value=[item]), \
