@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.15] — 2026-10-31
+
+### Fixed
+- Enable Supervisor API access (`hassio_api: true`) in addition to Home Assistant API access to provide the add-on's scoped authentication token for Alexa todo synchronization.
+- Preserve safe missing-token diagnostics in worker logs, without exposing credentials.
+
+### Validation
+- Pending real Home Assistant integration test: confirm that `Plátanos` syncs from Alexa to Grocy and reverse-direction sync works without duplicates.
+
+
 ## [0.7.14] — 2026-10-31
 
 ### Fixed
