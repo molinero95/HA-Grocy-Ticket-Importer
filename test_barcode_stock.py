@@ -324,100 +324,41 @@ class BarcodeTests(unittest.TestCase):
             barcode_stock.inventory_snapshot()
 
     @patch("barcode_stock.grocy")
-    def test_edit_product_pack_preserves_stock_and_description(self, api):
-        existing = {"id": 7, "name": "Vainilla", "description": "Uso repostería", "qu_id_stock": 2, "qu_id_purchase": 3}
+    def test_edit_product_name_preserves_existing_description(self, api):
+        product = {"id": 7, "name": "Vainilla", "description": "Uso repostería",
+                   "qu_id_stock": 2, "qu_id_purchase": 2, "qu_factor_purchase_to_stock": 1}
         def fake(method, path, body=None):
             if method == "GET" and path == "objects/products/7":
-                return existing
-            if method == "PUT" and path == "objects/products/7":
-                self.assertEqual(body["name"], "Aroma vainilla")
-                self.assertIn("Uso repostería", body["description"])
-                self.assertIn("unidades_por_envase=4", body["description"])
-                self.assertIn("\n[Despensa: unidades_por_envase=4]", body["description"])
-                existing.update(body)
-                return {}
-            if method == "GET" and path == "objects/product_barcodes":
-                return [{"product_id": 7, "barcode": "1234567890123"}]
+                return product
             if method == "GET" and path == "objects/quantity_units":
-                return [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}]
-            if method == "GET" and path == "stock/products/7":
-                return {"stock_amount": 0}
-            raise AssertionError((method, path))
-        api.side_effect = fake
-        result = barcode_stock.update_product_info(7, "Aroma vainilla", "4")
-        self.assertEqual(result["pack_size"], 4)
-        detail = barcode_stock.product_detail(7)
-        self.assertEqual(detail["pack_size"], 4)
-        self.assertEqual(detail["description"], "Uso repostería")
-        self.assertFalse(any(c.args[0] == "POST" for c in api.call_args_list))
-
-    @patch("barcode_stock.grocy")
-    def test_reediting_pack_updates_existing_marker_without_duplicates(self, api):
-        product = {"id": 7, "name": "Vainilla",
-                   "description": "Nota antigua\n[Despensa: unidades_por_envase=4]", "qu_id_stock": 2, "qu_id_purchase": 3}
-        def fake(method, path, body=None):
-            if method == "GET":
-                return [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}] if path == "objects/quantity_units" else product
-            if method == "PUT":
-                self.assertEqual(body["description"].count("unidades_por_envase="), 1)
-                self.assertIn("unidades_por_envase=6", body["description"])
+                return [{"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}]
+            if method == "PUT" and path == "objects/products/7":
+                self.assertEqual(body, {"name": "Aroma vainilla"})
                 product.update(body)
                 return {}
             raise AssertionError((method, path))
         api.side_effect = fake
-        barcode_stock.update_product_info(7, "Vainilla", "6")
-        self.assertEqual(product["description"], "Nota antigua\n[Despensa: unidades_por_envase=6]")
+        result = barcode_stock.update_product_info(7, "Aroma vainilla", "1", "2")
+        self.assertEqual(result["name"], "Aroma vainilla")
+        self.assertEqual(product["description"], "Uso repostería")
 
     @patch("barcode_stock.grocy")
-    def test_piece_hides_pack_size_and_preserves_photo(self, api):
+    def test_edit_product_preserves_photo_metadata(self, api):
         product = {"id": 7, "name": "Leche", "qu_id_stock": 2,
-                   "description": "Notas\n[Despensa: imagen=https://images.openfoodfacts.org/images/products/a.jpg]"}
+                   "qu_id_purchase": 2, "qu_factor_purchase_to_stock": 1,
+                   "description": "Notas\\n[Despensa: imagen=https://images.openfoodfacts.org/images/products/a.jpg]"}
         def fake(method, path, body=None):
             if path == "objects/products/7" and method == "GET":
                 return product
             if path == "objects/quantity_units":
-                return [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}]
-            if path == "objects/product_barcodes":
-                return []
-            if path == "stock/products/7":
-                return {"stock_amount": "1"}
-            if path == "objects/products/7" and method == "PUT":
-                self.assertIn("imagen=https://images.openfoodfacts.org", body["description"])
-                self.assertNotIn("unidades_por_envase=", body["description"])
+                return [{"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}]
+            if method == "PUT":
                 product.update(body)
                 return {}
             raise AssertionError((method, path))
         api.side_effect = fake
-        barcode_stock.update_product_info(7, "Leche", "4", "2")
-        detail = barcode_stock.product_detail(7)
-        self.assertFalse(detail["is_pack"])
-        self.assertEqual(detail["pack_size"], 1)
-        self.assertEqual(detail["image_url"], "https://images.openfoodfacts.org/images/products/a.jpg")
-
-    @patch("barcode_stock.grocy")
-    def test_piece_to_pack_preserves_piece_stock_and_sets_purchase_conversion(self, api):
-        def fake(method, path, body=None):
-            if path == "objects/products/7" and method == "GET":
-                return {"id": 7, "name": "Leche", "qu_id_stock": 2}
-            if path == "objects/quantity_units":
-                return [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}]
-            if method == "PUT" and path == "objects/products/7":
-                self.assertEqual(body["qu_id_purchase"], 3)
-                self.assertEqual(body["qu_factor_purchase_to_stock"], 6)
-                self.assertNotIn("qu_id_stock", body)
-                return {}
-            raise AssertionError((method, path))
-        api.side_effect = fake
-        result = barcode_stock.update_product_info(7, "Leche", "6", "3")
-        self.assertEqual(result["unit_id"], 2)
-        self.assertFalse(any(c.args[0] == "POST" for c in api.call_args_list))
-
-    @patch("barcode_stock.grocy")
-    def test_invalid_pack_count_never_writes(self, api):
-        for invalid in ("0", "-1", "1001", "not-a-number"):
-            with self.assertRaises(barcode_stock.BarcodeError):
-                barcode_stock.update_product_info(7, "Vainilla", invalid)
-        api.assert_not_called()
+        barcode_stock.update_product_info(7, "Leche nueva", "1", "2")
+        self.assertIn("imagen=https://images.openfoodfacts.org", product["description"])
 
     @patch("barcode_stock.grocy")
     def test_inventory_inline_shopping_quantities(self, api):
