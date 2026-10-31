@@ -29,6 +29,20 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.json["items"], items)
         self.assertEqual(response.json["pending_matches"], matches)
 
+    def test_variant_write_requires_csrf(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.variant_catalog, "save_variant") as save:
+            response = self.client.post("/api/v1/products/3/variants", json={"barcode": "8412345678901", "name": "Leche"})
+        self.assertEqual(response.status_code, 403)
+        save.assert_not_called()
+
+    def test_variant_write_rejects_conflicting_barcode(self):
+        payload = {"barcode": "8412345678901", "name": "Leche", "supermarket": "A", "brand": "", "units_per_purchase": "1"}
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.variant_catalog, "save_variant", side_effect=ValueError("belongs to another product")) as save:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.post("/api/v1/products/3/variants", json=payload, headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 409)
+        save.assert_called_once()
+
     def test_variants_read_only_and_product_must_exist(self):
         catalog = [{"id": 3, "name": "Leche"}]
         variants = [{"barcode": "8412345678901", "name": "Leche A", "supermarket": "A", "brand": "", "units_per_purchase": 1}]
