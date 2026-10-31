@@ -192,6 +192,21 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'lista de la compra', r.data)
         consume.assert_called_once_with("1234567890123", "0.50", True)
 
+    def test_duplicates_action_navigates_to_read_only_results(self):
+        self.login()
+        actions = self.client.get("/?view=actions")
+        self.assertIn(b"view=duplicates", actions.data)
+        with patch.object(web, "detect_duplicates", return_value=[
+            {"reason": "Nombre idéntico", "items": [
+                {"id": 5, "name": "Leche", "barcodes": []},
+                {"id": 8, "name": "Leche", "barcodes": []}]}]):
+            result = self.client.get("/?view=duplicates")
+        self.assertEqual(result.status_code, 200)
+        self.assertIn(b"Posibles duplicados", result.data)
+        self.assertIn(b"product_id=5", result.data)
+        self.assertIn(b"product_id=8", result.data)
+        self.assertNotIn(b"<h2>🛒 Lista de la compra</h2>", result.data)
+
     def test_action_forms_are_separate(self):
         self.login()
         for view, endpoint in [
