@@ -328,7 +328,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <p class="helper">{% if product.barcodes %}Selecciona el código que quieres sustituir. El código anterior dejará de estar asociado a este artículo; las existencias no cambian.{% else %}El artículo ya está seleccionado. Añadir un código no cambia las existencias.{% endif %}</p>
 <form method="post" action="{{ url_for('product_barcode_add', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-{% if product.barcodes %}<label for="old-product-barcode">Código actual</label><select id="old-product-barcode" name="old_barcode" required>{% for code in product.barcodes %}<option value="{{ code }}">{{ code }}</option>{% endfor %}</select>{% endif %}
+{% if product.barcodes %}<label for="old-product-barcode">Código actual</label><input id="old-product-barcode" name="old_barcode" value="{{ product.barcodes[0] }}" inputmode="numeric" pattern="[0-9]{8,14}" required><p class="helper">Puedes editar el código actual directamente para sustituirlo.</p>{% endif %}
 <label>{% if product.barcodes %}Nuevo código{% else %}Código{% endif %} <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
 <div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía encontrada" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
 <button type="submit">{% if product.barcodes %}Sustituir código{% else %}Añadir código{% endif %}</button></form>
