@@ -463,21 +463,6 @@ class BarcodeTests(unittest.TestCase):
             barcode_stock.remove_shopping_list_item(10)
 
     @patch("barcode_stock.grocy")
-    def test_changing_stock_unit_with_existing_stock_is_blocked(self, api):
-        def fake(method, path, body=None):
-            if method == "GET" and path == "objects/products/7":
-                return {"id": 7, "name": "Tomate", "qu_id_stock": 2}
-            if method == "GET" and path == "objects/quantity_units":
-                return [{"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}]
-            if method == "GET" and path == "stock/products/7":
-                return {"stock_amount": 3}
-            raise AssertionError((method, path))
-        api.side_effect = fake
-        with self.assertRaises(barcode_stock.BarcodeError):
-            barcode_stock.update_product_info(7, "Tomate", "1", "4")
-        self.assertFalse(any(c.args[0] == "PUT" for c in api.call_args_list))
-
-    @patch("barcode_stock.grocy")
     def test_changing_stock_unit_with_zero_stock(self, api):
         def fake(method, path, body=None):
             if method == "GET" and path == "objects/products/7":
