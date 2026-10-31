@@ -117,12 +117,16 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
             return jsonify({"error": "authentication_required"}), 401
         try:
             items = barcode_stock.shopping_list_snapshot()
+            from api_photos import local_image_url
+            for item in items:
+                if item.get("product_id"):
+                    item["image_url"] = local_image_url(item["product_id"]) or item.get("image_url")
         except Exception:
             app.logger.exception("api_v1_shopping_failed")
             return jsonify({"items": [], "pending_matches": [], "shopping_error": True,
                             "pending_matches_error": False}), 503
         try:
-            matches = shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
+            matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH) if not row.get("dismissed")]
             matches_error = False
         except Exception:
             app.logger.exception("api_v1_alexa_matches_failed")

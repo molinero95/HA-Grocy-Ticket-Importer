@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
+from purchase_units import purchase_factor, create_purchase_conversion
 
 DB_PATH = os.environ.get('GROCY_IMPORT_DB', str(Path(__file__).resolve().parent / 'grocy_imports.sqlite3'))
 
@@ -147,7 +148,10 @@ def main():
                     status, reason = 'REVIEW', 'Existing product has different stock unit'
                 elif unit == 2:
                     purchase_id = int(p.get('qu_id_purchase') or unit)
-                    existing_factor = dec(p.get('qu_factor_purchase_to_stock') or 1)
+                    try:
+                        existing_factor = purchase_factor(grocy, int(p['id']), purchase_id, unit)
+                    except (ValueError, ArithmeticError):
+                        existing_factor = None
                     if purchase_id != (pack_id if pieces > 1 else unit) or existing_factor != pieces:
                         status, reason = 'REVIEW', 'Saved purchase conversion differs; review product in Grocy'
             if status == 'REVIEW':
@@ -165,10 +169,10 @@ def main():
                 conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest,i,None,'pending','Creating catalog product; verify before retry'))
                 conn.commit()
                 payload = {'name': name, 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'qu_id_purchase': pack_id if pieces > 1 else unit, 'qu_id_stock': unit, 'min_stock_amount': 0}
-                if pieces > 1:
-                    payload['qu_factor_purchase_to_stock'] = pieces
                 result = grocy('POST', 'objects/products', payload)
                 pid = int(result['created_object_id'])
+                if pieces > 1:
+                    create_purchase_conversion(grocy, pid, pack_id, unit, pieces)
                 catalog.setdefault(norm(name), []).append({**payload, 'id': pid})
             conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest,i,pid,'pending','Stock write may have happened; verify before retry'))
             conn.commit()

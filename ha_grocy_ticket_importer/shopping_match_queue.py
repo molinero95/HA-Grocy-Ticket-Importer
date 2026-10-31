@@ -44,6 +44,12 @@ def connect(path):
         active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))
     );
     """)
+    # Additive migration: retain all existing choices and scoped databases.
+    db.execute("BEGIN IMMEDIATE")
+    columns = {row[1] for row in db.execute("PRAGMA table_info(pending_matches)")}
+    if "dismissed" not in columns:
+        db.execute("ALTER TABLE pending_matches ADD COLUMN dismissed INTEGER NOT NULL DEFAULT 0")
+    db.commit()
     return db
 
 
@@ -79,14 +85,14 @@ def refresh(path, alexa_names, products):
 def pending(path):
     with closing(connect(path)) as db:
         rows = db.execute(
-            "SELECT normalized_name, original_name, candidates_json, selected_product_id "
+            "SELECT normalized_name, original_name, candidates_json, selected_product_id, dismissed "
             "FROM pending_matches WHERE active=1 ORDER BY original_name").fetchall()
     result = []
-    for key, original, candidates, selected in rows:
+    for key, original, candidates, selected, dismissed in rows:
         options = json.loads(candidates)
         candidate_ids = {int(option["id"]) for option in options}
         result.append({"key": key, "name": original, "candidates": options,
-                       "selected_product_id": selected,
+                       "selected_product_id": selected, "dismissed": bool(dismissed),
                        "selection_stale": selected is not None and selected not in candidate_ids})
     return result
 
@@ -101,7 +107,7 @@ def choose(path, key, product_id):
             (key,)).fetchone()
         if not row or pid not in {int(item["id"]) for item in json.loads(row[0])}:
             raise ValueError("La coincidencia ya no está disponible; actualiza la lista")
-        db.execute("UPDATE pending_matches SET selected_product_id=? WHERE normalized_name=?",
+        db.execute("UPDATE pending_matches SET selected_product_id=?, dismissed=0 WHERE normalized_name=?",
                    (pid, key))
 
 
@@ -118,7 +124,7 @@ def keep_original(path, key):
         if row is None:
             raise ValueError("La propuesta ya no está disponible; actualiza la lista")
         db.execute(
-            "UPDATE pending_matches SET selected_product_id=NULL WHERE normalized_name=? AND active=1",
+            "UPDATE pending_matches SET selected_product_id=NULL, dismissed=1 WHERE normalized_name=? AND active=1",
             (key,))
 
 

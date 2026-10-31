@@ -163,3 +163,37 @@ de consolidar productos existentes. No subas exportaciones reales a GitHub.
 no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y la persistencia deben
 validarse en la instalación real antes de publicar la versión.
+
+## Desarrollo de Despensa 1.0 (PR #10, sin publicar)
+
+La migración usa React 19, TypeScript 7, Vite 7 y Vitest 4. El código del frontend
+está en `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace para desarrollo.
+El contenedor compila la interfaz y la sirve en `/react/`, conservando la interfaz
+estable en `/`. La rama de migración no cambia la versión estable 0.16.4.
+
+```bash
+python -m pip install Flask python-dotenv websocket-client pillow
+python -m unittest discover -v -p 'test_*.py'
+cd frontend
+npm ci
+npm test
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+Las pruebas de navegador usan datos desechables y bloquean las llamadas externas
+a Grocy. Para probar el frontend compilado con tu servidor local, configura
+`FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` y abre `/react/`.
+No compartas credenciales Grocy con el navegador.
+
+Se conservan las fotos, el historial de tickets y los checkpoints Alexa. El nuevo
+registro de consumos `stock-commands.sqlite3` reside junto al historial de
+importaciones (se puede configurar con `STOCK_COMMAND_DB`); nunca lo borres para
+repetir una operación con resultado incierto. Revisa primero el stock en Grocy.
+
+La conversión Pack→Piece usa conversiones por producto y verifica el factor antes
+de añadir stock. La validación en Home Assistant/Grocy y el ciclo destructivo de
+productos siguen pendientes. Consulta
+[la matriz de paridad](docs/REACT_PARITY.md) antes de eliminar código legacy,
+fusionar la migración o publicar 1.0.

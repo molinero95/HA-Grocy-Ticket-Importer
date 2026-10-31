@@ -89,3 +89,20 @@ consolidation; explicit approval is required.
 Variant purchase factors are informational until Grocy/receipt conversion is
 implemented and verified. Real barcode association, camera capture and
 persistence across an add-on upgrade still need end-to-end validation.
+
+## Candidata Despensa 1.0 (sin publicar)
+
+La rama de migración incluye una vista React opcional en `/react/`; la entrada
+principal conserva la interfaz estable. No se requiere cambiar opciones ni
+reinicializar bases de datos. Fotos, historial de tickets, metadatos de variantes
+y checkpoints de Alexa deben conservarse durante cualquier actualización.
+
+Los consumos de la vista React registran un identificador persistente en
+`/config/stock-commands.sqlite3`. Una respuesta incierta bloquea su repetición:
+comprueba las existencias en Grocy antes de iniciar otra operación. Si el consumo
+funciona y falla la reposición en la lista, añade la compra desde Mi despensa sin
+repetir el consumo. No borres el registro para forzar un reintento.
+
+La candidata no se considera lista hasta validar la paridad, el contenedor y los
+flujos reales de Grocy/HA. La versión estable sigue siendo 0.16.4; no hay publicación
+1.0 ni migración automática de existencias Pack.

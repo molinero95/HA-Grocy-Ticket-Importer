@@ -29,6 +29,13 @@ def variants_for_product(product_id):
             for row in rows]
 
 
+def variant_product_id(barcode):
+    """Resolve local ownership even if a Grocy barcode was removed externally."""
+    with closing(connect(CATALOG_DB)) as db:
+        variant = resolve_barcode(db, barcode)
+    return int(variant["grocy_product_id"]) if variant else None
+
+
 def is_registered_variant(barcode):
     """Protect local metadata from barcode replacement in the legacy editor."""
     with closing(connect(CATALOG_DB)) as db:

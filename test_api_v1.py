@@ -65,7 +65,7 @@ class ShoppingApiTests(unittest.TestCase):
             token = self.client.get("/api/v1/session").json["csrf_token"]
             response = self.client.patch("/api/v1/catalog/products/3", json={"name": "Arroz integral"}, headers={"X-CSRF-Token": token})
         self.assertEqual(response.status_code, 200)
-        edit.assert_called_once_with(3, "Arroz integral", "1", None)
+        edit.assert_called_once_with(3, "Arroz integral", None, None)
 
     def test_catalog_barcode_rejects_conflict_without_writing(self):
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "associate_product_barcode", side_effect=web.barcode_stock.BarcodeError("Código en otro producto")) as save:

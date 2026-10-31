@@ -34,3 +34,28 @@ Do not switch the ingress entrypoint to the React app before authentication, wri
 | Unused dependencies and transitional adapters | Audited runtime dependencies | No remaining imports and clean container build |
 
 **Do not remove** SQLite data, Home Assistant options, Grocy product/stock data, or Alexa sync checkpoints as part of source cleanup. Deletions must be independently reviewed and tested; the first 1.0 preview does not change production entrypoints.
+
+## Implementation update — 2026-11-01
+
+The canonical frontend now lives inside the add-on build context at
+`ha_grocy_ticket_importer/frontend/`; `/frontend` is a development symlink.
+Docker builds it with Node 22 and the npm lockfile, copies the resulting static
+assets, and includes every extracted API module. Flask exposes an opt-in
+`/react/` preview with an ingress-root base URL; stable `/` is unchanged.
+
+`api_photos.py` centralizes photo discovery/upload and local image URLs.
+`stock_commands.py` isolates the durable consumption-command journal from the
+receipt ledger. SQLite write-ahead records reject uncertain repeats; they do not
+pretend to make the remote Grocy write transactional. Product metadata edits
+preserve purchase setup and descriptions, with fail-closed unit changes.
+
+CI uses network-free Python/React regressions and Chromium mobile/ingress tests
+against disposable Flask fixtures. Pack conversion, destructive catalog lifecycle
+and real Grocy/HA upgrade verification still gate default rollout and legacy removal.
+
+Pack conversion uses Grocy 4's `objects/quantity_unit_conversions` contract,
+verified before initial stock; stock writes are already in Piece units. Receipt
+imports read the same conversion table and preserve pending/imported markers.
+No `qu_factor_purchase_to_stock` field is written to product objects. Reference:
+https://github.com/grocy/grocy/blob/master/services/StockService.php
+(`ExternalBarcodeLookup` and `GetProductDetails`). Live schema validation is still required.

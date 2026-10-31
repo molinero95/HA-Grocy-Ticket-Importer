@@ -114,14 +114,25 @@ class ProductCreationTests(unittest.TestCase):
         self.assertEqual(posts[-1][1]["amount"], 0.5)
 
     @patch("barcode_stock.grocy")
-    def test_new_pack_conversion_is_rejected_without_writes(self, api):
-        api.side_effect = lambda method, path, body=None: {
-            "objects/quantity_units": [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}],
-            "objects/products": [], "objects/product_barcodes": [],
-        }[path] if method == "GET" else self.fail("Unexpected write")
-        with self.assertRaisesRegex(barcode_stock.BarcodeError, "Pack a Piece"):
-            barcode_stock.create_catalog_product("Yogures", "", 3, "2", pack_size="5")
-        self.assertFalse(any(c.args[0] == "POST" for c in api.call_args_list))
+    def test_two_packs_of_five_add_ten_stock_pieces(self, api):
+        posts = []
+        def fake(method, path, body=None):
+            if method == "GET":
+                return {
+                    "objects/quantity_units": [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}],
+                    "objects/products": [], "objects/product_barcodes": [],
+                    "objects/quantity_unit_conversions": [{"product_id": 17, "from_qu_id": 3, "to_qu_id": 2, "factor": 5}],
+                }[path]
+            posts.append((path, body))
+            return {"created_object_id": 17}
+        api.side_effect = fake
+        barcode_stock.create_catalog_product("Yogures", "", 3, "2", pack_size="5")
+        self.assertEqual(posts[0][1]["qu_id_stock"], 2)
+        self.assertEqual(posts[0][1]["qu_id_purchase"], 3)
+        self.assertNotIn("qu_factor_purchase_to_stock", posts[0][1])
+        self.assertEqual(posts[1], ("objects/quantity_unit_conversions", {"product_id": 17, "from_qu_id": 3, "to_qu_id": 2, "factor": 5}))
+        self.assertEqual(posts[-1][0], "stock/products/17/add")
+        self.assertEqual(posts[-1][1]["amount"], 10)
 
     @patch("barcode_stock.grocy")
     def test_invalid_creation_never_writes(self, api):
@@ -543,3 +554,39 @@ class PhotoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class MetadataPreservationTests(unittest.TestCase):
+    @patch("barcode_stock.grocy")
+    def test_rename_preserves_pack_purchase_and_description_byte_for_byte(self, api):
+        product = {"id": 7, "name": "Yogur", "qu_id_stock": 2, "qu_id_purchase": 3,
+                   "qu_factor_purchase_to_stock": 5,
+                   "description": "Notas\n[Despensa: unidades_por_envase=5]\n[Despensa: imagen=https://images.openfoodfacts.org/a.jpg]"}
+        api.side_effect = [product, [{"id": 2, "name": "Piece"}], {}]
+        result = barcode_stock.update_product_info(7, "Yogur natural")
+        self.assertEqual(result["pack_size"], 5)
+        api.assert_called_with("PUT", "objects/products/7", {"name": "Yogur natural"})
+
+    @patch("barcode_stock.grocy")
+    def test_unit_change_never_reinterprets_nonzero_or_unknown_stock(self, api):
+        for stock in ({"stock_amount": "1"}, {"stock_amount": "NaN"}, {}):
+            with self.subTest(stock=stock):
+                api.reset_mock()
+                api.side_effect = [{"id": 7, "qu_id_stock": 2}, [{"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}], stock]
+                with self.assertRaises(barcode_stock.BarcodeError):
+                    barcode_stock.update_product_info(7, "Producto", unit_id=4)
+                self.assertTrue(all(call.args[0] == "GET" for call in api.call_args_list))
+
+class VariantOwnershipTests(unittest.TestCase):
+    @patch('barcode_stock.grocy')
+    @patch('variant_catalog.variant_product_id', return_value=88)
+    def test_cannot_steal_variant_code_missing_from_grocy(self, owner, grocy):
+        with self.assertRaisesRegex(barcode_stock.BarcodeError, 'otro producto'):
+            barcode_stock.associate_product_barcode(7, '8412345678901')
+        grocy.assert_not_called()
+
+    @patch('barcode_stock.grocy')
+    @patch('variant_catalog.variant_product_id', return_value=7)
+    def test_replacement_cannot_bypass_local_variant_registry(self, owner, grocy):
+        with self.assertRaisesRegex(barcode_stock.BarcodeError, 'variante'):
+            barcode_stock.replace_product_barcode(7, '12345678', '8412345678901')
+        grocy.assert_not_called()

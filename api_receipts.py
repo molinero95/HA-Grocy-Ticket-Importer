@@ -2,6 +2,7 @@
 import json
 import hashlib
 import secrets
+from functools import wraps
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from flask import jsonify, request, session
@@ -9,6 +10,17 @@ from werkzeug.utils import secure_filename
 
 
 def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, lock):
+    def exclusive_preview(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            if not lock.acquire(blocking=False):
+                return jsonify({"error": "import_in_progress"}), 409
+            try:
+                return function(*args, **kwargs)
+            finally:
+                lock.release()
+        return wrapped
+
     @app.post("/api/v1/receipts")
     def api_v1_upload_receipt():
         uploads = [file for file in request.files.getlist("ticket") if file and file.filename]
@@ -45,6 +57,7 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
         return jsonify({"receipt_id": receipt_id, "receipt": json.loads(path.read_text(encoding="utf-8"))})
 
     @app.post("/api/v1/receipts/<receipt_id>/preview")
+    @exclusive_preview
     def api_v1_preview_receipt(receipt_id):
         if session.get("receipt_id") != receipt_id or len(receipt_id) != 32 or any(c not in "0123456789abcdef" for c in receipt_id):
             return jsonify({"error": "receipt_not_found"}), 404
@@ -103,6 +116,10 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
         if not lock.acquire(blocking=False):
             return jsonify({"error": "import_in_progress"}), 409
         try:
+            # A preview may have edited the file while this request waited for
+            # the lock. Validate the exact bytes again before any stock write.
+            if session.get("previewed_digest") != hashlib.sha256(path.read_bytes()).hexdigest():
+                return jsonify({"error": "receipt_changed_since_preview"}), 409
             marker = data_dir / (receipt_id + ".commit-started")
             try:
                 with marker.open("x", encoding="utf-8") as handle:

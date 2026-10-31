@@ -1,27 +1,37 @@
 # Despensa 1.0 — Legacy/React parity gate
 
-The stable Home Assistant UI must remain available until the React frontend replaces its workflows. The versioned JSON API is extracted into `api_inventory.py`, `api_shopping.py` and `api_variants.py`. **Do not delete `PAGE`, legacy routes, or their dependencies just because the React build passes.**
+Current implementation status: 2026-11-01. PR #10 is an unreleased migration branch.
+Stable `main` and the default ingress UI remain at 0.16.4. Historical roadmap notes
+are not evidence of validation on the current head.
 
-| Workflow | Legacy route(s) | React status | Migration gate |
-| --- | --- | --- | --- |
-| Shopping list read, complete, remove | `/shopping/*` | Implemented through v1 API | End-to-end ingress and CSRF smoke test |
-| Alexa ambiguous product selection | `/alexa/match/choose` | Implemented through v1 API | Verify keeping original does not requeue the same suggestion |
-| Inventory, name/barcode search, shopping +/- | `/inventory/barcode-lookup`, `/shopping/step/*` | Implemented through v1 API | Test mobile camera and scanner fallback |
-| Generic product variants | `/product/*/variant` | Variant list and edit/create in React | Verify barcode ownership conflicts and stock invariants |
-| Receipt upload, preview and commit | `/upload`, `/preview/*`, `/commit/*` | Implemented through v1 API and React | Add v1 API and React workflow with import tests |
-| Product creation, editing and deletion | `/barcode/add`, `/product/*/edit`, `/product/*/delete` | Create/edit implemented; deletion read-only safety check, destructive action blocked | Confirm safe product lifecycle and Grocy errors |
-| Stock adjustments | `/product/*/stock-save`, `/product/*/edit-all` | Implemented with stale-stock guard | Validate units/packs and audit trail |
-| Barcode association and removal | `/barcode/associate`, `/barcode/remove*`, `/product/*/barcode` | Implemented with variant ownership checks | Add reassignment/removal safeguards |
-| Product merge | `/product/*/merge-preview` | Read-only preview and dependency audit; merge disabled | Preview and conflict-confirmation flow |
-| Product photos | `/product/*/photo*`, `/photo/lookup`, `/barcode/photo` | Upload implemented; display/lookup parity incomplete | Upload, fetch and persistence tests |
-| Catalog audit | `/catalog/audit` | Read-only audit and JSON export implemented | Expose audit read-only and review UI |
-| Clear completed shopping | `/shopping/clear-completed` | Implemented in React with confirmation | Confirm bulk-operation semantics |
-| Login/logout outside HA ingress | `/login`, `/logout` | Implemented in v1 API and React; HA ingress bypass preserved | Test CSRF, session expiry, failed password and logout |
+Canonical frontend: `ha_grocy_ticket_importer/frontend/`; root `frontend` is a
+symlink. The add-on Dockerfile builds static assets and serves `/react/` as an
+opt-in preview. Python adapters and their root/package mirrors remain identical.
 
-## Release criteria
+| Workflow | React implementation | Remaining migration gate |
+| --- | --- | --- |
+| Shopping read, complete, remove, clear completed | v1 API, pending states, aligned mobile actions, product-sheet links | Full failure recovery and live Grocy semantics |
+| Alexa ambiguous product selection | Inline suggestions, selection, durable keep-original dismissal | Isolated live list/checkpoint restart test; no automatic conversion |
+| Inventory, name/barcode search, shopping +/- | Automatic exact-code filtering, race isolation, cart/stepper in place | Physical mobile camera validation |
+| Variants | List/create/edit, barcode scanner, server ownership checks | Browser lifecycle, upgrade persistence and isolated Grocy integration |
+| Receipt upload, preview, commit | Simulation digest, shared preview/commit lock, write-ahead marker, UI resubmission block | Full browser import/restart workflow with isolated Grocy |
+| Product creation/editing | Duplicate detection, existing-sheet link, verified Pack conversion, preserves purchase/photo metadata on rename | Live Pack contract and partial-create reconciliation |
+| Product deletion | Read-only eligibility audit, destructive operation blocked | Complete dependency/history contract; no stock-consuming deletion |
+| Stock adjustments | Expected-stock guard, current product query, no extra confirmation screen | Live units and audit verification |
+| Consumption | Product ID without EAN, precise quantity, optional refill, durable operation replay/uncertainty guard | Isolated Grocy endpoint and restart integration |
+| Barcode association/removal | API safeguards, variant ownership protection, scanner, photo discovery | Complete reassignment and browser regression matrix |
+| Product merge | Read-only dependency preview, disabled merge | Explicitly approved consolidation plan and complete reference migration |
+| Product photos | Exact-code preview/save, trusted server URL, sanitized local upload, all three views, cache version | Physical camera and upgrade persistence validation |
+| Catalog audit | Read-only review and JSON export | Integration against installed Grocy schema |
+| Standalone authentication | Public CSRF bootstrap, rotation, logout, expired-session cache clearing | Final security review of candidate deployment |
+| Mobile and HA ingress | Three primary tabs, focus/scroll management, fixed action columns, prefixed assets/APIs | Physical Android/HA validation and broader browser coverage |
+| Packaging | Multi-stage React build, runtime API modules, npm lockfile, source/dependency checks | Final-head Docker CI result and isolated container startup |
 
-1. Maintain stable add-on and old UI until missing workflows are implemented or explicitly scoped out with user approval.
-2. Keep root and packaged Python modules identical; run Python unit tests, frontend tests, typecheck, build and container build in CI.
-3. Test Home Assistant ingress prefix, authenticated session, CSRF rejection, barcode conflicts, shopping synchronization, receipt import and failure recovery.
-4. Verify mobile UI without page reload or scroll reset; document any supported-browser limitations.
-5. Only after parity and green CI: switch the default UI to React, release notes, then remove obsolete HTML/JS and legacy endpoints in a separate cleanup PR.
+## Validation and release criteria
+
+1. Preserve the stable UI until every required workflow is implemented or the user explicitly scopes it out. Keep `PAGE`, legacy routes and their dependencies until then.
+2. Run Python tests, source-mirror checks, embedded JavaScript syntax, React tests, TypeScript/build, mobile/ingress Playwright and container build on the **final** head.
+3. Browser fixtures replace external Grocy/Alexa I/O; passing them is not validation against the installed services.
+4. Test upgrade persistence of receipt ledger, photos, generic/variant catalog, scoped Alexa queue/checkpoints and stock-command journal. Never delete persistent state as source cleanup.
+5. Live Pack validation and destructive product lifecycle remain release blockers. Do not describe the migration as complete, enable destructive operations or remove legacy based only on a passing frontend build.
+6. Only after parity and green CI: switch the default UI, separately remove obsolete HTML/JS/routes, then prepare release notes and 1.0.0. No version bump or publication is authorized before these gates.

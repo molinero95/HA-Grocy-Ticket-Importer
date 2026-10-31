@@ -20,13 +20,24 @@ jobs:
       - name: Upgrade npm for TypeScript 7 compatibility trial
         run: npm install --global npm@11
       - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
         working-directory: frontend
       - name: Test React frontend
         run: npm test
         working-directory: frontend
       - name: Typecheck and build React frontend
         run: npm run build
+        working-directory: frontend
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser smoke-test dependencies
+        run: python -m pip install Flask python-dotenv websocket-client pillow
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Mobile and ingress browser smoke tests (disposable data only)
+        run: npm run test:e2e
         working-directory: frontend
   test:
     runs-on: ubuntu-latest
@@ -42,13 +53,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install web test dependencies
-        run: python -m pip install Flask python-dotenv websocket-client
+        run: python -m pip install Flask python-dotenv websocket-client pillow
       - name: Compile every Python file (catches syntax errors)
         run: |
           python - <<'PY'
           from pathlib import Path
           import py_compile
-          files = sorted(p for p in Path('.').rglob('*.py') if '.venv' not in p.parts)
+          files = sorted(p for p in Path('.').rglob('*.py') if '.venv' not in p.parts and 'node_modules' not in p.parts)
           for path in files:
               py_compile.compile(str(path), doraise=True)
           print(f'Compiled {len(files)} Python files')
@@ -73,7 +84,7 @@ jobs:
           PY
       - name: Check Home Assistant packaged sources are synchronized
         run: |
-          for file in extract.py importer.py barcode_stock.py product_images.py web.py generic_catalog.py variant_catalog.py catalog_audit.py shopping_match_queue.py shopping_sync_worker.py api_variants.py api_inventory.py api_shopping.py api_receipts.py api_catalog.py duplicate_candidates.py merge_audit.py; do
+          for file in extract.py importer.py barcode_stock.py product_images.py web.py generic_catalog.py variant_catalog.py catalog_audit.py shopping_match_queue.py shopping_sync_worker.py shopping_sync.py shopping_sync_adapters.py shopping_sync_runtime.py shopping_identity_sync.py shopping_identity_runtime.py shopping_sync_events.py api_photos.py stock_commands.py purchase_units.py api_variants.py api_inventory.py api_shopping.py api_receipts.py api_catalog.py duplicate_candidates.py merge_audit.py; do
             cmp "$file" "ha_grocy_ticket_importer/$file"
           done
       - name: Build Home Assistant add-on container

@@ -1,5 +1,17 @@
 # AGENTS.md — Despensa / Grocy Ticket Importer
 
+## Current migration handoff — 2026-11-01
+- Active work: PR #10, `feature/despensa-v1-react`; stable `main` remains 0.16.4.
+- Do not merge, publish, bump the add-on version or switch `/` until all release gates in `docs/REACT_PARITY.md` pass.
+- Canonical frontend source is `ha_grocy_ticket_importer/frontend/`; root `frontend` is a symlink for development/CI. Docker builds it from the add-on context and serves an opt-in `/react/` preview. This is not a deployment.
+- `api_photos.py`: trusted exact-barcode discovery, association validation, sanitized local uploads, shared versioned local URLs. Automatic lookup preserves an existing photo.
+- `stock_commands.py`: persistent at-most-once consumption journal beside the existing import ledger. Never delete pending command records to make a retry succeed; reconcile uncertain writes against Grocy.
+- Name edits must preserve descriptions, photos and purchase setup. Unit changes fail closed for nonzero/unknown stock and incompatible purchase configuration.
+- Alexa queue `dismissed` is an additive column; it hides a kept-original suggestion from UI without changing the identity planner, remote lists or checkpoints. The worker must still inspect all entries for stale bindings.
+- Tests: Python unittest discovery, `npm ci`, `npm test`, `npm run build`, and `npm run test:e2e` in frontend. Browser tests use `tests/preview_server.py`, disposable fixtures and blocked external Grocy I/O.
+- Source mirrors include every root application Python module, including new API/journal modules. Keep them byte-identical.
+- Remaining blockers: live Grocy/HA contracts and upgrade persistence; Pack conversion is implemented using verified product-specific quantity_unit_conversions and still requires live integration; merge/delete stay fail-closed; retain legacy until parity is established. Historical handoffs below may describe older PRs.
+
 ## Mission
 Maintain a Spanish, mobile-first Home Assistant OS add-on (panel "Despensa") backed by the user's existing Grocy installation. Prefer autonomous, small, tested commits and practical UX. The user's requests in `DECISIONS.md` are binding product requirements. Keep user-visible copy in Spanish and code comments/docs for agents in English when useful.
 

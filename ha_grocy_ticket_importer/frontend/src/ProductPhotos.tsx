@@ -1,0 +1,47 @@
+import { useDebouncedValue } from "./useDebouncedValue";
+import { useQuery } from "@tanstack/react-query";
+import { isBarcode } from "./barcodes";
+import { lookupPhoto } from "./api";
+
+/** Lookup failure is advisory: a missing public photo must never block a save. */
+export function PhotoPreview({ barcode }: { barcode: string }) {
+  const code = barcode.trim();
+  const lookupCode = useDebouncedValue(code);
+  const photo = useQuery({
+    queryKey: ["photo-lookup", code],
+    queryFn: () => lookupPhoto(code),
+    enabled: isBarcode(code) && code === lookupCode,
+    retry: false,
+    staleTime: 300_000,
+  });
+  if (!isBarcode(code) || code !== lookupCode) return null;
+  return (
+    <div className="photo-preview" aria-live="polite">
+      {photo.isFetching && <p>Buscando fotografía por código…</p>}
+      {photo.isError && (
+        <p>
+          Puedes guardar el producto sin foto. La búsqueda no está disponible.
+        </p>
+      )}
+      {photo.data && !photo.data.photo?.image_url && (
+        <p>No se encontró fotografía para este código.</p>
+      )}
+      {photo.data?.photo?.image_url && (
+        <>
+          <img
+            src={photo.data.photo.image_url}
+            alt="Fotografía encontrada por código"
+            referrerPolicy="no-referrer"
+          />
+          <a
+            href={photo.data.photo.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {photo.data.photo.attribution}
+          </a>
+        </>
+      )}
+    </div>
+  );
+}

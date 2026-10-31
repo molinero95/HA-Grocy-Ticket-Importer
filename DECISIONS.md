@@ -1,5 +1,14 @@
 # DECISIONS.md — Product and implementation decisions
 
+## Current v1 migration decisions — 2026-11-01
+- Continue on PR #10 only; no main changes, release, default-UI switch or merge until migration acceptance passes.
+- React uses the same Grocy source of truth, photo directory, receipt ledger and scoped Alexa queue. The bundled `/react/` URL is an opt-in preview.
+- Consumption uses a durable command identifier: a completed request replays its result; an uncertain write cannot be automatically retried. Replenishment failures report partial success without repeating consumption.
+- Editing a product name must preserve purchase factors and description bytes. Changing stock units with nonzero, invalid or unknown stock is prohibited.
+- "Mantener original" dismisses the advisory Alexa suggestion persistently. It does not authorize note conversion, product consolidation, checkpoint rewrites or deletion.
+- Open Facts photo discovery is advisory. Barcode association or creation can succeed without a photo; existing custom photos take precedence. Only the server's lookup for an associated barcode may be saved.
+- Pack conversion, destructive consolidation/deletion and removal of the stable UI remain gated. Historical sections below record earlier staging decisions, not current validation claims.
+
 Last reviewed: 2026-10-31. This records the user's explicitly requested behavior, and distinguishes it from incomplete validation.
 
 ## Navigation and shopping list

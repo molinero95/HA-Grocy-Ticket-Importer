@@ -1,5 +1,25 @@
 # ROADMAP.md — Despensa backlog and validation checklist
 
+## Active Despensa 1.0 checklist — 2026-11-01 (supersedes historical status below)
+- [x] React 19 / TypeScript 7 / Vite 7 / Vitest 4 installed and locked; typecheck/build pass locally.
+- [x] Fix standalone CSRF bootstrap, failed-write token invalidation, expired-session handling and JSON auth errors.
+- [x] Photo lookup/preview, associated-code validation, persistent Grocy reference, sanitized upload, all-view display and cache invalidation.
+- [x] Automatic barcode filtering, stale-response isolation, cart/stepper behavior, fixed mobile action columns and scanner cleanup/fallback.
+- [x] ID-based consumption with stale-stock check, optional replenishment, durable duplicate-command protection and partial-success reporting.
+- [x] Preserve product description, photos and purchase factors on rename; reject unsafe unit changes.
+- [x] Persist dismissal of Alexa suggestions using an additive queue migration; preserve worker conflict checks.
+- [x] Serialize receipt preview against commit and prevent UI resubmission after uncertain import.
+- [x] Package API modules and compiled React in the add-on Docker context; keep stable `/` and opt-in `/react/`.
+- [x] Local Python, React and browser mobile/ingress suites pass with disposable data.
+- [ ] Inspect CI on the final new commit, including container build and browser smoke tests.
+- [ ] Verify live HA ingress/camera, Grocy 4.7.1 request semantics and persistence after upgrade on an isolated candidate (no exploratory writes to real stock/list).
+- [x] Implement Pack purchase conversion using product-specific quantity_unit_conversions and verify the saved factor before stock; receipt retries preserve pending/imported ledger entries.
+- [ ] Validate Pack conversion against the installed Grocy schema (no migration of existing stock).
+- [ ] Validate full receipt, variant and Alexa browser workflows plus interruption/restart recovery against an isolated Grocy service.
+- [ ] Define/validate complete merge/delete lifecycle before exposing destructive controls; existing audit remains read-only.
+- [ ] Only after parity and final CI: switch default UI, remove legacy HTML/routes in a separately verifiable cleanup, then prepare 1.0 release notes/version. No release has been prepared.
+
+
 ## 0.16.1 follow-up (2026-10-31)
 - [x] PR #5 was merged and 0.16.0 installed in Home Assistant; read-only app inventory confirmed the add-on was started.
 - [x] Fixed the disabled-sync preview gap: configuring the Alexa entity now starts a dry-run worker to populate the local ambiguity queue without remote writes.

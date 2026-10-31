@@ -289,7 +289,8 @@ def product_detail(product_id):
     purchase_unit_id = int(product.get("qu_id_purchase") or product["qu_id_stock"])
     is_pack = any(u["id"] == purchase_unit_id and "pack" in u["name"].casefold()
                   for u in units)
-    pack_factor = int(product.get("qu_factor_purchase_to_stock") or 0)
+    stock_details = grocy("GET", f"stock/products/{pid}")
+    pack_factor = int(stock_details.get("qu_conversion_factor_purchase_to_stock") or product.get("qu_factor_purchase_to_stock") or 0)
     if pack_factor < 1:
         pack_factor = int(marker.group(1)) if marker else 1
     return {
@@ -302,7 +303,7 @@ def product_detail(product_id):
         "barcodes": codes,
         "unit_id": int(product["qu_id_stock"]),
         "units": units,
-        "stock_amount": str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)),
+        "stock_amount": str(stock_details["stock_amount"]),
     }
 
 
@@ -324,23 +325,27 @@ def update_product_info(product_id, name, pack_size=None, unit_id=None):
         selected = int(unit_id) if unit_id not in (None, "") else int(product["qu_id_stock"])
     except (ValueError, TypeError) as exc:
         raise BarcodeError("Unidad de medida no válida") from exc
-    if selected not in allowed:
+    if selected not in allowed and selected != int(product["qu_id_stock"]):
         raise BarcodeError("Selecciona unidades o kilogramos")
-    description = PHOTO_MARKER.sub("", PACK_MARKER.sub("", str(product.get("description") or ""))).strip()
-    photo_url = saved_photo(product)
-    if photo_url:
-        description += ("\\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
+    # A name edit must not rewrite purchase factors, descriptions or photos.
     changes = {"name": name}
+    purchase_id = int(product.get("qu_id_purchase") or product["qu_id_stock"])
+    factor = product.get("qu_factor_purchase_to_stock") or 1
     if selected != int(product["qu_id_stock"]):
-        changes["qu_id_stock"] = selected
-    if selected != int(product.get("qu_id_purchase") or product["qu_id_stock"]):
-        changes["qu_id_purchase"] = selected
-    if Decimal(str(product.get("qu_factor_purchase_to_stock") or 1)) != 1:
-        changes["qu_factor_purchase_to_stock"] = 1
-    if description != str(product.get("description") or "").strip():
-        changes["description"] = description
+        stock = grocy("GET", f"stock/products/{pid}")
+        try:
+            amount = Decimal(str(stock["stock_amount"]))
+        except (KeyError, TypeError, ArithmeticError) as exc:
+            raise BarcodeError("No se pudo verificar el stock; no se cambia la unidad") from exc
+        if not amount.is_finite() or amount != 0:
+            raise BarcodeError("No se puede cambiar la unidad con existencias. Concilia el stock primero")
+        if purchase_id != int(product["qu_id_stock"]) or Decimal(str(factor)) != 1:
+            raise BarcodeError("La configuración de compra requiere una migración explícita antes de cambiar la unidad")
+        changes.update(qu_id_stock=selected, qu_id_purchase=selected)
+        purchase_id = selected
     grocy("PUT", f"objects/products/{pid}", changes)
-    return {"id": pid, "name": name, "pack_size": 1, "unit_id": selected}
+    return {"id": pid, "name": name, "pack_size": factor, "unit_id": selected,
+            "purchase_unit_id": purchase_id}
 
 
 def associate_barcode(barcode, product_id):
@@ -370,6 +375,10 @@ def associate_product_barcode(product_id, barcode):
     pid = int(product_id)
     if pid <= 0:
         raise BarcodeError("Producto no válido")
+    from variant_catalog import variant_product_id
+    owner = variant_product_id(barcode)
+    if owner is not None and owner != pid:
+        raise BarcodeError("Este código pertenece a otro producto genérico en el catálogo de variantes")
     product = grocy("GET", f"objects/products/{pid}")
     if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
         raise BarcodeError("Producto inexistente")
@@ -392,6 +401,10 @@ def replace_product_barcode(product_id, old_barcode, new_barcode):
     pid = int(product_id)
     if pid <= 0:
         raise BarcodeError("Producto no válido")
+    from variant_catalog import variant_product_id
+    owner = variant_product_id(new_barcode)
+    if owner is not None:
+        raise BarcodeError("El código nuevo está registrado como variante. Revisa la variante antes de sustituirlo")
     product = grocy("GET", f"objects/products/{pid}")
     if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
         raise BarcodeError("Producto inexistente")
@@ -576,8 +589,6 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
         return {"created": False, "product_id": existing["id"], "name": existing["name"]}
     from product_images import safe_image_url
     safe_url = safe_image_url(image_url)
-    if pack_size > 1:
-        raise BarcodeError("La conversión Pack a Piece aún no es compatible con la API de Grocy; no se ha creado el producto")
     result = grocy("POST", "objects/products", {
         "name": name, "location_id": location_id, "qu_id_stock": unit_id,
         "qu_id_purchase": purchase_id,
@@ -586,6 +597,13 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
                        (f"[Despensa: unidades_por_envase={pack_size}]" if pack_size > 1 else ""),
     })
     pid = int(result["created_object_id"])
+    if purchase_id != unit_id:
+        from purchase_units import create_purchase_conversion
+        try:
+            create_purchase_conversion(grocy, pid, purchase_id, unit_id, pack_size)
+        except Exception as exc:
+            raise BarcodeError(f"Producto {pid} creado sin existencias. Revisa su conversión en Grocy antes de añadir stock") from exc
+
     if barcode:
         grocy("POST", "objects/product_barcodes", {"product_id": pid, "barcode": barcode})
     if amount > 0:
@@ -630,6 +648,19 @@ def add_one(barcode, name="", location_id=2, unit_id=2):
 def consume_quantity(barcode, amount, add_to_list=False):
     """Consume a chosen stock amount; optionally replenish Grocy's shopping list."""
     name, pid = _get_name_and_id(barcode)
+    return _consume_product_amount(pid, name, amount, add_to_list)
+
+
+def consume_product_quantity(product_id, amount, expected_amount, add_to_list=False):
+    """Consume an explicitly selected catalog item, including one without EAN."""
+    pid = int(product_id)
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
+        raise BarcodeError("Producto inexistente")
+    return _consume_product_amount(pid, product["name"], amount, add_to_list, expected_amount)
+
+
+def _consume_product_amount(pid, name, amount, add_to_list, expected_amount=None):
     try:
         quantity = Decimal(str(amount).strip().replace(",", "."))
     except (ValueError, TypeError, ArithmeticError) as exc:
@@ -640,6 +671,13 @@ def consume_quantity(barcode, amount, add_to_list=False):
     available = Decimal(str(details.get("stock_amount", 0)))
     if not available.is_finite() or available < quantity:
         raise BarcodeError("No hay suficiente stock para consumir esa cantidad")
+    if expected_amount is not None:
+        try:
+            expected = Decimal(str(expected_amount))
+        except ArithmeticError as exc:
+            raise BarcodeError("Stock esperado no válido") from exc
+        if not expected.is_finite() or expected != available:
+            raise BarcodeError("El stock ha cambiado. Actualiza la ficha antes de consumir")
     grocy("POST", f"stock/products/{pid}/consume",
           {"amount": float(quantity), "spoiled": False})
     shopping_added = False

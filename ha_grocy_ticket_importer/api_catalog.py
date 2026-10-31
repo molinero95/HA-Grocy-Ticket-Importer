@@ -12,6 +12,19 @@ def register_catalog_routes(app, barcode_stock, lock):
             app.logger.exception("api_v1_catalog_units_failed")
             return jsonify({"error": "catalog_units_unavailable"}), 503
 
+    @app.get("/api/v1/catalog/products/<int:product_id>")
+    def api_v1_catalog_product(product_id):
+        try:
+            from api_photos import local_image_url
+            product = barcode_stock.product_detail(product_id)
+            product["image_url"] = local_image_url(product_id) or product.get("image_url")
+            return jsonify(product)
+        except barcode_stock.BarcodeError as exc:
+            return jsonify({"error": str(exc)}), 404
+        except Exception:
+            app.logger.exception("api_v1_catalog_product_unavailable")
+            return jsonify({"error": "No se pudo cargar el producto"}), 503
+
     @app.post("/api/v1/catalog/products")
     def api_v1_create_catalog_product():
         payload = request.get_json(silent=True)
@@ -41,7 +54,7 @@ def register_catalog_routes(app, barcode_stock, lock):
         if not lock.acquire(blocking=False):
             return jsonify({"error": "operation_in_progress"}), 409
         try:
-            result = barcode_stock.update_product_info(product_id, payload.get("name"), "1", payload.get("unit_id"))
+            result = barcode_stock.update_product_info(product_id, payload.get("name"), None, payload.get("unit_id"))
         except barcode_stock.BarcodeError as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception:
@@ -69,6 +82,33 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify(result)
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/consume")
+    def api_v1_consume_catalog_product(product_id):
+        from stock_commands import execute_once, CommandConflict
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or type(payload.get("add_to_list")) is not bool
+                or not isinstance(payload.get("expected_amount"), str)
+                or not isinstance(payload.get("amount"), str)):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            def consume():
+                try:
+                    result = barcode_stock.consume_product_quantity(product_id, payload["amount"], payload["expected_amount"], payload["add_to_list"])
+                    return {"status": 200, "body": result}
+                except barcode_stock.BarcodeError as exc:
+                    return {"status": 409, "body": {"error": str(exc)}}
+            result = execute_once(payload.get("operation_id"), {**payload, "product_id": product_id}, consume)
+            return jsonify(result["body"]), result["status"]
+        except CommandConflict as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_consume_uncertain")
+            return jsonify({"error": "Resultado incierto. Comprueba Grocy antes de volver a consumir."}), 502
+        finally:
+            lock.release()
 
     @app.get("/api/v1/catalog/products/<int:product_id>/barcodes")
     def api_v1_catalog_barcodes(product_id):
@@ -135,43 +175,6 @@ def register_catalog_routes(app, barcode_stock, lock):
             lock.release()
         return jsonify(result)
 
-    @app.post("/api/v1/catalog/products/<int:product_id>/photo")
-    def api_v1_upload_catalog_photo(product_id):
-        import io
-        from pathlib import Path
-        from PIL import Image, ImageOps, UnidentifiedImageError
-        from flask import current_app
-        uploaded = request.files.get("photo")
-        if not uploaded or not uploaded.filename:
-            return jsonify({"error": "Selecciona una fotografía"}), 400
-        if not lock.acquire(blocking=False):
-            return jsonify({"error": "operation_in_progress"}), 409
-        try:
-            barcode_stock.product_detail(product_id)
-            raw = uploaded.read(8 * 1024 * 1024 + 1)
-            if len(raw) > 8 * 1024 * 1024:
-                return jsonify({"error": "La imagen supera 8 MiB"}), 413
-            image = Image.open(io.BytesIO(raw))
-            if image.format not in ("JPEG", "PNG", "WEBP"):
-                return jsonify({"error": "Formato no admitido. Usa JPG, PNG o WebP"}), 400
-            image = ImageOps.exif_transpose(image)
-            image.thumbnail((1200, 1200))
-            image = image.convert("RGB")
-            directory = Path(os.environ.get("PRODUCT_IMAGE_DIR", str(Path(__file__).resolve().parent / "runtime" / "product_images")))
-            directory.mkdir(parents=True, exist_ok=True)
-            temporary = directory / (str(product_id) + ".tmp")
-            image.save(temporary, format="JPEG", quality=85)
-            temporary.replace(directory / (str(product_id) + ".jpg"))
-        except (UnidentifiedImageError, OSError, ValueError, barcode_stock.BarcodeError):
-            current_app.logger.warning("api_v1_catalog_photo_invalid", exc_info=True)
-            return jsonify({"error": "Imagen inválida o producto inexistente"}), 400
-        except Exception:
-            current_app.logger.exception("api_v1_catalog_photo_failed")
-            return jsonify({"error": "photo_upload_uncertain"}), 502
-        finally:
-            lock.release()
-        return jsonify({"saved": True, "photo_url": f"product/{product_id}/photo/local"})
-
     @app.get("/api/v1/catalog/duplicates")
     def api_v1_catalog_duplicates():
         try:
@@ -187,6 +190,9 @@ def register_catalog_routes(app, barcode_stock, lock):
         payload = {"expected_name": request.args.get("expected_name")}
         if not isinstance(payload, dict) or not isinstance(payload.get("expected_name"), str):
             return jsonify({"error": "expected_name_required"}), 400
+        return deletion_report(product_id, payload["expected_name"])
+
+    def deletion_report(product_id, expected_name):
         if not lock.acquire(blocking=False):
             return jsonify({"error": "operation_in_progress"}), 409
         try:
@@ -196,7 +202,7 @@ def register_catalog_routes(app, barcode_stock, lock):
             product = barcode_stock.grocy("GET", f"objects/products/{product_id}")
             if not isinstance(product, dict) or int(product.get("id", 0)) != product_id:
                 return jsonify({"error": "product_not_found"}), 404
-            if product.get("name") != payload["expected_name"]:
+            if product.get("name") != expected_name:
                 return jsonify({"error": "stale_product_name"}), 409
             stock = barcode_stock.grocy("GET", f"stock/products/{product_id}")
             amount = Decimal(str(stock["stock_amount"]))
@@ -226,38 +232,7 @@ def register_catalog_routes(app, barcode_stock, lock):
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict) or not isinstance(payload.get("expected_name"), str):
             return jsonify({"error": "expected_name_required"}), 400
-        if not lock.acquire(blocking=False):
-            return jsonify({"error": "operation_in_progress"}), 409
-        try:
-            from decimal import Decimal
-            from variant_catalog import variants_for_product
-            from merge_audit import COLLECTIONS, REFERENCES
-            product = barcode_stock.grocy("GET", f"objects/products/{product_id}")
-            if not isinstance(product, dict) or int(product.get("id", 0)) != product_id:
-                return jsonify({"error": "product_not_found"}), 404
-            if product.get("name") != payload["expected_name"]:
-                return jsonify({"error": "stale_product_name"}), 409
-            stock = barcode_stock.grocy("GET", f"stock/products/{product_id}")
-            amount = Decimal(str(stock["stock_amount"]))
-            if not amount.is_finite() or amount != 0:
-                return jsonify({"error": "nonzero_or_invalid_stock"}), 409
-            if variants_for_product(product_id):
-                return jsonify({"error": "product_has_variants"}), 409
-            for collection, _ in COLLECTIONS:
-                rows = barcode_stock.grocy("GET", "objects/" + collection)
-                if not isinstance(rows, list):
-                    return jsonify({"error": "reference_audit_unavailable"}), 409
-                if any(isinstance(row, dict) and any(str(row.get(field)) == str(product_id) for field in REFERENCES) for row in rows):
-                    return jsonify({"error": "product_has_references", "collection": collection}), 409
-            # Historical and external references cannot be audited exhaustively.
-            return jsonify({"error": "historical_references_not_audited",
-                            "details": "No se elimina el producto hasta verificar historial y referencias externas."}), 409
-        except Exception:
-            app.logger.exception("api_v1_catalog_delete_audit_failed")
-            return jsonify({"error": "product_delete_audit_unavailable"}), 503
-        finally:
-            lock.release()
-
+        return deletion_report(product_id, payload["expected_name"])
 
     @app.get("/api/v1/catalog/audit")
     def api_v1_catalog_audit():

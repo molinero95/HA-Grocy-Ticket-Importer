@@ -8,12 +8,9 @@ def register_inventory_routes(app, barcode_stock, lock):
         """Single read-only inventory response; no per-product Grocy requests."""
         try:
             items = barcode_stock.inventory_with_shopping()
-            from pathlib import Path
-            import os
-            directory = Path(os.environ.get("PRODUCT_IMAGE_DIR", str(Path(__file__).resolve().parent / "runtime" / "product_images")))
+            from api_photos import local_image_url
             for item in items:
-                if (directory / (str(item["id"]) + ".jpg")).is_file():
-                    item["image_url"] = f"product/{item['id']}/photo/local"
+                item["image_url"] = local_image_url(item["id"]) or item.get("image_url")
             return jsonify({"items": items})
         except Exception:
             app.logger.exception("api_v1_inventory_failed")

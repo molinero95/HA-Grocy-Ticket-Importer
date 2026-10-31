@@ -14,7 +14,7 @@ import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, render_template_string, request, session, url_for, send_file
+from flask import Flask, abort, jsonify, redirect, render_template_string, request, session, url_for, send_file, send_from_directory
 from werkzeug.utils import secure_filename
 
 import extract
@@ -992,6 +992,38 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 })();
 </script></html>"""
 
+@app.errorhandler(401)
+@app.errorhandler(403)
+@app.errorhandler(413)
+def api_http_error(error):
+    if request.path.startswith("/api/v1/"):
+        messages = {401: "La sesión ha caducado. Vuelve a iniciar sesión.",
+                    403: "No se pudo verificar la sesión. Actualiza la página antes de continuar.",
+                    413: "El archivo supera el tamaño máximo permitido."}
+        return jsonify({"error": messages[error.code]}), error.code
+    return error
+
+@app.get("/react/")
+def react_preview():
+    """Opt-in bundled preview. Keep the stable ingress entrypoint unchanged."""
+    import html
+    directory = Path(os.environ.get("FRONTEND_DIST_DIR", str(ROOT / "frontend_dist")))
+    index = directory / "index.html"
+    if not index.is_file():
+        return "Vista React no compilada. Ejecuta npm run build en frontend.", 503
+    # Vite emits relative asset URLs; both assets and JSON APIs resolve under
+    # the ingress root, including deep links and standalone authentication.
+    base = html.escape(url_for("index"), quote=True)
+    page = index.read_text(encoding="utf-8").replace("<head>", f'<head><base href="{base}">', 1)
+    return app.response_class(page, mimetype="text/html", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/assets/<path:filename>")
+def react_assets(filename):
+    directory = Path(os.environ.get("FRONTEND_DIST_DIR", str(ROOT / "frontend_dist")))
+    return send_from_directory(directory / "assets", filename, max_age=31536000)
+
+
 def configured():
     return bool(app.secret_key and (INGRESS_MODE or os.environ.get("WEB_PASSWORD")))
 
@@ -1003,7 +1035,7 @@ def protect():
         token = session.get("csrf")
         if not token or not hmac.compare_digest((request.headers.get("X-CSRF-Token", "") if request.path.startswith("/api/v1/") else request.form.get("csrf", "")), token):
             abort(403)
-    if request.endpoint not in ("index", "login", "static", "api_v1_auth_status", "api_v1_auth_login") and not (INGRESS_MODE or session.get("auth")):
+    if request.endpoint not in ("index", "login", "static", "api_v1_auth_status", "api_v1_auth_login", "react_preview", "react_assets") and not (INGRESS_MODE or session.get("auth")):
         abort(401)
 
 def csrf_token():
@@ -1197,6 +1229,9 @@ register_receipt_routes(app, DATA, ALLOWED, extract, lambda rid, mode: run_impor
 
 from api_catalog import register_catalog_routes
 register_catalog_routes(app, barcode_stock, LOCK)
+
+from api_photos import register_photo_routes
+register_photo_routes(app, barcode_stock, LOCK)
 
 
 @app.get("/")
@@ -1575,7 +1610,8 @@ def product_merge_preview(product_id):
 def local_product_photo(product_id):
     if not (INGRESS_MODE or session.get("auth")):
         abort(401)
-    path = PHOTO_DIR / (str(product_id) + ".jpg")
+    from api_photos import image_directory
+    path = image_directory() / (str(product_id) + ".jpg")
     if not path.is_file():
         abort(404)
     return send_file(path, mimetype="image/jpeg", max_age=3600)
