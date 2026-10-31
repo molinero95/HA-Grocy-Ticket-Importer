@@ -10,14 +10,14 @@ permissions:
 
 jobs:
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Upgrade npm for TypeScript 7 compatibility trial
+      - name: Use npm 11 for TypeScript 7
         run: npm install --global npm@11
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund

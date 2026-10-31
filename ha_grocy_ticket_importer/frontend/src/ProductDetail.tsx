@@ -108,13 +108,15 @@ export function ProductDetail({
     },
   });
   const [editing, setEditing] = useState(false);
-  const [desiredStock, setDesiredStock] = useState(stockAmount);
+  const [desiredStock, setDesiredStock] = useState<string | null>(null);
+  const targetStock = desiredStock ?? currentStock;
   const [stockMessage, setStockMessage] = useState("");
   const adjustStock = useMutation({
     mutationFn: () =>
-      adjustCatalogStock(id, desiredStock, expectedStock ?? currentStock),
+      adjustCatalogStock(id, targetStock, expectedStock ?? currentStock),
     onSuccess: () => {
       setStockMessage("Stock actualizado correctamente");
+      setDesiredStock(null);
       setExpectedStock(undefined);
       void refreshProduct();
     },
@@ -418,7 +420,7 @@ export function ProductDetail({
                   type="number"
                   min="0"
                   step="0.01"
-                  value={desiredStock}
+                  value={targetStock}
                   onChange={(event) => {
                     setExpectedStock((previous) => previous ?? currentStock);
                     setDesiredStock(event.target.value);
@@ -431,9 +433,9 @@ export function ProductDetail({
                   !product.data ||
                   product.isError ||
                   adjustStock.isPending ||
-                  !desiredStock ||
-                  Number(desiredStock) < 0 ||
-                  Number(desiredStock) === Number(currentStock)
+                  !targetStock ||
+                  Number(targetStock) < 0 ||
+                  Number(targetStock) === Number(currentStock)
                 }
               >
                 Actualizar stock
