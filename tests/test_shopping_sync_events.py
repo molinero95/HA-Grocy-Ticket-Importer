@@ -33,7 +33,19 @@ def test_target_state_change_wakes():
 
 def test_service_target_wakes_without_substring_false_positive():
     wake = threading.Event()
-    events.handle_event({"type": "event", "event": {"event_type": "call_service", "data": {"domain": "todo", "service_data": {"entity_id": ["todo.target_extra"]}}}}, "todo.target", wake)
+    events.handle_event({"type": "event", "event": {"event_type": "call_service", "data": {"domain": "todo", "service": "add_item", "service_data": {"entity_id": ["todo.target_extra"]}}}}, "todo.target", wake)
     assert not wake.is_set()
-    events.handle_event({"type": "event", "event": {"event_type": "call_service", "data": {"domain": "todo", "target": {"entity_id": "todo.target"}}}}, "todo.target", wake)
+    events.handle_event({"type": "event", "event": {"event_type": "call_service", "data": {"domain": "todo", "service": "add_item", "target": {"entity_id": "todo.target"}}}}, "todo.target", wake)
     assert wake.is_set()
+
+
+def test_noop_state_update_does_not_wake():
+    wake = threading.Event()
+    events.handle_event({"type": "event", "event": {"event_type": "state_changed", "data": {"entity_id": "todo.target", "old_state": {"state": "3"}, "new_state": {"state": "3"}}}}, "todo.target", wake)
+    assert not wake.is_set()
+
+
+def test_read_only_todo_service_does_not_wake():
+    wake = threading.Event()
+    events.handle_event({"type": "event", "event": {"event_type": "call_service", "data": {"domain": "todo", "service": "get_items", "service_data": {"entity_id": "todo.target"}}}}, "todo.target", wake)
+    assert not wake.is_set()
