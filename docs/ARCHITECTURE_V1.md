@@ -22,3 +22,15 @@
 
 ## Safety
 Do not switch the ingress entrypoint to the React app before authentication, write actions, error handling and feature parity are complete. Preview must not change existing add-on behavior.
+
+## Cleanup and removal ledger
+
+| Legacy component | Replacement | Removal gate |
+| --- | --- | --- |
+| Inline `PAGE` HTML/CSS/JS in `web.py` | React components and styles | Every screen has passing parity/e2e tests |
+| Flask form POST + redirects | Typed `/api/v1` commands | All clients use JSON commands with CSRF |
+| Duplicated root/add-on Python modules | Single Python source package | Docker and local tests import same package |
+| Legacy browser-JavaScript syntax check | Vite TypeScript build and frontend tests | Inline scripts removed |
+| Unused dependencies and transitional adapters | Audited runtime dependencies | No remaining imports and clean container build |
+
+**Do not remove** SQLite data, Home Assistant options, Grocy product/stock data, or Alexa sync checkpoints as part of source cleanup. Deletions must be independently reviewed and tested; the first 1.0 preview does not change production entrypoints.
