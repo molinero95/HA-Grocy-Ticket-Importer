@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.1] — 2026-10-31
+
+### Fixed
+- Product rename only sends fields that require changes, avoiding unnecessary unit and conversion updates that Grocy may reject.
+- Applied to both development and packaged add-on copies.
+
+### Validation
+- Pending CI and real product rename smoke test.
+
+
 ## [0.8.0] — 2026-10-31
 
 ### Changed
