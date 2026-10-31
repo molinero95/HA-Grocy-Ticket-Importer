@@ -28,8 +28,12 @@ def handle_event(message, entity, wake):
     event = message.get("event") or {}
     data = event.get("data") or {}
     if event.get("event_type") == "state_changed" and data.get("entity_id") == entity:
-        wake.set()
-    elif event.get("event_type") == "call_service" and data.get("domain") == "todo":
+        old = (data.get("old_state") or {}).get("state")
+        new = (data.get("new_state") or {}).get("state")
+        if old != new or "old_state" not in data or "new_state" not in data:
+            wake.set()
+    elif (event.get("event_type") == "call_service" and data.get("domain") == "todo"
+          and data.get("service") in ("add_item", "remove_item", "update_item")):
         target = data.get("service_data") or {}
         ids = target.get("entity_id") or (data.get("target") or {}).get("entity_id") or []
         if isinstance(ids, str):
