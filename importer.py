@@ -81,10 +81,10 @@ def validate(receipt):
     for item in receipt['items']:
         if not isinstance(item.get('name'), str) or not item['name'].strip():
             raise ValueError('Missing name')
-        qty, price = dec(item['quantity']), money(item['unit_price'])
+        qty, price = dec(item['quantity']), dec(item['unit_price'])
         if qty <= 0 or price < 0:
             raise ValueError('Invalid quantity or price')
-        total += qty * price
+        total += money(qty * price)
     if money(total) != money(receipt['total']):
         raise ValueError(f'Total mismatch: calculated {money(total)}, ticket {money(receipt["total"])}')
 
@@ -97,7 +97,7 @@ def main():
     args = parser.parse_args()
     # Read secrets from local .env without printing or exporting them.
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parent / '.env')
+    load_dotenv(os.environ.get('GROCY_ENV_FILE', str(Path(__file__).resolve().parent / '.env')))
     receipt = json.loads(args.receipt.read_text(encoding='utf-8'))
     validate(receipt)
     digest = receipt.get('source_sha256') or hashlib.sha256(args.receipt.read_bytes()).hexdigest()
@@ -119,7 +119,7 @@ def main():
                 continue
             status, unit, reason = classify(item)
             if status == 'EXPENSE':
-                print(f'[{i+1}] {"WOULD RECORD EXPENSE" if args.dry_run else "RECORD EXPENSE"} {name}: {money(dec(item["quantity"]) * money(item["unit_price"]))} EUR (no stock)')
+                print(f'[{i+1}] {"WOULD RECORD EXPENSE" if args.dry_run else "RECORD EXPENSE"} {name}: {money(dec(item["quantity"]) * dec(item["unit_price"]))} EUR (no stock)')
                 if not args.dry_run:
                     conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest, i, None, 'expense', json.dumps({'name': name, 'quantity': item['quantity'], 'unit_price': item['unit_price'], 'merchant': receipt['merchant'], 'receipt_date': receipt['receipt_date']}, ensure_ascii=False)))
                     conn.commit()
