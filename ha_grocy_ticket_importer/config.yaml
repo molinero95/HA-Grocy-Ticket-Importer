@@ -1,5 +1,5 @@
 name: "Grocy Ticket Importer"
-version: "0.7.15"
+version: "0.7.16"
 slug: "ha_grocy_ticket_importer"
 description: "Import receipts and manage Grocy stock via Home Assistant"
 url: "https://github.com/molinero95/HA-Grocy-Ticket-Importer"
@@ -24,6 +24,7 @@ options:
   grocy_location_id: 2
   shopping_sync_enabled: false
   alexa_shopping_list_entity: ""
+  homeassistant_access_token: ""
 schema:
   grocy_url: "url"
   grocy_api_key: "password"
@@ -31,3 +32,4 @@ schema:
   grocy_location_id: "int(1,)"
   shopping_sync_enabled: "bool"
   alexa_shopping_list_entity: "str?"
+  homeassistant_access_token: "password?"
