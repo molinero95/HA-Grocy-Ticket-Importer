@@ -50,6 +50,19 @@ class ReceiptTotalsTests(unittest.TestCase):
     def test_fractional_unit_price_is_not_rounded_early(self):
         self.assertEqual(importer.money(Decimal('2') * Decimal('1.765')), Decimal('3.53'))
 
+    def test_packaged_potatoes_use_piece(self):
+        item = {'name': 'Patata Meleiro bolsa 2,5 kg', 'quantity': 1, 'ambiguous': False}
+        self.assertEqual(importer.classify(item)[0:2], ('STOCK', 2))
+
+    def test_fish_with_size_range_uses_kilogram(self):
+        item = {'name': 'Lubina kg (800-1200 g)', 'quantity': 1.095, 'ambiguous': False}
+        self.assertEqual(importer.classify(item)[0:2], ('STOCK', 4))
+
+    def test_discount_stays_in_review(self):
+        item = {'name': 'Pasta Gallo ensaladas hélices 400 g', 'quantity': 2,
+                'ambiguous': True, 'reason': 'Discount applied on second unit'}
+        self.assertEqual(importer.classify(item)[0], 'REVIEW')
+
     def test_extraction_does_not_flag_rounding_as_ambiguity(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'dummy.pdf'
