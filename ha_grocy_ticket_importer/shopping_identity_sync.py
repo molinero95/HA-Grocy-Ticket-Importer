@@ -66,6 +66,18 @@ def identities(alexa_names, grocy_rows, products, choices=None):
                       "entry_id": int(entry["id"]),
                       "amount": entry.get("amount"),
                       "note": entry.get("note") or ""}
+    # An unresolved Alexa name must not create a free-text duplicate when a
+    # plausible candidate is already on Grocy's shopping list. Require an
+    # explicit review instead of guessing or altering the existing product.
+    existing_product_ids = {row["product_id"] for row in grocy.values()
+                            if row["product_id"] is not None}
+    for row in alexa.values():
+        if row["product_id"] is None:
+            decision, candidates = suggest_catalog_matches(row["name"], products)
+            if decision == "review" and existing_product_ids.intersection(
+                    int(candidate["id"]) for candidate in candidates):
+                raise IdentityConflict(
+                    "Ambiguous Alexa item overlaps an existing Grocy product")
     # A note with the canonical product name is still a note, not a product.
     # Otherwise the first sync could add a duplicate catalog item while
     # retaining the existing shopping note with its original quantity.
