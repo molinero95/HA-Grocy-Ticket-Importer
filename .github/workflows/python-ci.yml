@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install web test dependencies
-        run: python -m pip install Flask python-dotenv
+        run: python -m pip install Flask python-dotenv websocket-client
       - name: Compile every Python file (catches syntax errors)
         run: |
           python - <<'PY'
