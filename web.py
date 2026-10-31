@@ -59,7 +59,14 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 .product-result{display:block;width:100%;text-align:left;background:white;border:0;border-bottom:1px solid #edf0f2;border-radius:0;cursor:pointer;padding:12px;margin:0}
 .product-result:hover,.product-result:focus,.product-result[aria-selected="true"]{background:#e6f3ed}
 .product-result[hidden]{display:none}#product-search{width:100%;box-sizing:border-box}
-#selected-product-label{font-weight:600}</style>
+#selected-product-label{font-weight:600}
+.barcode-input-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.barcode-input-row input{min-width:150px;flex:1}
+.scan-trigger{background:#e2eee9;border:1px solid #9cbaae;border-radius:9px}
+#scanner-dialog{border:0;border-radius:16px;padding:18px;max-width:min(94vw,540px);width:100%;box-sizing:border-box}
+#scanner-dialog::backdrop{background:rgba(0,0,0,.72)}
+#scanner-video{width:100%;aspect-ratio:4/3;object-fit:cover;background:#000;border-radius:12px}
+#scanner-status{min-height:2.4em}#scanner-stop{width:100%}</style>
 <header><h1>Tickets → Grocy</h1>{% if authenticated and not ingress_mode %}
 <form action="{{ url_for('logout') }}" method="post">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button>Salir</button></form>{% endif %}</header>
@@ -72,14 +79,14 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <section><h2>Añadir producto por código de barras</h2>
 <form method="post" action="{{ url_for('barcode_add') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código de barras (EAN/UPC) <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<label>Código de barras (EAN/UPC) <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <label>Nombre (solo si es nuevo) <input name="name" maxlength="200" placeholder="Leche entera 1 L"></label>
 <button type="submit">Añadir 1 al stock</button></form>
 <p>Si el código no está registrado, indica un nombre para crear el producto. Si existe, se reutiliza.</p></section>
 <section><h2>Asociar código a producto existente</h2>
 <form method="post" action="{{ url_for('barcode_associate') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <label for="product-search">Buscar producto existente</label>
 <input id="product-search" type="search" placeholder="Escribe el nombre (ej. Nutella)" autocomplete="off" aria-controls="product-results" aria-label="Buscar producto">
 <input type="hidden" id="selected-product-id" name="product_id" required>
@@ -96,7 +103,7 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <section><h2>Buscar foto por código de barras</h2>
 <form method="post" action="{{ url_for('barcode_photo') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <button type="submit">Buscar imagen</button></form>
 {% if photo %}<p><strong>{{ photo.name }}</strong></p>
 <img src="{{ photo.image_url }}" alt="Fotografía de {{ photo.name }}" width="180" loading="lazy">
@@ -106,7 +113,7 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <section><h2>Eliminar una unidad del stock</h2>
 <form method="post" action="{{ url_for('barcode_remove_preview') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <button type="submit">Buscar unidad para descontar</button></form>
 <p>Esta opción consume una unidad; nunca elimina el producto de la base de datos.</p></section>
 {% if remove_candidate %}
@@ -139,6 +146,115 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 {% endif %}
 </section>{% endif %}
 {% endif %}
+<dialog id="scanner-dialog" aria-labelledby="scanner-title">
+<h2 id="scanner-title">Escanear código de barras</h2>
+<p>Apunta la cámara trasera al código EAN/UPC. No se añadirá ni eliminará stock hasta que confirmes.</p>
+<video id="scanner-video" autoplay muted playsinline></video>
+<p id="scanner-status" role="status" aria-live="polite">Preparando cámara…</p>
+<button type="button" id="scanner-stop">Cerrar cámara</button>
+</dialog>
+<script>
+(() => {
+  const dialog = document.getElementById('scanner-dialog');
+  if (!dialog) return;
+  const video = document.getElementById('scanner-video');
+  const status = document.getElementById('scanner-status');
+  const stopButton = document.getElementById('scanner-stop');
+  let stream = null;
+  let scanning = false;
+  let target = null;
+  let detector = null;
+  let frameId = null;
+  const supportedCodes = new Set(['ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf']);
+  function stop() {
+    scanning = false;
+    if (frameId !== null) cancelAnimationFrame(frameId);
+    frameId = null;
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+    if (dialog.open) dialog.close();
+  }
+  async function scanFrame() {
+    if (!scanning) return;
+    if (video.readyState >= 2) {
+      try {
+        const results = await detector.detect(video);
+        if (!scanning) return;
+        const found = results.find(result => /^\d{8,14}$/.test(result.rawValue || ''));
+        if (found) {
+          target.value = found.rawValue;
+          target.dispatchEvent(new Event('input', {bubbles: true}));
+          stop();
+          target.focus();
+          return;
+        }
+      } catch (error) {
+        status.textContent = 'No se puede leer la imagen. Prueba a mejorar la iluminación o escribe el código.';
+      }
+    }
+    if (scanning) frameId = requestAnimationFrame(scanFrame);
+  }
+  async function start(input) {
+    stop();
+    target = input;
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      status.textContent = 'La cámara requiere una conexión segura (HTTPS) y permisos. Introduce el código manualmente.';
+      dialog.showModal();
+      return;
+    }
+    if (!('BarcodeDetector' in window)) {
+      status.textContent = 'El lector de códigos no está disponible en este navegador. Prueba en Chrome para Android o introduce el código manualmente.';
+      dialog.showModal();
+      return;
+    }
+    dialog.showModal();
+    try {
+      let formats = Array.from(supportedCodes);
+      if (typeof BarcodeDetector.getSupportedFormats === 'function') {
+        const available = await BarcodeDetector.getSupportedFormats();
+        formats = formats.filter(format => available.includes(format));
+      }
+      if (!formats.length) {
+        status.textContent = 'Este dispositivo no admite la lectura de EAN/UPC. Usa la entrada manual.';
+        return;
+      }
+      detector = new BarcodeDetector({formats});
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false, video: {facingMode: {ideal: 'environment'}}
+      });
+      if (!dialog.open) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        return;
+      }
+      video.srcObject = stream;
+      await video.play();
+      status.textContent = 'Buscando código… Mantén el código visible dentro de la imagen.';
+      scanning = true;
+      frameId = requestAnimationFrame(scanFrame);
+    } catch (error) {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      stream = null;
+      const denied = error?.name === 'NotAllowedError' || error?.name === 'SecurityError';
+      status.textContent = denied
+        ? 'Permiso de cámara denegado o bloqueado por Home Assistant. Habilítalo en Android o usa el código manual.'
+        : 'No ha sido posible abrir la cámara. Usa el código manual o prueba desde Chrome.';
+    }
+  }
+  document.querySelectorAll('.scan-trigger').forEach(button => {
+    button.addEventListener('click', () => {
+      const input = button.closest('form')?.querySelector('input[name="barcode"]');
+      if (input) start(input);
+    });
+  });
+  stopButton.addEventListener('click', stop);
+  dialog.addEventListener('cancel', event => {event.preventDefault(); stop();});
+  dialog.addEventListener('close', stop);
+  document.addEventListener('visibilitychange', () => {if (document.hidden) stop();});
+  window.addEventListener('pagehide', stop);
+})();
+</script>
 <script>
 (() => {
   const search = document.getElementById('product-search');
