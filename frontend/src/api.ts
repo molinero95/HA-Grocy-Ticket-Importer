@@ -156,3 +156,17 @@ export async function getMergePreview(sourceId: number, targetId: number): Promi
   if (!response.ok) throw new Error(data.error ?? 'No se pudo comparar los productos');
   return data;
 }
+
+export type CatalogAudit = {
+  schema_version: number;
+  source: string;
+  products: { id: number; name: string; stock_amount: string; barcodes: string[]; shopping_entry_ids: number[]; variants: unknown[] }[];
+  barcode_conflicts: unknown[];
+  unlinked_shopping_entries: number[];
+  shopping_notes?: unknown[];
+};
+export async function getCatalogAudit(): Promise<CatalogAudit> {
+  const response = await fetch(base + 'catalog/audit', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se pudo auditar el catálogo');
+  return response.json() as Promise<CatalogAudit>;
+}
