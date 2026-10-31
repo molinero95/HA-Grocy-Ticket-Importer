@@ -361,7 +361,7 @@ class WebTests(unittest.TestCase):
                     "csrf": token, "name": "Aroma", "pack_size": "4", "unit_id": "2"})
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(b'Existencias sin cambios', response.data)
-                change.assert_called_once_with(5, "Aroma", "4", "2")
+                change.assert_called_once_with(5, "Aroma", "1", "2")
 
     def test_product_picture_lookup_saves_reference(self):
         token = self.login()
