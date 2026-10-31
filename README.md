@@ -98,6 +98,10 @@ para la lista elegida. Despensa sincroniza exclusivamente esa lista y la lista
 predeterminada de Grocy (ID 1). Se excluyen los artículos completados de Alexa.
 Configura `alexa_shopping_list_entity` y habilita `shopping_sync_enabled`
 **solo después de validar el flujo real**. Por defecto sigue desactivado.
+Si configuras únicamente la entidad Alexa, el complemento ya actualiza la
+cola de **Acciones → Coincidencias Alexa** en modo de solo lectura, aunque la
+sincronización esté desactivada. Esto permite revisar sugerencias sin añadir,
+eliminar ni modificar artículos en Alexa o Grocy.
 El proceso combina eventos con comprobaciones periódicas (120 segundos por
 defecto). No modifica existencias ni productos del catálogo.
 
