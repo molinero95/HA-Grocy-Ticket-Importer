@@ -261,10 +261,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section class="inventory-panel"><p class="section-eyebrow">Inventario actual</p><h2>Mi despensa</h2>
 {% if inventory_error %}<p role="alert">No se ha podido consultar el inventario de Grocy. Inténtalo más tarde.</p>{% else %}
 <p>{{ inventory|length }} productos registrados. Cantidades leídas de Grocy.</p>
-<label for="inventory-search">Buscar en mi despensa</label><input id="inventory-search" type="search" autocomplete="off" placeholder="Busca leche, arroz, tomate…">
-<div class="barcode-input-row"><input id="inventory-barcode" inputmode="numeric" placeholder="Código EAN / UPC" aria-label="Código de barras para buscar"><button type="button" class="scan-trigger" data-scan-input="inventory-barcode">📷 Escanear</button><button type="button" id="inventory-barcode-search" class="scan-trigger">Buscar código</button></div><p id="inventory-barcode-status" role="status"></p><div class="inventory-list" id="inventory-list">
+<label for="inventory-search">Buscar por nombre o código de barras</label><div class="barcode-input-row"><input id="inventory-search" type="search" autocomplete="off" placeholder="Nombre o código EAN / UPC"><button type="button" class="scan-trigger" data-scan-input="inventory-search">📷 Escanear</button></div><p id="inventory-barcode-status" role="status" aria-live="polite"></p><div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
-<article class="inventory-row pantry-row" data-name="{{ p.name }}">
+<article class="inventory-row pantry-row" data-name="{{ p.name }}" data-product-id="{{ p.id }}">
 <div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ficha →</small></a></div>
 <div class="pantry-side">
 <div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
@@ -803,31 +802,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   });
 })();
 </script>
-<script>
-(() => {
-  const input = document.getElementById('inventory-barcode');
-  const button = document.getElementById('inventory-barcode-search');
-  if (input && button) {
-    const status = document.getElementById('inventory-barcode-status');
-    async function lookup() {
-      const code = input.value.trim();
-      if (!/^\\d{8,14}$/.test(code)) { status.textContent = 'Introduce o escanea un código EAN/UPC válido.'; return; }
-      status.textContent = 'Buscando…';
-      try {
-        const response = await fetch('{{ url_for("inventory_barcode_lookup") }}?barcode=' + encodeURIComponent(code), {credentials:'same-origin'});
-        const result = await response.json();
-        if (!response.ok || !result.product_id) { status.textContent = result.error || 'Producto no encontrado en tu despensa.'; return; }
-        const destination = new URL('{{ url_for("index", view="product") }}', window.location.href);
-        destination.searchParams.set('product_id', result.product_id);
-        window.location.href = destination.toString();
-      } catch (_) { status.textContent = 'No se pudo consultar el código.'; }
-    }
-    button.addEventListener('click', lookup);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup(); } });
-    input.addEventListener('input', () => { if (/^\\d{8,14}$/.test(input.value.trim())) lookup(); });
-  }
-})();
-</script>
+
 <script>
 (() => {
   const section = document.getElementById('shopping-live-section');
@@ -879,12 +854,27 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   if (!search) return;
   const items = Array.from(document.querySelectorAll('.inventory-row'));
   const empty = document.getElementById('inventory-empty');
-  const norm = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
-  function update() {
+  const status = document.getElementById('inventory-barcode-status');
+  const norm = value => value.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLocaleLowerCase('es');
+  let lookupToken = 0;
+  async function update() {
     const query = norm(search.value.trim());
+    const token = ++lookupToken;
+    let matchingId = null;
+    if (/^\\d{8,14}$/.test(query)) {
+      status.textContent = 'Buscando código…';
+      try {
+        const response = await fetch('{{ url_for("inventory_barcode_lookup") }}?barcode=' + encodeURIComponent(query), {credentials:'same-origin'});
+        const result = await response.json();
+        if (token !== lookupToken) return;
+        if (response.ok && result.product_id) matchingId = String(result.product_id);
+        status.textContent = matchingId ? '' : (result.error || 'Código no encontrado.');
+      } catch (_) { if (token !== lookupToken) return; status.textContent = 'No se pudo consultar el código.'; }
+    } else { status.textContent = ''; }
     let count = 0;
     for (const item of items) {
-      const show = norm(item.dataset.name).includes(query);
+      const nameMatch = norm(item.dataset.name || '').includes(query);
+      const show = matchingId ? item.dataset.productId === matchingId : (/^\\d{8,14}$/.test(query) ? false : nameMatch);
       item.hidden = !show;
       if (show) count++;
     }
