@@ -47,7 +47,7 @@ class AlexaMatchQueueTests(unittest.TestCase):
                     [{"id": 1, "name": "Leche entera"}])
             self.assertEqual(pending(path), [])
 
-    def test_changed_candidates_reset_stale_choice(self):
+    def test_changed_candidates_keep_stale_choice_but_never_resolve_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "queue.sqlite3"
             products = [{"id": 1, "name": "Arroz redondo"},
@@ -55,7 +55,7 @@ class AlexaMatchQueueTests(unittest.TestCase):
             refresh(path, ["Arroz"], products)
             choose(path, "arroz", 1)
             refresh(path, ["Arroz"], products[:1])
-            self.assertIsNone(pending(path)[0]["selected_product_id"])
+            self.assertEqual(pending(path)[0]["selected_product_id"], 1)\n            self.assertEqual(resolved_choices(path, ["Arroz"], products[:1]), {})
 
 
 if __name__ == "__main__":
