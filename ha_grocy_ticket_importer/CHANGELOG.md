@@ -17,6 +17,9 @@
   queues. First v2 sync is a non-destructive union.
 
 ### Safety and migration
+- Unresolved Alexa suggestions cannot create duplicate free-text shopping notes
+  when a plausible canonical product is already on Grocy's shopping list;
+  synchronization pauses for manual review instead.
 - Sync remains **disabled by default**. The worker refuses stale choices,
   duplicate identities, conflicting Grocy notes and concurrent quantity
   changes; it verifies both remote lists before advancing the checkpoint.
