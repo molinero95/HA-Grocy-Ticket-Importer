@@ -122,6 +122,27 @@ class WebTests(unittest.TestCase):
         self.assertIn("product_id=18", r.headers["Location"])
         create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2)
 
+    def test_consume_form_has_amount_and_shopping_checkbox(self):
+        self.login()
+        r = self.client.get("/?view=remove")
+        self.assertIn(b'/barcode/remove-preview', r.data)
+        self.assertNotIn(b'Confirmar: quitar 1 unidad', r.data)
+        self.assertNotIn(b'<strong>Asociar c', self.client.get("/?view=actions").data)
+
+    def test_consume_selected_quantity_and_replenish(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "consume_quantity", return_value={
+                "amount": "0.50", "name": "Tomate",
+                "shopping_added": True, "shopping_error": False}) as consume:
+            with self.client.session_transaction() as sess:
+                sess["remove_barcode"] = "1234567890123"
+            r = self.client.post("/barcode/remove", data={
+                "csrf": token, "barcode": "1234567890123", "amount": "0.50",
+                "add_to_list": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'lista de la compra', r.data)
+        consume.assert_called_once_with("1234567890123", "0.50", True)
+
     def test_action_forms_are_separate(self):
         self.login()
         for view, endpoint in [
