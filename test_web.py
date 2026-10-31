@@ -54,7 +54,7 @@ class WebTests(unittest.TestCase):
                 {"id": 12, "name": "Nutella 350 g"},
                 {"id": 14, "name": "Leche Asturiana"}]):
             self.login()
-            response = self.client.get("/")
+            response = self.client.get("/?view=associate")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'id="product-search"', response.data)
         self.assertIn(b'data-product-id="12"', response.data)
@@ -62,28 +62,55 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'id="selected-product-id"', response.data)
         self.assertNotIn(b'<select name="product_id"', response.data)
 
-    def test_mobile_dashboard_links_and_safe_forms(self):
-        self.login()
-        with patch.object(web.barcode_stock, "list_products", return_value=[]):
+    def test_inventory_home_and_actions_are_separate(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "inventory_snapshot", return_value=[
+            {"id": 5, "name": "Leche", "amount": "3", "unit": "Unidad"},
+            {"id": 8, "name": "Tomate", "amount": "1.5", "unit": "Kilogramo"}]):
             response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        for marker in (b'class="action-grid"', b'class="bottom-nav"',
-                       b'id="entrada"', b'id="salida"', b'id="ticket"',
-                       b'id="asociar"', b'id="scanner-dialog"'):
-            self.assertIn(marker, response.data)
-        # The ticket table renders only after a receipt has been uploaded.
+        self.assertIn(b'id="inventory-search"', response.data)
+        self.assertIn(b'Leche', response.data)
+        self.assertIn(b'3', response.data)
+        self.assertNotIn(b'name="barcode"', response.data)
+        self.assertNotIn(b'class="scan-trigger"', response.data)
+        self.assertIn(b'view=actions', response.data)
+        self.assertTrue(token)
+
+        with patch.object(web.barcode_stock, "inventory_snapshot", side_effect=AssertionError("Should not fetch")):
+            actions = self.client.get("/?view=actions")
+        self.assertEqual(actions.status_code, 200)
+        self.assertIn(b'class="action-grid"', actions.data)
+        self.assertIn(b'view=associate', actions.data)
+        self.assertNotIn(b'name="barcode"', actions.data)
+
+    def test_action_forms_are_separate(self):
+        self.login()
+        for view, endpoint in [
+            ("add", b'/barcode/add'), ("remove", b'/barcode/remove-preview'),
+            ("associate", b'/barcode/associate'), ("photo", b'/barcode/photo'),
+            ("ticket", b'/upload')]:
+            result = self.client.get("/?view=" + view)
+            self.assertEqual(result.status_code, 200, view)
+            self.assertIn(endpoint, result.data, view)
+            self.assertIn(b'Volver a acciones', result.data)
+            self.assertIn(b'class="bottom-nav"', result.data)
         self.assertIn(b'class="ticket-table"', web.PAGE.encode("utf-8"))
-        self.assertNotIn(b'class="ticket-table"', response.data)
-        self.assertIn(b'name="barcode"', response.data)
-        self.assertIn(b'Confirmar: quitar 1 unidad', web.PAGE.encode("utf-8"))
-        self.assertNotIn(b'<form method="get" action="/barcode/add"', response.data)
+        self.assertNotIn(b'class="ticket-table"', self.client.get("/?view=ticket").data)
+
+    def test_inventory_backend_failure_has_no_fake_zeroes(self):
+        self.login()
+        with patch.object(web.barcode_stock, "inventory_snapshot", side_effect=RuntimeError("offline")):
+            response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'No se ha podido consultar', response.data)
 
     def test_camera_scanner_available_for_all_barcode_actions(self):
         self.login()
         with patch.object(web.barcode_stock, "list_products", return_value=[]):
-            response = self.client.get("/")
+            response = self.client.get("/?view=add")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data.count(b'class="scan-trigger"'), 4)
+        self.assertEqual(response.data.count(b'class="scan-trigger"'), 1)
         self.assertIn(b'id="scanner-dialog"', response.data)
         self.assertIn(b'new BarcodeDetector', response.data)
         self.assertIn(b'getUserMedia', response.data)
