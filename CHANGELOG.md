@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.13.1] — 2026-10-31
+
+### Changed
+- Remove redundant Photography section from the bottom of the product editor.
+- Group photo capture and preview at the top, organize fields by purpose, and move destructive deletion into collapsed advanced options.
+- Keep one Save changes action for regular product edits.
+
+### Validation
+- CI and live mobile UI verification pending.
+
+
 ## [0.13.0] — 2026-10-31
 
 ### Added
