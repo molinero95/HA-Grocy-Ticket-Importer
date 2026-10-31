@@ -79,6 +79,12 @@ def validate(receipt):
         raise ValueError('No items')
     total = Decimal('0')
     for item in receipt['items']:
+        factor = dec(item.get('pieces_per_pack', 1))
+        purchased = dec(item.get('purchase_units', item['quantity']))
+        if (not factor.is_finite() or factor != factor.to_integral_value()
+                or not 1 <= factor <= 1000 or not purchased.is_finite()
+                or purchased != dec(item['quantity'])):
+            raise ValueError('Invalid pack conversion or purchase quantity')
         if not isinstance(item.get('name'), str) or not item['name'].strip():
             raise ValueError('Missing name')
         qty, price = dec(item['quantity']), dec(item['unit_price'])
@@ -105,6 +111,8 @@ def main():
     units = {int(u['id']): u['name'] for u in grocy('GET', 'objects/quantity_units')}
     if 2 not in units or 4 not in units:
         raise ValueError('Expected Piece=2 and Kilogram=4; verify units before running')
+    pack_ids = [uid for uid, label in units.items() if norm(label) in ('pack', 'paquete', 'envase')]
+    pack_id = pack_ids[0] if len(pack_ids) == 1 else None
     catalog = {}
     for p in products:
         catalog.setdefault(norm(p['name']), []).append(p)
@@ -127,15 +135,27 @@ def main():
             matches = catalog.get(norm(name), [])
             if len(matches) > 1:
                 status, reason = 'REVIEW', 'Multiple catalog matches'
+            pieces = int(item.get('pieces_per_pack', 1))
+            purchased = dec(item.get('purchase_units', item['quantity']))
+            if status == 'STOCK' and unit == 4 and pieces != 1:
+                status, reason = 'REVIEW', 'Kilograms cannot be converted to pieces'
+            if status == 'STOCK' and unit == 2 and pieces > 1 and pack_id is None:
+                status, reason = 'REVIEW', 'Create a unique Pack quantity unit in Grocy first'
             if status == 'STOCK' and len(matches) == 1:
                 p = matches[0]
                 if int(p['qu_id_stock']) != unit:
                     status, reason = 'REVIEW', 'Existing product has different stock unit'
+                elif unit == 2:
+                    purchase_id = int(p.get('qu_id_purchase') or unit)
+                    existing_factor = dec(p.get('qu_factor_purchase_to_stock') or 1)
+                    if purchase_id != (pack_id if pieces > 1 else unit) or existing_factor != pieces:
+                        status, reason = 'REVIEW', 'Saved purchase conversion differs; review product in Grocy'
             if status == 'REVIEW':
                 print(f'[{i+1}] REVIEW {name}: {reason}')
                 continue
             existing = len(matches) == 1
-            print(f'[{i+1}] {"WOULD IMPORT" if args.dry_run else "IMPORT"} {name}: {item["quantity"]} {units[unit]}, {item["unit_price"]} EUR/{units[unit]} ({"existing" if existing else "NEW"})')
+            stock_amount = purchased * pieces if unit == 2 else purchased
+            print(f'[{i+1}] {"WOULD IMPORT" if args.dry_run else "IMPORT"} {name}: {stock_amount} {units[unit]} ({purchased} purchases × {pieces}) ({"existing" if existing else "NEW"})')
             if args.dry_run:
                 continue
             if existing:
@@ -144,14 +164,16 @@ def main():
                 # Write-ahead marker before product creation; interrupted attempts need manual reconciliation.
                 conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest,i,None,'pending','Creating catalog product; verify before retry'))
                 conn.commit()
-                payload = {'name': name, 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'qu_id_purchase': unit, 'qu_id_stock': unit, 'min_stock_amount': 0}
+                payload = {'name': name, 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'qu_id_purchase': pack_id if pieces > 1 else unit, 'qu_id_stock': unit, 'min_stock_amount': 0}
+                if pieces > 1:
+                    payload['qu_factor_purchase_to_stock'] = pieces
                 result = grocy('POST', 'objects/products', payload)
                 pid = int(result['created_object_id'])
                 catalog.setdefault(norm(name), []).append({**payload, 'id': pid})
             conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest,i,pid,'pending','Stock write may have happened; verify before retry'))
             conn.commit()
             # Grocy timestamps the purchase on import; source date is preserved in note.
-            payload = {'amount': float(dec(item['quantity'])), 'price': float(money(item['unit_price'])), 'best_before_date': '2999-12-31', 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'note': f'Ticket {receipt["merchant"]} {receipt["receipt_date"]} | {digest[:12]} line {i+1}'}
+            payload = {'amount': float(stock_amount), 'price': float(money(dec(item['quantity']) * dec(item['unit_price']) / stock_amount)), 'best_before_date': '2999-12-31', 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'note': f'Ticket {receipt["merchant"]} {receipt["receipt_date"]} | {digest[:12]} line {i+1}'}
             grocy('POST', f'stock/products/{pid}/add', payload)
             conn.execute('UPDATE receipt_items SET state=?, detail=? WHERE receipt_hash=? AND line=?', ('imported','',digest,i))
             conn.commit()

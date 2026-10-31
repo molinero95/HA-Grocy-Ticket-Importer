@@ -421,6 +421,8 @@ class WebTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"1 l\xc3\xadneas", r.data)
         self.assertIn(b"Milk", r.data)
+        self.assertIn(b'name="pieces_per_pack_0"', r.data)
+        self.assertIn(b'capture="environment"', r.data)
         mock_extract.assert_called_once()
         with self.client.session_transaction() as session:
             rid = session["receipt_id"]

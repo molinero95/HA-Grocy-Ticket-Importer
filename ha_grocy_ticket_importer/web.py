@@ -103,6 +103,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .section-eyebrow{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:var(--primary);margin:0 0 8px}
 .helper{font-size:.9rem}
 .ticket-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ticket-review-item{border-bottom:1px solid var(--line);padding:14px 0}
+.ticket-review-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:520px){.ticket-review-fields{grid-template-columns:1fr}}
 .main-tabs{display:flex;gap:8px;margin:10px 0 18px}
 .main-tabs a{flex:1;display:flex;justify-content:center;align-items:center;text-decoration:none;border:1px solid var(--line);border-radius:13px;background:white;font-weight:700;min-height:52px}
 .main-tabs a[aria-current=page]{background:var(--primary);color:white}
@@ -429,18 +432,31 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<input type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png" required>
+<label for="ticket-file">Elegir archivo PDF o imagen</label>
+<input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png">
+<label for="ticket-camera">O hacer una foto del ticket</label>
+<input id="ticket-camera" type="file" name="ticket" accept="image/*" capture="environment">
+<p class="helper">Usa una de las dos opciones. En móviles compatibles, la segunda abre la cámara trasera.</p>
 <button type="submit">Extraer y revisar</button></form></section>
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
 <p>{{ receipt['items']|length }} líneas. Las marcadas como revisión se omitirán al importar.</p>
-<div class="ticket-table"><table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio/u</th><th>Estado</th></tr></thead><tbody>
-{% for item in receipt['items'] %}<tr><td>{{ item.name }}</td><td>{{ item.quantity }}</td>
-<td>{{ item.unit_price }} €</td><td class="{{ 'review' if item.ambiguous else '' }}">
-{{ 'Revisar: ' + item.reason if item.ambiguous else 'Propuesto' }}</td></tr>{% endfor %}
-</tbody></table></div>
+<p>Revisa las unidades compradas. Si es un pack, indica cuántas piezas contiene; guardaremos esa conversión para próximas compras.</p>
 <form method="post" action="{{ url_for('preview', rid=rid) }}">
-<input type="hidden" name="csrf" value="{{ csrf }}"><button>Simular en Grocy</button></form>
+<input type="hidden" name="csrf" value="{{ csrf }}">
+{% for item in receipt['items'] %}
+<div class="ticket-review-item">
+<strong>{{ item.name }}</strong>
+<p>{{ item.quantity }} × {{ item.unit_price }} € · {{ 'Revisión necesaria: ' + item.reason if item.ambiguous else 'Propuesto' }}</p>
+<div class="ticket-review-fields">
+<label>Unidades compradas
+<input name="purchase_units_{{ loop.index0 }}" type="number" min="0.01" step="0.01" value="{{ item.get('purchase_units', item.quantity) }}" required></label>
+<label>Piezas por envase (1 = individual)
+<input name="pieces_per_pack_{{ loop.index0 }}" type="number" min="1" max="1000" step="1" value="{{ item.get('pieces_per_pack', 1) }}" required></label>
+</div>
+</div>
+{% endfor %}
+<button type="submit">Guardar cantidades y simular</button></form>
 {% if simulation %}<h3>Simulación</h3><pre>{{ simulation }}</pre>
 {% if can_commit %}<form method="post" action="{{ url_for('commit', rid=rid) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -1158,8 +1174,11 @@ def barcode_remove():
 
 @app.post("/upload")
 def upload():
-    upload = request.files.get("ticket")
-    if not upload or Path(secure_filename(upload.filename or "")).suffix.lower() not in ALLOWED:
+    uploads = [f for f in request.files.getlist("ticket") if f and f.filename]
+    if len(uploads) != 1:
+        abort(400, "Selecciona un archivo o una foto")
+    upload = uploads[0]
+    if Path(secure_filename(upload.filename or "")).suffix.lower() not in ALLOWED:
         abort(400, "Formato no admitido")
     DATA.mkdir(parents=True, exist_ok=True, mode=0o700)
     rid = secrets.token_hex(16)
@@ -1171,6 +1190,19 @@ def upload():
                                     encoding="utf-8")
     finally:
         source.unlink(missing_ok=True)
+    # Prefill known purchase conversions; no stock mutation during upload.
+    try:
+        products = barcode_stock.grocy("GET", "objects/products")
+        known = {barcode_stock.norm(p["name"]): p for p in products}
+        for item in receipt["items"]:
+            p = known.get(barcode_stock.norm(item["name"]))
+            if p and int(p.get("qu_id_stock") or 0) == 2 and int(p.get("qu_id_purchase") or 0) != 2:
+                factor = int(p.get("qu_factor_purchase_to_stock") or 1)
+                if factor > 1:
+                    item["pieces_per_pack"] = factor
+        receipt_path(rid).write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+    except (ValueError, KeyError, TypeError, OSError):
+        pass
     session["receipt_id"] = rid
     session.pop("previewed", None)
     return render("Revisa el ticket antes de importarlo", receipt, rid)
@@ -1187,6 +1219,21 @@ def run_import(rid, mode):
 @app.post("/preview/<rid>")
 def preview(rid):
     receipt = check_receipt_session(rid)
+    session.pop("previewed", None)
+    from decimal import Decimal, InvalidOperation
+    try:
+        for i, item in enumerate(receipt["items"]):
+            qty = Decimal(request.form.get(f"purchase_units_{i}", str(item["quantity"])))
+            factor = Decimal(request.form.get(f"pieces_per_pack_{i}", str(item.get("pieces_per_pack", 1))))
+            if (not qty.is_finite() or qty <= 0 or qty != Decimal(str(item["quantity"]))
+                    or not factor.is_finite() or factor != factor.to_integral_value()
+                    or not 1 <= factor <= 1000):
+                raise ValueError("Cantidad o conversión inválida")
+            item["purchase_units"] = str(qty)
+            item["pieces_per_pack"] = int(factor)
+        receipt_path(rid).write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+    except (ValueError, InvalidOperation, TypeError):
+        return render("Revisa las cantidades: deben coincidir con el ticket; las piezas por envase son enteras.", receipt, rid), 400
     result = run_import(rid, "--dry-run")
     if result.returncode != 0:
         session.pop("previewed", None)
