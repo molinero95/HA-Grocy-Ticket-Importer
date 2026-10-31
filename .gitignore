@@ -218,3 +218,24 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# HA Grocy ticket importer: secrets and user data
+.env.*
+!.env.example
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.webp
+resultado.json
+froiz.json
+ticket_*.json
+receipts/
+data/
+runtime/
+logs/
+*.sqlite
+*.sqlite3
+*.db
+*.key
+*.pem
