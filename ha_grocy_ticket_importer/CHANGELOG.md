@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1] — 2026-10-31
+
+### Changed
+- Remove the redundant system camera option from receipt uploads now that the in-app camera works.
+- Keep the in-app camera and existing-file picker.
+
+
 ## [0.11.0] — 2026-10-31
 
 ### Added
