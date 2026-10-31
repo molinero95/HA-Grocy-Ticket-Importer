@@ -38,6 +38,32 @@ def list_products():
         key=lambda p: (p["name"].casefold(), p["id"]),
     )
 
+PHOTO_MARKER = re.compile(r"(?:\\n|^)\\[Despensa: imagen=(https://images\\.openfoodfacts\\.org/[^\\]\\s]+)\\]\\s*")
+
+
+def saved_photo(product):
+    """Only show image URLs from the trusted Open Food Facts image host."""
+    from product_images import safe_image_url
+    match = PHOTO_MARKER.search(str(product.get("description") or ""))
+    return safe_image_url(match.group(1)) if match else None
+
+
+def save_product_photo(product_id, image_url):
+    """Persist the discovered public image URL in Grocy product metadata."""
+    from product_images import safe_image_url
+    url = safe_image_url(image_url)
+    if not url:
+        raise BarcodeError("URL de imagen no permitida")
+    pid = int(product_id)
+    product = grocy("GET", f"objects/products/{pid}")
+    if not isinstance(product, dict) or int(product.get("id") or 0) != pid:
+        raise BarcodeError("Producto inexistente")
+    description = PHOTO_MARKER.sub("", str(product.get("description") or "")).rstrip()
+    description += ("\\n" if description else "") + "[Despensa: imagen=" + url + "]"
+    grocy("PUT", f"objects/products/{pid}", {"description": description})
+    return url
+
+
 def inventory_snapshot():
     """Read-only stock overview in three Grocy requests, not one per product.
 
@@ -67,6 +93,7 @@ def inventory_snapshot():
         rows.append({
             "id": pid,
             "name": str(product["name"]),
+            "image_url": saved_photo(product),
             "amount": format(quantity.quantize(Decimal("0.01")), "f").rstrip("0").rstrip(".") if quantity else "0",
             "unit": units.get(int(product.get("qu_id_stock") or 0), "ud. stock"),
         })
@@ -160,6 +187,7 @@ def shopping_list_snapshot():
             raise BarcodeError("Cantidad no válida en la lista de compra")
         unit_id = int(entry.get("qu_id") or (product or {}).get("qu_id_stock") or 0)
         rows.append({
+            "image_url": saved_photo(product) if product else None,
             "id": int(entry["id"]),
             "product_id": pid,
             "name": name,
@@ -257,7 +285,8 @@ def product_detail(product_id):
     return {
         "id": pid, "name": str(product["name"]),
         "pack_size": int(marker.group(1)) if marker else 1,
-        "description": PACK_MARKER.sub("", description).strip(),
+        "description": PHOTO_MARKER.sub("", PACK_MARKER.sub("", description)).strip(),
+        "image_url": saved_photo(product),
         "barcodes": codes,
         "unit_id": int(product["qu_id_stock"]),
         "units": sorted(
@@ -431,7 +460,7 @@ def _new_product_match(name, barcode, products, barcodes):
     return None
 
 
-def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", location_id=2):
+def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", location_id=2, image_url=None):
     """Create only new products; an existing match is returned without any writes."""
     name = (name or "").strip()
     if not name or len(name) > 200:
@@ -457,9 +486,12 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
     existing = _new_product_match(name, barcode, products, barcodes)
     if existing:
         return {"created": False, "product_id": existing["id"], "name": existing["name"]}
+    from product_images import safe_image_url
+    safe_url = safe_image_url(image_url)
     result = grocy("POST", "objects/products", {
         "name": name, "location_id": location_id, "qu_id_stock": unit_id,
         "qu_id_purchase": unit_id, "min_stock_amount": 0,
+        "description": "[Despensa: imagen=" + safe_url + "]" if safe_url else "",
     })
     pid = int(result["created_object_id"])
     if barcode:
