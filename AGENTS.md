@@ -65,3 +65,5 @@ Favor actionable fixes, tests and concise Spanish summaries with commit/version 
 - Describe user-visible additions, fixes, configuration or migration steps, and known limitations honestly. Never claim deployment or validated behavior without evidence.
 - Keep `ha_grocy_ticket_importer/DOCS.md` and `README.md` aligned when configuration changes.
 - Do not publish or merge a version bump without corresponding release notes.
+
+- Home Assistant Supervisor displays add-on release notes from `ha_grocy_ticket_importer/CHANGELOG.md` (within the add-on directory), not only the repository-root `CHANGELOG.md`. Maintain both files identically for every version bump.
