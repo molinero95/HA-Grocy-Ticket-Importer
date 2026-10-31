@@ -47,43 +47,105 @@ app.config.update(
 
 PAGE = """<!doctype html><html lang="es"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tickets → Grocy</title>
-<style>body{font:16px system-ui;max-width:760px;margin:auto;padding:24px;color:#202936}
-header{display:flex;justify-content:space-between;align-items:center}
-section{background:#f4f6f8;padding:18px;border-radius:12px;margin:16px 0}
-input,button{font:inherit;padding:10px;margin:5px 0;max-width:100%}
-button{cursor:pointer}table{border-collapse:collapse;width:100%}
-td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
-.review{color:#a34b00}.error{color:#a40000}pre{white-space:pre-wrap;overflow-wrap:anywhere}
-.product-results{max-height:280px;overflow-y:auto;margin:8px 0;border:1px solid #c7d0d8;border-radius:10px;background:white}
-.product-result{display:block;width:100%;text-align:left;background:white;border:0;border-bottom:1px solid #edf0f2;border-radius:0;cursor:pointer;padding:12px;margin:0}
-.product-result:hover,.product-result:focus,.product-result[aria-selected="true"]{background:#e6f3ed}
-.product-result[hidden]{display:none}#product-search{width:100%;box-sizing:border-box}
-#selected-product-label{font-weight:600}
-.barcode-input-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.barcode-input-row input{min-width:150px;flex:1}
-.scan-trigger{background:#e2eee9;border:1px solid #9cbaae;border-radius:9px}
-#scanner-dialog{border:0;border-radius:16px;padding:18px;max-width:min(94vw,540px);width:100%;box-sizing:border-box}
-#scanner-dialog::backdrop{background:rgba(0,0,0,.72)}
+<title>Despensa · Grocy</title>
+<style>
+:root{color-scheme:light;--bg:#f5f7f5;--card:#fff;--text:#182925;--muted:#62736d;--primary:#126948;--primary-dark:#0b5136;--line:#dce6df;--soft:#e9f5ee;--danger:#aa4038}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{font:16px/1.48 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:920px;margin:0 auto;padding:0 20px 88px;background:var(--bg);color:var(--text)}
+header{padding:22px 0 12px;display:flex;justify-content:space-between;align-items:center;gap:14px}
+header h1{font-size:clamp(1.55rem,5vw,2.15rem);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.035em}
+header p{margin:6px 0 0;color:var(--muted);font-size:.93rem}
+h2{font-size:1.17rem;line-height:1.3;margin:0 0 14px}
+h3{font-size:1.05rem}
+p{margin:10px 0;color:var(--muted)}
+section{background:var(--card);padding:22px;border-radius:18px;margin:18px 0;border:1px solid var(--line);box-shadow:0 3px 16px rgba(24,41,37,.035);scroll-margin-top:20px}
+section:target{border-color:#9bcab2}
+label{display:block;font-weight:650;margin:14px 0 7px}
+input,button{font:inherit}
+input:not([type=hidden]),button{min-height:46px}
+input:not([type=hidden]){width:100%;max-width:100%;border:1px solid #bacdc2;background:white;color:var(--text);border-radius:11px;padding:11px 12px;outline-offset:2px}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #50a97c;outline-offset:3px}
+button{cursor:pointer;border:0;border-radius:11px;padding:12px 16px;background:var(--primary);color:white;font-weight:700;touch-action:manipulation}
+button:hover{background:var(--primary-dark)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button[type=submit]{margin-top:16px;width:100%}
+a{color:var(--primary)}
+table{border-collapse:collapse;width:100%}
+td,th{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}
+.review{color:#a34b00}.error{color:var(--danger)}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.product-results{max-height:275px;overflow-y:auto;overscroll-behavior:contain;margin:8px 0;border:1px solid var(--line);border-radius:12px;background:white}
+.product-result{display:block;width:100%;text-align:left;background:white;color:var(--text);border:0;border-bottom:1px solid var(--line);border-radius:0;cursor:pointer;padding:13px 14px;margin:0;font-weight:500}
+.product-result:hover,.product-result:focus,.product-result[aria-selected=true]{background:var(--soft);color:var(--primary-dark)}
+.product-result[hidden]{display:none}
+#selected-product-label{font-weight:700;color:var(--primary)}
+.barcode-input-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:7px}
+.barcode-input-row input{min-width:130px;flex:1}
+.scan-trigger{background:var(--soft);border:1px solid #b9d8c6;border-radius:11px;color:var(--primary-dark);flex-shrink:0}
+.scan-trigger:hover{background:#d3e9dc;color:var(--primary-dark)}
+#scanner-dialog{border:0;border-radius:18px;padding:20px;max-width:min(94vw,540px);width:100%;background:var(--card);color:var(--text)}
+#scanner-dialog::backdrop{background:rgba(0,0,0,.75)}
 #scanner-video{width:100%;aspect-ratio:4/3;object-fit:cover;background:#000;border-radius:12px}
-#scanner-status{min-height:2.4em}#scanner-stop{width:100%}</style>
-<header><h1>Tickets → Grocy</h1>{% if authenticated and not ingress_mode %}
+#scanner-status{min-height:2.4em}
+#scanner-stop{width:100%;background:#e7ece9;color:var(--text)}
+.hero{background:linear-gradient(130deg,#e1f1e7,#f6faf6);border:1px solid #c7e2d2;padding:20px;border-radius:18px;margin:10px 0 18px}
+.hero strong{font-size:1.05rem}
+.hero p{margin:6px 0 0}
+.action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.action-link{display:flex;min-height:100px;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;text-decoration:none;border:1px solid #b9dcc8;border-radius:14px;background:#fff;padding:14px;color:var(--text)}
+.action-link strong{font-size:1rem}
+.action-link span{font-size:1.35rem}
+.action-link small{font-size:.78rem;color:var(--muted)}
+.action-link:focus,.action-link:hover{background:#e9f5ee;border-color:var(--primary)}
+.notice{border-left:4px solid #8fbe9e;padding-left:14px}
+.status-message{background:#e2f2e9;border-color:#b8d8c5}
+.section-eyebrow{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:var(--primary);margin:0 0 8px}
+.helper{font-size:.9rem}
+.ticket-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.bottom-nav{display:none}
+@media(max-width:600px){
+ body{padding:0 12px 96px;font-size:16px}
+ header{padding:18px 3px 12px}
+ section{padding:17px 15px;border-radius:15px;margin:13px 0}
+ .hero{padding:16px;margin-top:4px}
+ .action-grid{gap:7px}
+ .action-link{min-height:86px;padding:11px 8px}
+ .action-link strong{font-size:.88rem}
+ .action-link small{font-size:.72rem}
+ .barcode-input-row{flex-wrap:nowrap}
+ .barcode-input-row input{min-width:0}
+ .scan-trigger{padding:10px 12px;min-width:104px}
+ .bottom-nav{position:fixed;display:flex;bottom:0;left:0;right:0;padding:7px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:7px;background:rgba(255,255,255,.97);border-top:1px solid var(--line);box-shadow:0 -5px 18px rgba(0,0,0,.06);z-index:10}
+ .bottom-nav a{min-height:49px;flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:.81rem;font-weight:750;color:var(--primary);border-radius:10px;background:var(--soft);text-align:center;padding:4px}
+ .bottom-nav a:focus,.bottom-nav a:hover{background:#cfe6d8}
+ #scanner-dialog{padding:14px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+<header><div><h1>🌿 Despensa</h1><p>Tu inventario, sin complicaciones</p></div>{% if authenticated and not ingress_mode %}
 <form action="{{ url_for('logout') }}" method="post">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button>Salir</button></form>{% endif %}</header>
-{% if message %}<section><strong>{{ message }}</strong></section>{% endif %}
+{% if message %}<section class="status-message" role="status"><strong>{{ message }}</strong></section>{% endif %}
 {% if not authenticated %}<section><form method="post" action="{{ url_for('login') }}">
 <input type="password" name="password" placeholder="Contraseña" required>
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="submit">Entrar</button></form></section>
 {% else %}
-<section><h2>Añadir producto por código de barras</h2>
+<div class="hero"><strong>¿Qué quieres hacer?</strong><p>Escanea un producto o sube un ticket de compra.</p>
+<nav class="action-grid" aria-label="Acciones rápidas">
+<a class="action-link" href="#entrada"><span aria-hidden="true">➕</span><strong>Guardar</strong><small>Añadir al stock</small></a>
+<a class="action-link" href="#salida"><span aria-hidden="true">➖</span><strong>Consumir</strong><small>Quitar del stock</small></a>
+<a class="action-link" href="#ticket"><span aria-hidden="true">🧾</span><strong>Ticket</strong><small>Importar compra</small></a>
+</nav></div>
+<section id="entrada"><p class="section-eyebrow">Entrada de productos</p><h2>Guardar producto en despensa</h2>
 <form method="post" action="{{ url_for('barcode_add') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código de barras (EAN/UPC) <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <label>Nombre (solo si es nuevo) <input name="name" maxlength="200" placeholder="Leche entera 1 L"></label>
 <button type="submit">Añadir 1 al stock</button></form>
 <p>Si el código no está registrado, indica un nombre para crear el producto. Si existe, se reutiliza.</p></section>
-<section><h2>Asociar código a producto existente</h2>
+<section id="asociar"><p class="section-eyebrow">Catálogo</p><h2>Asociar código a producto existente</h2>
 <form method="post" action="{{ url_for('barcode_associate') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
@@ -100,7 +162,7 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <button type="submit" id="associate-submit" disabled>Asociar código sin cambiar stock</button></form>
 <p>Permite reconocer al instante productos ya registrados y evita duplicados.</p>
 </section>
-<section><h2>Buscar foto por código de barras</h2>
+<section id="foto"><p class="section-eyebrow">Fotografías</p><h2>Buscar foto por código de barras</h2>
 <form method="post" action="{{ url_for('barcode_photo') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
@@ -110,21 +172,21 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">{{ photo.attribution }}</a></p>
 <p>Esta foto se muestra como vista previa. Todavía no se guarda en la ficha de Grocy.</p>
 {% endif %}</section>
-<section><h2>Eliminar una unidad del stock</h2>
+<section id="salida"><p class="section-eyebrow">Salida de productos</p><h2>Consumir un producto</h2>
 <form method="post" action="{{ url_for('barcode_remove_preview') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código de barras <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Abrir cámara para escanear el código de barras">📷 Escanear</button></span></label>
 <button type="submit">Buscar unidad para descontar</button></form>
 <p>Esta opción consume una unidad; nunca elimina el producto de la base de datos.</p></section>
 {% if remove_candidate %}
-<section><h3>Confirmar salida de stock</h3>
+<section id="confirmar-salida" class="status-message"><h3>Confirmar salida de stock</h3>
 <p>Producto: <strong>{{ remove_candidate.name }}</strong> ({{ remove_candidate.barcode }})</p>
 <form method="post" action="{{ url_for('barcode_remove') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <input type="hidden" name="barcode" value="{{ remove_candidate.barcode }}">
 <button type="submit">Confirmar: quitar 1 unidad</button></form></section>
 {% endif %}
-<section><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
+<section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <input type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png" required>
@@ -132,11 +194,11 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
 <p>{{ receipt['items']|length }} líneas. Las marcadas como revisión se omitirán al importar.</p>
-<table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio/u</th><th>Estado</th></tr></thead><tbody>
+<div class="ticket-table"><table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio/u</th><th>Estado</th></tr></thead><tbody>
 {% for item in receipt['items'] %}<tr><td>{{ item.name }}</td><td>{{ item.quantity }}</td>
 <td>{{ item.unit_price }} €</td><td class="{{ 'review' if item.ambiguous else '' }}">
 {{ 'Revisar: ' + item.reason if item.ambiguous else 'Propuesto' }}</td></tr>{% endfor %}
-</tbody></table>
+</tbody></table></div>
 <form method="post" action="{{ url_for('preview', rid=rid) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button>Simular en Grocy</button></form>
 {% if simulation %}<h3>Simulación</h3><pre>{{ simulation }}</pre>
@@ -145,6 +207,9 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <button type="submit">Confirmar importación</button></form>{% endif %}
 {% endif %}
 </section>{% endif %}
+<nav class="bottom-nav" aria-label="Navegación móvil">
+<a href="#entrada">➕ Guardar</a><a href="#salida">➖ Consumir</a><a href="#ticket">🧾 Ticket</a>
+</nav>
 {% endif %}
 <dialog id="scanner-dialog" aria-labelledby="scanner-title">
 <h2 id="scanner-title">Escanear código de barras</h2>
