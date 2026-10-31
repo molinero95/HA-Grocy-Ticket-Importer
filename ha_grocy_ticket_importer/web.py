@@ -117,6 +117,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .inventory-row strong{display:block}
 .inventory-row small{display:block;color:var(--muted);font-size:.79rem;margin-top:3px}
 .inventory-quantity{text-align:right;min-width:80px}
+.inventory-quantity form{margin-top:7px}
+.inventory-quantity button{min-height:36px;padding:6px 10px;font-size:.8rem}
+.shopping-controls{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.shopping-controls button{min-height:38px;padding:7px 10px;font-size:.82rem}
 .quantity-unknown{color:#a34b00;font-size:.85rem}
 .version-label{border:1px solid var(--line);border-radius:999px;background:var(--soft);padding:6px 11px;text-decoration:none;font-size:.77rem;font-weight:750;white-space:nowrap}
 .about-list{display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:12px 8px;overflow-wrap:anywhere}
@@ -156,8 +160,27 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="submit">Entrar</button></form></section>
 {% else %}
-<nav class="main-tabs" aria-label="Secciones principales"><a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' %}aria-current="page"{% endif %}>📦 Mi despensa</a><a href="{{ url_for('index', view='actions') }}" {% if view != 'inventory' %}aria-current="page"{% endif %}>⚡ Acciones</a></nav>
-{% if view == 'inventory' %}
+<nav class="main-tabs" aria-label="Secciones principales"><a href="{{ url_for('index', view='shopping') }}" {% if view == 'shopping' %}aria-current="page"{% endif %}>🛒 Lista de la compra</a><a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' or view == 'product' %}aria-current="page"{% endif %}>📦 Mi despensa</a><a href="{{ url_for('index', view='actions') }}" {% if view not in ('shopping','inventory','product') %}aria-current="page"{% endif %}>⚡ Acciones</a></nav>
+{% if view == 'shopping' %}
+<section><p class="section-eyebrow">Sincronizada con Grocy</p><h2>🛒 Lista de la compra</h2>
+{% if shopping_error %}<p role="alert">No se pudo cargar la lista desde Grocy.</p>{% else %}
+<p>{{ shopping|length }} artículos en la lista. Marcarlos como comprados no añade stock automáticamente.</p>
+{% if not shopping %}<p>Tu lista está vacía. Añade un artículo desde Mi despensa.</p>{% endif %}
+<div class="inventory-list">
+{% for item in shopping %}
+<article class="inventory-row">
+<div><strong {% if item.done %}style="text-decoration:line-through;opacity:.6"{% endif %}>{{ item.name }}</strong><small>{{ item.amount }} {{ item.unit }}</small></div>
+<div class="shopping-controls">
+<form method="post" action="{{ url_for('shopping_toggle', item_id=item.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="done" value="{{ '0' if item.done else '1' }}">
+<button type="submit" class="scan-trigger">{{ '↩ Pendiente' if item.done else '✓ Comprado' }}</button></form>
+<form method="post" action="{{ url_for('shopping_remove', item_id=item.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="scan-trigger">✕ Quitar</button></form>
+</div>
+</article>
+{% endfor %}</div>{% endif %}
+</section>
+{% elif view == 'inventory' %}
 <section class="inventory-panel"><p class="section-eyebrow">Inventario actual</p><h2>Mi despensa</h2>
 {% if inventory_error %}<p role="alert">No se ha podido consultar el inventario de Grocy. Inténtalo más tarde.</p>{% else %}
 <p>{{ inventory|length }} productos registrados. Cantidades leídas de Grocy.</p>
@@ -166,7 +189,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% for p in inventory %}
 <article class="inventory-row" data-name="{{ p.name }}">
 <div><a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ver y editar ficha →</small></a></div>
-<div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
+<div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}
+<form method="post" action="{{ url_for('shopping_add', product_id=p.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="scan-trigger" aria-label="Añadir {{ p.name }} a la lista de la compra">🛒 Añadir</button></form></div>
 </article>
 {% endfor %}
 </div><p id="inventory-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
@@ -324,8 +348,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </section>{% endif %}
 {% endif %}
 <nav class="bottom-nav" aria-label="Navegación móvil">
-<a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' %}aria-current="page"{% endif %}>📦 Mi despensa</a>
-<a href="{{ url_for('index', view='actions') }}" {% if view != 'inventory' %}aria-current="page"{% endif %}>⚡ Acciones</a>
+<a href="{{ url_for('index', view='shopping') }}" {% if view == 'shopping' %}aria-current="page"{% endif %}>🛒 Lista de compra</a>
+<a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' or view == 'product' %}aria-current="page"{% endif %}>📦 Mi despensa</a>
+<a href="{{ url_for('index', view='actions') }}" {% if view not in ('shopping','inventory','product') %}aria-current="page"{% endif %}>⚡ Acciones</a>
 </nav>
 {% endif %}
 <dialog id="scanner-dialog" aria-labelledby="scanner-title">
@@ -514,7 +539,7 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-VIEWS = {"inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about"}
+VIEWS = {"shopping", "inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about"}
 POST_VIEWS = {
     "barcode_add": "add",
     "barcode_associate": "associate",
@@ -525,6 +550,9 @@ POST_VIEWS = {
     "product_photo": "product",
     "product_barcode_add": "product",
     "product_stock_save": "product",
+    "shopping_add": "shopping",
+    "shopping_toggle": "shopping",
+    "shopping_remove": "shopping",
     "upload": "ticket",
     "preview": "ticket",
     "commit": "ticket",
@@ -532,14 +560,20 @@ POST_VIEWS = {
 
 def current_view():
     if request.endpoint == "index":
-        candidate = request.args.get("view", "inventory")
+        candidate = request.args.get("view", "shopping")
     else:
-        candidate = POST_VIEWS.get(request.endpoint, "inventory")
-    return candidate if candidate in VIEWS else "inventory"
+        candidate = POST_VIEWS.get(request.endpoint, "shopping")
+    return candidate if candidate in VIEWS else "shopping"
 
 def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None):
     view = current_view()
     inventory, inventory_error = [], False
+    shopping, shopping_error = [], False
+    if view == "shopping" and (INGRESS_MODE or session.get("auth")):
+        try:
+            shopping = barcode_stock.shopping_list_snapshot()
+        except Exception:
+            shopping_error = True
     product = None
     if view == "product" and (INGRESS_MODE or session.get("auth")):
         pid = request.view_args.get("product_id") if request.view_args else request.args.get("product_id")
@@ -558,6 +592,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
                                   view=view, inventory=inventory, inventory_error=inventory_error,
+                                  shopping=shopping, shopping_error=shopping_error,
                                   product=product,
                                   app_version=os.environ.get("DESPENSA_VERSION", "dev"),
                                   app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
@@ -601,6 +636,51 @@ def product_choices():
         return barcode_stock.list_products()
     except Exception:
         return []
+
+@app.post("/shopping/add/<int:product_id>")
+def shopping_add(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        name = barcode_stock.add_to_shopping_list(product_id)
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se ha podido añadir el artículo. Comprueba la lista en Grocy antes de repetir."), 502
+    finally:
+        LOCK.release()
+    return render(name + " añadido a la lista de la compra.")
+
+
+@app.post("/shopping/<int:item_id>/toggle")
+def shopping_toggle(item_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        barcode_stock.update_shopping_list_item(item_id, request.form.get("done") == "1")
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se pudo actualizar el artículo de compra."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="shopping"))
+
+
+@app.post("/shopping/<int:item_id>/remove")
+def shopping_remove(item_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        barcode_stock.remove_shopping_list_item(item_id)
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se pudo quitar el artículo de la lista."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="shopping"))
+
 
 @app.post("/barcode/associate")
 def barcode_associate():
