@@ -21,6 +21,7 @@ import extract
 import barcode_stock
 import product_images
 import variant_catalog
+import catalog_audit
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(os.environ.get("GROCY_ENV_FILE", str(ROOT / ".env")))
@@ -358,6 +359,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if view == 'duplicates' %}
 <section><p class="section-eyebrow">Catálogo · Solo lectura</p><h2>🔎 Posibles duplicados</h2>
 <p>Compara códigos de barras y nombres. No se modifica ni elimina ningún artículo.</p>
+<p><a class="back-link" href="{{ url_for('download_catalog_audit') }}">⬇ Descargar auditoría completa de Grocy (JSON)</a></p>
 {% if duplicates_error %}<p role="alert">No se ha podido consultar el catálogo de Grocy.</p>
 {% elif not duplicates %}<p>Sin posibles duplicados detectados.</p>
 {% else %}<p>{{ duplicates|length }} grupos para revisar.</p>
@@ -1144,6 +1146,19 @@ def product_choices():
         return barcode_stock.list_products()
     except Exception:
         return []
+
+@app.get("/catalog/audit")
+def download_catalog_audit():
+    try:
+        payload = catalog_audit.build_snapshot()
+    except Exception:
+        app.logger.exception("catalog_audit_failed")
+        return render("No se pudo generar la auditoría. No se ha modificado Grocy."), 502
+    response = jsonify(payload)
+    response.headers["Content-Disposition"] = 'attachment; filename="despensa-catalog-audit.json"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
 
 @app.get("/inventory/barcode-lookup")
 def inventory_barcode_lookup():
