@@ -7,7 +7,7 @@ from flask import jsonify, request, session
 from werkzeug.utils import secure_filename
 
 
-def register_receipt_routes(app, data_dir, allowed, extract_module, run_import):
+def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, lock):
     @app.post("/api/v1/receipts")
     def api_v1_upload_receipt():
         uploads = [file for file in request.files.getlist("ticket") if file and file.filename]
@@ -83,3 +83,33 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import):
             return jsonify({"error": "receipt_preview_rejected", "details": result.stderr[-1200:]}), 400
         session["previewed"] = receipt_id
         return jsonify({"receipt_id": receipt_id, "preview": result.stdout, "ready_to_commit": True})
+
+    @app.post("/api/v1/receipts/<receipt_id>/commit")
+    def api_v1_commit_receipt(receipt_id):
+        if session.get("receipt_id") != receipt_id or len(receipt_id) != 32 or any(c not in "0123456789abcdef" for c in receipt_id):
+            return jsonify({"error": "receipt_not_found"}), 404
+        if session.get("previewed") != receipt_id:
+            return jsonify({"error": "preview_required"}), 403
+        path = data_dir / (receipt_id + ".json")
+        if not path.is_file():
+            return jsonify({"error": "receipt_not_found"}), 404
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "import_in_progress"}), 409
+        try:
+            marker = data_dir / (receipt_id + ".commit-started")
+            try:
+                with marker.open("x", encoding="utf-8") as handle:
+                    handle.write("started\\n")
+            except FileExistsError:
+                return jsonify({"error": "receipt_already_submitted", "details": "Comprueba el stock antes de reintentar."}), 409
+            session.pop("previewed", None)
+            try:
+                result = run_import(receipt_id, "--commit")
+            except Exception:
+                app.logger.exception("api_v1_receipt_commit_uncertain")
+                return jsonify({"error": "receipt_commit_uncertain", "details": "Comprueba Grocy antes de reintentar."}), 502
+            if result.returncode:
+                return jsonify({"error": "receipt_commit_uncertain", "details": "La importación se interrumpió. Comprueba Grocy antes de reintentar.", "output": result.stdout[-1200:]}), 502
+            return jsonify({"receipt_id": receipt_id, "status": "committed", "output": result.stdout})
+        finally:
+            lock.release()
