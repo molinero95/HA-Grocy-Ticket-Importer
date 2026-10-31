@@ -28,6 +28,9 @@ def load_config(path=OPTIONS):
         raise ValueError("alexa_shopping_list_entity debe ser una entidad todo.* válida")
     if options.get("shopping_sync_enabled") is True and not alexa_entity:
         raise ValueError("Configura alexa_shopping_list_entity antes de activar la sincronización")
+    interval = int(options.get("shopping_sync_interval_seconds", 120))
+    if not 30 <= interval <= 3600:
+        raise ValueError("shopping_sync_interval_seconds debe estar entre 30 y 3600")
     return {
         "HA_TOKEN": str(options.get("homeassistant_access_token") or "").strip(),
         "HA_URL": "http://homeassistant:8123" if str(options.get("homeassistant_access_token") or "").strip() else "http://supervisor/core",
@@ -36,6 +39,7 @@ def load_config(path=OPTIONS):
         "GROCY_API_KEY": options["grocy_api_key"],
         "OPENAI_API_KEY": options["openai_api_key"],
         "GROCY_LOCATION_ID": str(location),
+        "SHOPPING_SYNC_INTERVAL_SECONDS": str(interval),
         "SHOPPING_SYNC_ENABLED": "1" if options.get("shopping_sync_enabled") is True else "0",
     }
 
