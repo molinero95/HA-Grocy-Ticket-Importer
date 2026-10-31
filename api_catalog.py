@@ -50,3 +50,22 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify(result)
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/stock")
+    def api_v1_adjust_catalog_stock(product_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or "desired_amount" not in payload or "expected_amount" not in payload:
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            preview = barcode_stock.prepare_stock_adjustment(product_id, payload["desired_amount"], payload["expected_amount"])
+            result = barcode_stock.apply_stock_adjustment(preview)
+        except barcode_stock.BarcodeError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_catalog_stock_uncertain")
+            return jsonify({"error": "stock_update_uncertain", "details": "Comprueba el stock de Grocy antes de reintentar."}), 502
+        finally:
+            lock.release()
+        return jsonify(result)
