@@ -62,6 +62,20 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'id="selected-product-id"', response.data)
         self.assertNotIn(b'<select name="product_id"', response.data)
 
+    def test_mobile_dashboard_links_and_safe_forms(self):
+        self.login()
+        with patch.object(web.barcode_stock, "list_products", return_value=[]):
+            response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        for marker in (b'class="action-grid"', b'class="bottom-nav"',
+                       b'id="entrada"', b'id="salida"', b'id="ticket"',
+                       b'id="asociar"', b'id="scanner-dialog"',
+                       b'class="ticket-table"'):
+            self.assertIn(marker, response.data)
+        self.assertIn(b'name="barcode"', response.data)
+        self.assertIn(b'Confirmar: quitar 1 unidad', web.PAGE.encode("utf-8"))
+        self.assertNotIn(b'<form method="get" action="/barcode/add"', response.data)
+
     def test_camera_scanner_available_for_all_barcode_actions(self):
         self.login()
         with patch.object(web.barcode_stock, "list_products", return_value=[]):
