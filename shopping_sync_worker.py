@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from shopping_sync_runtime import load_baseline, reconcile, save_baseline
+from shopping_sync import normalize
 from shopping_sync_adapters import (
     ha_todo_items, grocy_shopping_names, add_alexa, add_grocy,
     remove_alexa, remove_grocy,
@@ -30,9 +31,9 @@ def run_once(*, dry_run=True):
         # A failed or partial write must never advance the baseline.
         final_alexa = ha_todo_items()
         final_grocy = grocy_shopping_names()
-        verification = reconcile(final_alexa, final_grocy, result["next_baseline"])
-        if any(verification[key] for key in (
-                "add_alexa", "add_grocy", "remove_alexa", "remove_grocy")):
+        expected = set(result["next_baseline"])
+        if ({normalize(n) for n in final_alexa} != expected or
+                {normalize(n) for n in final_grocy} != expected):
             raise RuntimeError("Shopping sync verification failed")
         save_baseline(STATE, result["next_baseline"])
     return result
