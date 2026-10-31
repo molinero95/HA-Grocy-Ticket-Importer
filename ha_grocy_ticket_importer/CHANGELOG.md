@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.4] — 2026-10-31
+
+### Fixed
+- Fix HTTP 500 on the shopping list caused by an invalid Alexa suggestion template attribute.
+- Add a rendered-template regression test for inline Alexa product suggestions.
+
+
 ## [0.16.3] — 2026-10-31
 
 ### Fixed
