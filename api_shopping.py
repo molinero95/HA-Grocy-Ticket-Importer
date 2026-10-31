@@ -5,7 +5,7 @@ from flask import jsonify, request, session
 def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ingress_mode, csrf_token):
     @app.get("/api/v1/session")
     def api_v1_session():
-        if not (ingress_mode or session.get("auth")):
+        if not (ingress_mode() or session.get("auth")):
             return jsonify({"error": "authentication_required"}), 401
         return jsonify({"csrf_token": csrf_token()})
 
@@ -66,7 +66,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
     @app.get("/api/v1/shopping")
     def api_v1_shopping():
         """Read-only shopping snapshot for the v1 frontend; never expose Grocy secrets."""
-        if not (ingress_mode or session.get("auth")):
+        if not (ingress_mode() or session.get("auth")):
             return jsonify({"error": "authentication_required"}), 401
         try:
             items = barcode_stock.shopping_list_snapshot()
