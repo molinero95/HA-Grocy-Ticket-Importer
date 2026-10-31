@@ -78,6 +78,13 @@ class WebTests(unittest.TestCase):
         self.assertIn(b"data.name", response.data)
         self.assertIn(b"new-product-name", response.data)
 
+    def test_created_product_success_banner(self):
+        self.login()
+        with patch.object(web.barcode_stock, "product_detail", return_value=None):
+            response = self.client.get("/?view=product&product_id=42&created=1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Producto creado correctamente".encode(), response.data)
+
     def test_configuration_needed(self):
         with patch.dict(os.environ, {"WEB_PASSWORD": ""}):
             self.assertEqual(self.client.get("/").status_code, 503)
