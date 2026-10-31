@@ -36,6 +36,10 @@ Set `alexa_shopping_list_entity` to the desired Alexa Devices `todo.*`
 entity. The worker reads only its pending items and Grocy shopping list ID 1.
 `shopping_sync_enabled` defaults to `false`. Do not enable it before
 validating the Home Assistant and Grocy APIs on the installed versions.
+When the Alexa entity is configured, a read-only worker refreshes the
+**Coincidencias Alexa** queue even with sync disabled. This only writes local
+review metadata; no remote shopping-list or stock writes occur until sync is
+enabled explicitly.
 
 ### Identity-aware v2 behavior
 
