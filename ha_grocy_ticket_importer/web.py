@@ -269,7 +269,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if product %}
 <p class="section-eyebrow">Ficha del artículo</p>
 <h2>{{ product.name }}</h2>
-<div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"></div>
+<div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
+{% if not product.image_url and product.barcodes %}<div id="product-photo-autoload" data-barcode="{{ product.barcodes[0] }}" data-save-url="{{ url_for('product_photo_save', product_id=product.id) }}" data-csrf="{{ csrf }}"></div>{% endif %}
 <p>Las unidades por envase son informativas. Cambiarlas <strong>no modifica las existencias</strong> de Grocy.</p>
 <form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -519,6 +520,25 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         ? 'Permiso de cámara denegado o bloqueado por Home Assistant. Habilítalo en Android o usa el código manual.'
         : 'No ha sido posible abrir la cámara. Usa el código manual o prueba desde Chrome.';
     }
+  }
+  const productAuto = document.getElementById('product-photo-autoload');
+  if (productAuto) {
+    const statusNode = document.getElementById('product-photo-status');
+    const imageNode = document.getElementById('product-photo-display');
+    const payload = new URLSearchParams({
+      barcode: productAuto.dataset.barcode, csrf: productAuto.dataset.csrf
+    });
+    fetch(productAuto.dataset.saveUrl, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: payload.toString()
+    }).then(r => r.ok ? r.json() : null).then(result => {
+      if (result?.saved && imageNode) {
+        imageNode.src = result.image_url;
+        imageNode.hidden = false;
+        if (statusNode) statusNode.textContent = 'Imagen guardada desde Open Food Facts.';
+      }
+    }).catch(() => {});
   }
   // Scanning or typing a complete EAN/UPC previews an image automatically.
   document.querySelectorAll('form input[name="barcode"]').forEach(input => {
@@ -912,6 +932,26 @@ def product_photo(product_id):
     except Exception:
         return render("Foto encontrada, pero no se pudo guardar en Grocy."), 502
     return render("Fotografía guardada en la ficha del producto.")
+
+
+@app.post("/product/<int:product_id>/photo/save")
+def product_photo_save(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        product = barcode_stock.product_detail(product_id)
+        barcode = barcode_stock.validate_barcode(request.form.get("barcode", ""))
+        if barcode not in product["barcodes"]:
+            return jsonify({"saved": False}), 400
+        # Never trust a client-provided URL: look up the exact associated barcode.
+        photo = product_images.lookup_image(barcode)
+        if photo:
+            barcode_stock.save_product_photo(product_id, photo["image_url"])
+    except Exception:
+        return jsonify({"saved": False}), 503
+    finally:
+        LOCK.release()
+    return jsonify({"saved": bool(photo), "image_url": photo["image_url"] if photo else None})
 
 
 @app.get("/photo/lookup")
