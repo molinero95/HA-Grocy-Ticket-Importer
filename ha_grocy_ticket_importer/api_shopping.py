@@ -1,8 +1,36 @@
 """Shopping list, Alexa decisions and session endpoints for v1."""
+import hmac
+import os
 from flask import jsonify, request, session
 
 
 def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ingress_mode, csrf_token):
+    @app.get("/api/v1/auth/status")
+    def api_v1_auth_status():
+        return jsonify({"authenticated": bool(ingress_mode() or session.get("auth")),
+                        "ingress": bool(ingress_mode()), "csrf_token": csrf_token()})
+
+    @app.post("/api/v1/auth/login")
+    def api_v1_auth_login():
+        if ingress_mode():
+            return jsonify({"authenticated": True})
+        payload = request.get_json(silent=True)
+        password = payload.get("password") if isinstance(payload, dict) else None
+        expected = os.environ.get("WEB_PASSWORD")
+        if not isinstance(password, str) or not expected or not hmac.compare_digest(password, expected):
+            return jsonify({"error": "invalid_credentials"}), 401
+        session.clear()
+        session["auth"] = True
+        return jsonify({"authenticated": True, "csrf_token": csrf_token()})
+
+    @app.post("/api/v1/auth/logout")
+    def api_v1_auth_logout():
+        if ingress_mode():
+            return jsonify({"error": "ingress_managed_authentication"}), 409
+        session.clear()
+        return jsonify({"authenticated": False})
+
+
     @app.get("/api/v1/session")
     def api_v1_session():
         if not (ingress_mode() or session.get("auth")):
