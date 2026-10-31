@@ -16,7 +16,7 @@ import urllib.request
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
-DB_PATH = str(Path(__file__).resolve().parent / 'grocy_imports.sqlite3')
+DB_PATH = os.environ.get('GROCY_IMPORT_DB', str(Path(__file__).resolve().parent / 'grocy_imports.sqlite3'))
 
 class GrocyError(Exception):
     pass
