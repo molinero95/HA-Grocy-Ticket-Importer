@@ -2,18 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { getDuplicateCandidates, getMergePreview } from './api';
 
-function MergeComparison({ sourceId, targetId, onClose }: { sourceId: number; targetId: number; onClose: () => void }) {
-  const [pair, setPair] = useState<[number, number] | null>(null);
-  const preview = useQuery({ queryKey: ['merge-preview', pair], queryFn: () => getMergePreview(pair![0], pair![1]), enabled: pair !== null });
-  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['merge-preview', sourceId, targetId], queryFn: () => getMergePreview(sourceId, targetId) });
-  return <section className="notice" aria-label="Vista previa de fusión"><h3>Comparación sin cambios</h3>{isLoading && <p>Consultando Grocy…</p>}{isError && <p role="alert">{error.message} <button onClick={() => void refetch()}>Reintentar</button></p>}{data && <><p><strong>Origen:</strong> {data.source.name} (ID {data.source.id}) · {data.source.stock_amount} unidades (ID {data.source.unit_id}) · envase ×{data.source.pack_size}</p><p><strong>Destino:</strong> {data.target.name} (ID {data.target.id}) · {data.target.stock_amount} unidades (ID {data.target.unit_id}) · envase ×{data.target.pack_size}</p><p><strong>Códigos origen:</strong> {data.source.barcodes.join(', ') || 'Ninguno'}</p><p><strong>Códigos destino:</strong> {data.target.barcodes.join(', ') || 'Ninguno'}</p><p><strong>Variantes:</strong> {data.source_variants.length} en origen, {data.target_variants.length} en destino</p><ul>{data.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul><p><strong>Fusión deshabilitada.</strong> No se ha modificado ningún dato.</p></>}<button onClick={onClose}>Cerrar comparación</button></section>;
-}
-
 export function Duplicates() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['duplicates'], queryFn: getDuplicateCandidates });
   const [pair, setPair] = useState<[number, number] | null>(null);
   return <main><div className="heading"><div><span className="eyebrow">REVISIÓN DEL CATÁLOGO</span><h2>Posibles duplicados</h2><p>Coincidencias por nombre o código. No se fusiona ni elimina ningún producto automáticamente.</p></div><button onClick={() => void refetch()}>Volver a analizar</button></div>
-    {pair && <MergeComparison sourceId={pair[0]} targetId={pair[1]} onClose={() => setPair(null)}/>}
     {isLoading && <p>Cargando candidatos…</p>}{isError && <p role="alert" className="notice">No se pudo analizar el catálogo. <button onClick={() => void refetch()}>Reintentar</button></p>}
     {data?.length === 0 && <p>No se han detectado posibles duplicados.</p>}
     {pair && <section className="item"><h3>Vista previa de fusión (solo lectura)</h3><button type="button" onClick={() => setPair(null)}>Cerrar</button>{preview.isLoading && <p>Comprobando productos…</p>}{preview.isError && <p role="alert">{preview.error.message}</p>}{preview.data && <><p><strong>Origen:</strong> {preview.data.source.name} · {preview.data.source.stock_amount} unidades (unidad Grocy {preview.data.source.unit_id}) · códigos: {preview.data.source.barcodes.join(', ') || 'ninguno'}</p><p><strong>Destino:</strong> {preview.data.target.name} · {preview.data.target.stock_amount} unidades (unidad Grocy {preview.data.target.unit_id}) · códigos: {preview.data.target.barcodes.join(', ') || 'ninguno'}</p><p>Variantes: {preview.data.source_variants.length} en origen y {preview.data.target_variants.length} en destino.</p><strong>Bloqueos de seguridad:</strong><ul>{preview.data.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul><p>No se ha modificado ningún dato.</p></>}</section>}
