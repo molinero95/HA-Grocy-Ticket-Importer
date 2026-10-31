@@ -658,11 +658,15 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
     const preview = form?.querySelector('.barcode-photo-preview');
     const status = form?.querySelector('.photo-status');
     const hidden = form?.querySelector('.barcode-image-url');
+    const nameInput = form?.querySelector('#new-product-name');
+    let suggestedName = '';
     if (!preview) return;
     let sequence = 0;
     async function loadPhoto() {
       const id = ++sequence;
       const barcode = input.value.trim();
+      if (nameInput && nameInput.value === suggestedName) nameInput.value = '';
+      suggestedName = '';
       if (hidden) hidden.value = '';
       preview.hidden = true;
       preview.removeAttribute('src');
@@ -678,12 +682,16 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         if (!response.ok) throw new Error('lookup');
         const data = await response.json();
         if (sequence !== id) return;
+        if (nameInput && data.name && !nameInput.value.trim()) {
+          suggestedName = data.name;
+          nameInput.value = data.name;
+        }
         if (data.image_url) {
           preview.src = data.image_url;
           preview.hidden = false;
           if (hidden) hidden.value = data.image_url;
           if (status) status.textContent = 'Foto encontrada en Open Food Facts.';
-        } else if (status) status.textContent = 'No hay foto para este código.';
+        } else if (status) status.textContent = data.name ? 'Nombre encontrado en Open Food Facts; sin foto disponible.' : 'No hay información para este código.';
       } catch (_) {
         if (sequence === id && status) status.textContent = 'No se pudo buscar la foto; puedes continuar igualmente.';
       }
@@ -1088,7 +1096,7 @@ def photo_lookup():
         return jsonify({"image_url": None}), 400
     except Exception:
         return jsonify({"image_url": None}), 503
-    return jsonify({"image_url": found["image_url"] if found else None})
+    return jsonify({"image_url": found["image_url"] if found else None, "name": found["name"] if found else ""})
 
 
 @app.post("/barcode/photo")
