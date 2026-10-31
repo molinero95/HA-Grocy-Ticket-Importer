@@ -439,7 +439,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% endif %}
 {% if view == 'ticket' %}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
-<form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+<form id="ticket-upload-form" method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="button" id="ticket-live-camera">📷 Abrir cámara</button>
 <div id="ticket-camera-panel" hidden><video id="ticket-video" autoplay playsinline muted style="width:100%;max-height:420px"></video><button type="button" id="ticket-snapshot">Capturar foto</button><button type="button" id="ticket-camera-close">Cancelar</button></div>
@@ -447,7 +447,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <label for="ticket-file" class="scan-trigger" style="display:inline-block;padding:12px;cursor:pointer">📁 Elegir PDF o imagen existente</label>
 <input id="ticket-file" type="file" name="ticket" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0" tabindex="-1">
 <p class="helper" id="ticket-selection-status" role="status">Pulsa «Abrir cámara» para hacer una foto o «Elegir archivo» para adjuntar un documento.</p>
-<button type="submit">Extraer y revisar</button></form></section>
+<button id="ticket-upload-submit" type="submit">Extraer y revisar</button><p id="ticket-upload-progress" class="helper" role="status" aria-live="polite" hidden>⏳ Procesando ticket… Puede tardar unos segundos.</p></form></section>
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
 <p>{{ receipt['items']|length }} líneas. Las marcadas como revisión se omitirán al importar.</p>
@@ -761,6 +761,33 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
     window.addEventListener('pagehide', stop);
   }
   document.querySelectorAll('.ticket-match-select').forEach(select => select.addEventListener('change', () => { const input = document.getElementById(select.dataset.target); if(input && select.value) input.value = select.value; }));
+  const uploadForm = document.getElementById('ticket-upload-form');
+  if (uploadForm) {
+    let submitting = false;
+    uploadForm.addEventListener('submit', event => {
+      if (submitting) { event.preventDefault(); return; }
+      const cameraInput = document.getElementById('ticket-camera');
+      const fileInput = document.getElementById('ticket-file');
+      if (!(cameraInput && cameraInput.files.length) && !(fileInput && fileInput.files.length)) {
+        event.preventDefault();
+        const status = document.getElementById('ticket-selection-status');
+        if (status) status.textContent = 'Haz una foto o selecciona un archivo antes de continuar.';
+        return;
+      }
+      submitting = true;
+      const button = document.getElementById('ticket-upload-submit');
+      if (button) { button.disabled = true; button.textContent = '⏳ Extrayendo…'; button.setAttribute('aria-busy', 'true'); }
+      const progress = document.getElementById('ticket-upload-progress');
+      if (progress) progress.hidden = false;
+    });
+    window.addEventListener('pageshow', () => {
+      submitting = false;
+      const button = document.getElementById('ticket-upload-submit');
+      if (button) { button.disabled = false; button.textContent = 'Extraer y revisar'; button.removeAttribute('aria-busy'); }
+      const progress = document.getElementById('ticket-upload-progress');
+      if (progress) progress.hidden = true;
+    });
+  }
   const camera = document.getElementById('ticket-camera');
   const file = document.getElementById('ticket-file');
   if (!camera || !file) return;
