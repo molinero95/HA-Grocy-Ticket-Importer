@@ -63,3 +63,11 @@ Last reviewed: 2026-10-31. This records the user's explicitly requested behavior
   No automatic migration of existing product IDs, stock or shopping entries.
 - Alexa identity-aware matching and ambiguous-item review are still pending;
   preserve original shopping notes and sync checkpoints.
+
+## Alexa ambiguous match review (PR #5)
+
+- Pending suggestions and explicit manual choices are advisory metadata in
+  `/config/alexa-match-queue.sqlite3`. They never mutate shopping entries,
+  quantities, stock or synchronization checkpoints by themselves.
+- No automatic note-to-product conversion until identity-aware sync and
+  integration tests are implemented.
