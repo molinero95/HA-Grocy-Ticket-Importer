@@ -54,3 +54,21 @@ export async function getProductVariants(productId: number): Promise<ProductVari
 
 export type VariantInput = { barcode: string; name: string; supermarket: string; brand: string; units_per_purchase: string };
 export const saveProductVariant = (productId: number, variant: VariantInput) => mutate('products/' + productId + '/variants', 'POST', variant);
+
+export type ReceiptItem = { name: string; quantity: number | string; pieces_per_pack?: number; purchase_units?: string };
+export type Receipt = { items: ReceiptItem[]; [key: string]: unknown };
+export type ReceiptUpload = { receipt_id: string; receipt: Receipt };
+export async function uploadReceipt(file: File): Promise<ReceiptUpload> {
+  const body = new FormData();
+  body.append('ticket', file);
+  const response = await fetch(base + 'receipts', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': await token() }, body });
+  const result = await response.json() as ReceiptUpload & { error?: string };
+  if (!response.ok) throw new Error(result.error ?? 'No se pudo procesar el ticket');
+  return result;
+}
+export async function previewReceipt(id: string, items: { name: string; purchase_units: string; pieces_per_pack: number }[]): Promise<{ preview: string; ready_to_commit: boolean }> {
+  const response = await fetch(base + 'receipts/' + encodeURIComponent(id) + '/preview', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify({ items }) });
+  const result = await response.json() as { preview: string; ready_to_commit: boolean; error?: string; details?: string };
+  if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo simular la importación');
+  return result;
+}
