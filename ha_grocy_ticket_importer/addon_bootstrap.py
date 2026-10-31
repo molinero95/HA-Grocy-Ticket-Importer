@@ -29,6 +29,8 @@ def load_config(path=OPTIONS):
     if options.get("shopping_sync_enabled") is True and not alexa_entity:
         raise ValueError("Configura alexa_shopping_list_entity antes de activar la sincronización")
     return {
+        "HA_TOKEN": str(options.get("homeassistant_access_token") or "").strip(),
+        "HA_URL": "http://homeassistant:8123" if str(options.get("homeassistant_access_token") or "").strip() else "http://supervisor/core",
         "ALEXA_SHOPPING_LIST_ENTITY": alexa_entity,
         "GROCY_URL": options["grocy_url"].rstrip("/"),
         "GROCY_API_KEY": options["grocy_api_key"],
