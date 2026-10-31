@@ -62,5 +62,21 @@ class AlexaCatalogSuggestionTests(unittest.TestCase):
         from shopping_sync import suggest_catalog_matches
         self.assertEqual(suggest_catalog_matches("leche", [{"id": 1, "name": "detergente"}]), ("unmatched", []))
 
+
+
+class AlexaRiceCandidateTests(unittest.TestCase):
+    def test_generic_rice_offers_all_rice_varieties(self):
+        from shopping_sync import suggest_catalog_matches
+        products = [{"id": 1, "name": "Arroz basmati"}, {"id": 2, "name": "Arroz integral"}]
+        decision, candidates = suggest_catalog_matches("arroz", products)
+        self.assertEqual(decision, "review")
+        self.assertEqual({p["id"] for p in candidates}, {1, 2})
+
+    def test_exact_generic_rice_still_requires_review_when_varieties_exist(self):
+        from shopping_sync import suggest_catalog_matches
+        products = [{"id": 1, "name": "Arroz"}, {"id": 2, "name": "Arroz integral"}]
+        decision, candidates = suggest_catalog_matches("arroz", products)
+        self.assertEqual(decision, "review")
+        self.assertEqual({p["id"] for p in candidates}, {1, 2})
 if __name__ == "__main__":
     unittest.main()
