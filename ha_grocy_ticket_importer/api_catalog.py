@@ -134,3 +134,40 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify(result)
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/photo")
+    def api_v1_upload_catalog_photo(product_id):
+        import io
+        from pathlib import Path
+        from PIL import Image, ImageOps, UnidentifiedImageError
+        from flask import current_app
+        uploaded = request.files.get("photo")
+        if not uploaded or not uploaded.filename:
+            return jsonify({"error": "Selecciona una fotografía"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            barcode_stock.product_detail(product_id)
+            raw = uploaded.read(8 * 1024 * 1024 + 1)
+            if len(raw) > 8 * 1024 * 1024:
+                return jsonify({"error": "La imagen supera 8 MiB"}), 413
+            image = Image.open(io.BytesIO(raw))
+            if image.format not in ("JPEG", "PNG", "WEBP"):
+                return jsonify({"error": "Formato no admitido. Usa JPG, PNG o WebP"}), 400
+            image = ImageOps.exif_transpose(image)
+            image.thumbnail((1200, 1200))
+            image = image.convert("RGB")
+            directory = Path(os.environ.get("PRODUCT_IMAGE_DIR", str(Path(__file__).resolve().parent / "runtime" / "product_images")))
+            directory.mkdir(parents=True, exist_ok=True)
+            temporary = directory / (str(product_id) + ".tmp")
+            image.save(temporary, format="JPEG", quality=85)
+            temporary.replace(directory / (str(product_id) + ".jpg"))
+        except (UnidentifiedImageError, OSError, ValueError, barcode_stock.BarcodeError):
+            current_app.logger.warning("api_v1_catalog_photo_invalid", exc_info=True)
+            return jsonify({"error": "Imagen inválida o producto inexistente"}), 400
+        except Exception:
+            current_app.logger.exception("api_v1_catalog_photo_failed")
+            return jsonify({"error": "photo_upload_uncertain"}), 502
+        finally:
+            lock.release()
+        return jsonify({"saved": True, "photo_url": f"product/{product_id}/photo/local"})
