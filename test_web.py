@@ -265,6 +265,17 @@ class WebTests(unittest.TestCase):
         self.assertIn('class="shopping-stepper" aria-label="Cantidad de Tomate en lista de compra"', html)
         self.assertIn('class="shopping-quick"', html)
 
+    def test_embedded_javascript_is_template_free_for_node_syntax_check(self):
+        # Node --check parses the script from the Python source before Jinja renders.
+        script = web.PAGE.split("<script>", 1)[1].split("</script>", 1)[0]
+        self.assertNotIn("{{", script)
+        self.assertNotIn("{%", script)
+        self.assertIn("dialog.dataset.photoLookupUrl", script)
+        self.assertIn("data-photo-lookup-url=", web.PAGE)
+        self.login()
+        response = self.client.get("/?view=inventory")
+        self.assertIn(b'data-photo-lookup-url="/photo/lookup"', response.data)
+
     def test_shopping_toggle_and_remove(self):
         token = self.login()
         with patch.object(web.barcode_stock, "update_shopping_list_item") as toggle:
