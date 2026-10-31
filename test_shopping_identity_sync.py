@@ -99,7 +99,7 @@ class IdentityPlannerTests(unittest.TestCase):
 
     def test_duplicate_grocy_product_entry_is_not_silently_removed(self):
         with self.assertRaisesRegex(IdentityConflict, "Duplicate Grocy"):
-            identities([], [entry(2, 1), entry(2, 2)], PRODUCTS)
+            identities([], [entry(2, 1), entry(2, 2, name="Basmati arroz")], PRODUCTS)
 
 
 if __name__ == "__main__":
