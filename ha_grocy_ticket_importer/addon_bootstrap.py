@@ -51,6 +51,11 @@ def main():
         print("No se pudo iniciar Despensa. Revisa las opciones en Home Assistant y el historial.", file=sys.stderr)
         return 1
     os.environ.update(config)
+    import re
+    metadata = Path("/app/addon_config.yaml").read_text(encoding="utf-8")
+    match = re.search(r'^version:\\s*["\\']?([0-9]+\\.[0-9]+\\.[0-9]+)', metadata, re.MULTILINE)
+    os.environ["DESPENSA_VERSION"] = match.group(1) if match else "dev"
+    os.environ["DESPENSA_DISTRIBUTION"] = "Repositorio comunitario de GitHub"
     subprocess.run(["nginx"], check=True)
     os.execvpe(
         "/venv/bin/gunicorn",
