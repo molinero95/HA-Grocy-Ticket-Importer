@@ -62,9 +62,9 @@ p{margin:10px 0;color:var(--muted)}
 section{background:var(--card);padding:22px;border-radius:18px;margin:18px 0;border:1px solid var(--line);box-shadow:0 3px 16px rgba(24,41,37,.035);scroll-margin-top:20px}
 section:target{border-color:#9bcab2}
 label{display:block;font-weight:650;margin:14px 0 7px}
-input,button{font:inherit}
-input:not([type=hidden]),button{min-height:46px}
-input:not([type=hidden]){width:100%;max-width:100%;border:1px solid #bacdc2;background:white;color:var(--text);border-radius:11px;padding:11px 12px;outline-offset:2px}
+input,button,select{font:inherit}
+input:not([type=hidden]),button,select{min-height:46px}
+input:not([type=hidden]),select{width:100%;max-width:100%;border:1px solid #bacdc2;background:white;color:var(--text);border-radius:11px;padding:11px 12px;outline-offset:2px}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #50a97c;outline-offset:3px}
 button{cursor:pointer;border:0;border-radius:11px;padding:12px 16px;background:var(--primary);color:white;font-weight:700;touch-action:manipulation}
 button:hover{background:var(--primary-dark)}
@@ -204,11 +204,41 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label for="edit-product-name">Nombre del artículo</label>
 <input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
+<label for="edit-unit">Unidad de medida del stock</label>
+<select id="edit-unit" name="unit_id" required>
+{% for u in product.units %}<option value="{{ u.id }}" {% if u.id == product.unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
+</select>
+<p class="helper">Si hay existencias ({{ product.stock_amount }}), cambiar la unidad requiere una conversión previa en Grocy para no tratar unidades como kg.</p>
 <label for="edit-pack-size">Unidades por envase</label>
 <input id="edit-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="{{ product.pack_size }}" required>
 <p class="helper">Ejemplo: si el aroma de vainilla contiene 4 botellitas, indica 4. Se seguirá contando como un envase hasta que configuremos otra unidad de stock.</p>
 <button type="submit">Guardar cambios</button>
 </form>
+<h3>Ajustar cantidad disponible</h3>
+<p>Stock actual: <strong>{{ product.stock_amount }} {{ product.units|selectattr('id', 'equalto', product.unit_id)|map(attribute='name')|first|default('unidades') }}</strong></p>
+<form method="post" action="{{ url_for('product_stock_preview', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="expected_amount" value="{{ product.stock_amount }}">
+<label for="edit-stock-amount">Cantidad total que tengo</label>
+<input id="edit-stock-amount" name="desired_amount" inputmode="decimal" type="number" step="0.01" min="0" value="{{ product.stock_amount }}" required>
+<p class="helper">Máximo dos decimales. Si cambias el valor, se mostrará una confirmación antes de modificar Grocy.</p>
+<button type="submit">Revisar ajuste de cantidad</button>
+</form>
+{% if adjustment %}
+<div class="status-message stock-confirm"><h3>Confirmar ajuste</h3>
+<p>Antes: <strong>{{ adjustment.before }}</strong> · Después: <strong>{{ adjustment.after }}</strong></p>
+<p>Se {{ 'añadirán' if adjustment.direction == 'add' else 'descontarán' }} <strong>{{ adjustment.difference }}</strong> unidades de stock.</p>
+<form method="post" action="{{ url_for('product_stock_commit', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<button type="submit">Confirmar cambio de existencias</button>
+</form></div>
+{% endif %}
+<h3>Asociar código de barras</h3>
+<p class="helper">El artículo ya está seleccionado. Asociar un código no cambia las existencias.</p>
+<form method="post" action="{{ url_for('product_barcode_add', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Código <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
+<button type="submit">Asociar código a este artículo</button></form>
 <h3>Fotografía</h3>
 {% if photo %}<img src="{{ photo.image_url }}" alt="Fotografía de {{ photo.name }}" width="200" loading="lazy"><p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">Fuente: Open Food Facts</a></p><p class="helper">Fotografía de referencia. Todavía no se guarda en Grocy.</p>{% endif %}
 {% if product.barcodes %}
@@ -502,6 +532,9 @@ POST_VIEWS = {
     "barcode_photo": "photo",
     "product_update": "product",
     "product_photo": "product",
+    "product_barcode_add": "product",
+    "product_stock_preview": "product",
+    "product_stock_commit": "product",
     "upload": "ticket",
     "preview": "ticket",
     "commit": "ticket",
@@ -514,7 +547,7 @@ def current_view():
         candidate = POST_VIEWS.get(request.endpoint, "inventory")
     return candidate if candidate in VIEWS else "inventory"
 
-def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None):
+def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None, adjustment=None):
     view = current_view()
     inventory, inventory_error = [], False
     product = None
@@ -535,7 +568,7 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
                                   view=view, inventory=inventory, inventory_error=inventory_error,
-                                  product=product,
+                                  product=product, adjustment=adjustment,
                                   app_version=os.environ.get("DESPENSA_VERSION", "dev"),
                                   app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
                                   grocy_configured=bool(os.environ.get("GROCY_URL") and os.environ.get("GROCY_API_KEY")),
@@ -601,7 +634,7 @@ def product_update(product_id):
         abort(409, "Otra operación está en marcha")
     try:
         result = barcode_stock.update_product_info(
-            product_id, request.form.get("name"), request.form.get("pack_size"))
+            product_id, request.form.get("name"), request.form.get("pack_size"), request.form.get("unit_id"))
     except barcode_stock.BarcodeError as exc:
         return render(str(exc)), 400
     except Exception:
@@ -609,6 +642,52 @@ def product_update(product_id):
     finally:
         LOCK.release()
     return render("Producto actualizado: " + result["name"] + ". Existencias sin cambios.")
+
+
+@app.post("/product/<int:product_id>/barcode")
+def product_barcode_add(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = barcode_stock.associate_product_barcode(product_id, request.form.get("barcode", ""))
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se pudo asociar el código. Comprueba Grocy."), 502
+    finally:
+        LOCK.release()
+    return render("Código ya asociado." if result["already_linked"] else "Código asociado sin modificar existencias.")
+
+
+@app.post("/product/<int:product_id>/stock-preview")
+def product_stock_preview(product_id):
+    try:
+        adjustment = barcode_stock.prepare_stock_adjustment(
+            product_id, request.form.get("desired_amount"), request.form.get("expected_amount"))
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se pudo comprobar el stock en Grocy."), 502
+    session["stock_adjustment"] = adjustment
+    return render("Revisa y confirma el ajuste.", adjustment=adjustment)
+
+
+@app.post("/product/<int:product_id>/stock-commit")
+def product_stock_commit(product_id):
+    adjustment = session.pop("stock_adjustment", None)
+    if not isinstance(adjustment, dict) or adjustment.get("product_id") != product_id:
+        abort(403, "Primero revisa la corrección de stock")
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        applied = barcode_stock.apply_stock_adjustment(adjustment)
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 409
+    except Exception:
+        return render("Error de Grocy. Comprueba las existencias antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return render("Stock actualizado: " + applied["after"] + ". Ajuste confirmado.")
 
 
 @app.post("/product/<int:product_id>/photo")
