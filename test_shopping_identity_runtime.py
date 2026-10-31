@@ -72,10 +72,10 @@ class IdentityAdapterTests(unittest.TestCase):
     def test_concurrent_note_blocks_selected_product_add(self):
         note = ("Arroz", {"id": 8, "product_id": None, "note": "Arroz", "amount": 1})
         with patch("shopping_sync_adapters.grocy_entries", return_value=[note]), \
-             patch("shopping_sync_adapters.grocy") as grocy:
+             patch("shopping_sync_adapters.grocy", return_value=PRODUCTS) as grocy:
             with self.assertRaises(IdentityConflict):
                 add_grocy_identity({"name": "Arroz", "product_id": 2})
-        grocy.assert_not_called()
+        grocy.assert_called_once_with("GET", "objects/products")
 
     def test_concurrent_canonical_name_note_blocks_product_add(self):
         note = ("Arroz basmati", {"id": 8, "product_id": None,
