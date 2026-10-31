@@ -81,6 +81,19 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         apply.assert_not_called()
 
+    def test_catalog_barcode_delete_requires_csrf(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "remove_product_barcode") as remove:
+            response = self.client.delete("/api/v1/catalog/products/7/barcodes/8412345678901")
+        self.assertEqual(response.status_code, 403)
+        remove.assert_not_called()
+
+    def test_catalog_barcode_delete_rejects_variant(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "remove_product_barcode", side_effect=web.barcode_stock.BarcodeError("variant")) as remove:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.delete("/api/v1/catalog/products/7/barcodes/8412345678901", headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 409)
+        remove.assert_called_once_with(7, "8412345678901")
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
