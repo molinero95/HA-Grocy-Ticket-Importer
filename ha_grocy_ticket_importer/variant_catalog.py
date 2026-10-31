@@ -29,6 +29,12 @@ def variants_for_product(product_id):
             for row in rows]
 
 
+def is_registered_variant(barcode):
+    """Protect local metadata from barcode replacement in the legacy editor."""
+    with closing(connect(CATALOG_DB)) as db:
+        return resolve_barcode(db, barcode) is not None
+
+
 def save_variant(product_id, barcode, name, *, supermarket="", brand="", units_per_purchase="1"):
     """Audit both catalogs before writing metadata; never alter Grocy stock.
 
