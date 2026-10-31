@@ -73,7 +73,7 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'Leche', response.data)
         self.assertIn(b'3', response.data)
         self.assertNotIn(b'<input name="barcode"', response.data)
-        self.assertIn(b'/shopping/add/5', response.data)
+        self.assertIn(b'view=shopping_add', response.data)
         self.assertIn(b'view=actions', response.data)
         self.assertTrue(token)
 
@@ -124,10 +124,21 @@ class WebTests(unittest.TestCase):
         token = self.login()
         with patch.object(web.barcode_stock, "add_to_shopping_list", return_value="Leche") as add:
             with patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=[]):
-                response = self.client.post("/shopping/add/5", data={"csrf": token})
+                response = self.client.post("/shopping/add/5", data={"csrf": token, "amount": "1.50", "unit_id": "4"})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Leche', response.data)
-        add.assert_called_once_with(5)
+        add.assert_called_once_with(5, "1.50", "4")
+
+    def test_shopping_add_screen_has_amount_and_unit(self):
+        self.login()
+        with patch.object(web.barcode_stock, "shopping_product_options", return_value={
+                "id": 5, "name": "Tomate", "units": [
+                    {"id": 4, "name": "Kilogramo", "factor": "1"}]}):
+            response = self.client.get("/?view=shopping_add&product_id=5")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'name="amount"', response.data)
+        self.assertIn(b'name="unit_id"', response.data)
+        self.assertIn(b'step="0.01"', response.data)
 
     def test_shopping_toggle_and_remove(self):
         token = self.login()
