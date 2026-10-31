@@ -55,7 +55,8 @@ class AlexaMatchQueueTests(unittest.TestCase):
             refresh(path, ["Arroz"], products)
             choose(path, "arroz", 1)
             refresh(path, ["Arroz"], products[:1])
-            self.assertEqual(pending(path)[0]["selected_product_id"], 1)\n            self.assertEqual(resolved_choices(path, ["Arroz"], products[:1]), {})
+            self.assertEqual(pending(path)[0]["selected_product_id"], 1)
+            self.assertEqual(resolved_choices(path, ["Arroz"], products[:1]), {})
 
 
 if __name__ == "__main__":
