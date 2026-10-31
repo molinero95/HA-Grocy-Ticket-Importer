@@ -1275,10 +1275,13 @@ def api_v1_session():
 @app.post("/api/v1/alexa/matches/<key>/choose")
 def api_v1_choose_alexa_match(key):
     payload = request.get_json(silent=True)
-    if not isinstance(payload, dict) or type(payload.get("product_id")) is not int or payload["product_id"] <= 0:
+    if not isinstance(payload, dict) or type(payload.get("product_id")) is not int or payload["product_id"] < 0:
         return jsonify({"error": "invalid_product_id"}), 400
     try:
-        shopping_match_queue.choose(shopping_match_queue.DEFAULT_PATH, key, payload["product_id"])
+        if payload["product_id"] == 0:
+            shopping_match_queue.keep_original(shopping_match_queue.DEFAULT_PATH, key)
+        else:
+            shopping_match_queue.choose(shopping_match_queue.DEFAULT_PATH, key, payload["product_id"])
     except (ValueError, TypeError):
         return jsonify({"error": "stale_or_invalid_candidate"}), 409
     except Exception:
