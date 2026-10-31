@@ -90,3 +90,10 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
   app_config metadata on the installed add-on before enabling sync.
 - [ ] Prepare a release version with identical root/add-on changelogs and
   merge only after the above release gates pass.
+
+### Read-only integration verification — 2026-10-31
+- [x] Home Assistant MCP access recovered; installed Grocy and Despensa add-ons both report started.
+- [x] Main Alexa todo entity is discoverable and readable via Home Assistant; 8 active items observed. Do not store their names or personal data in the repository.
+- [x] Installed Despensa remains 0.15.0; PR candidate 0.16.0 is **not** deployed.
+- [ ] Validate add/remove and restart recovery against disposable items on the candidate build. Read-only access alone does not establish write semantics.
+- [ ] Validate variant camera, Grocy barcode persistence and shopping API on the installed candidate before merge.
