@@ -121,6 +121,7 @@ class BarcodeTests(unittest.TestCase):
                 self.assertEqual(body["name"], "Aroma vainilla")
                 self.assertIn("Uso repostería", body["description"])
                 self.assertIn("unidades_por_envase=4", body["description"])
+                self.assertIn("\n[Despensa: unidades_por_envase=4]", body["description"])
                 existing.update(body)
                 return {}
             if method == "GET" and path == "objects/product_barcodes":
@@ -133,6 +134,23 @@ class BarcodeTests(unittest.TestCase):
         self.assertEqual(detail["pack_size"], 4)
         self.assertEqual(detail["description"], "Uso repostería")
         self.assertFalse(any(c.args[0] == "POST" for c in api.call_args_list))
+
+    @patch("barcode_stock.grocy")
+    def test_reediting_pack_updates_existing_marker_without_duplicates(self, api):
+        product = {"id": 7, "name": "Vainilla",
+                   "description": "Nota antigua\n[Despensa: unidades_por_envase=4]"}
+        def fake(method, path, body=None):
+            if method == "GET":
+                return product
+            if method == "PUT":
+                self.assertEqual(body["description"].count("unidades_por_envase="), 1)
+                self.assertIn("unidades_por_envase=6", body["description"])
+                product.update(body)
+                return {}
+            raise AssertionError((method, path))
+        api.side_effect = fake
+        barcode_stock.update_product_info(7, "Vainilla", "6")
+        self.assertEqual(product["description"], "Nota antigua\n[Despensa: unidades_por_envase=6]")
 
     @patch("barcode_stock.grocy")
     def test_invalid_pack_count_never_writes(self, api):
