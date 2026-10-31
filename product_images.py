@@ -32,9 +32,10 @@ def lookup_image(barcode):
     if data.get("status") != 1 or str(product.get("code")) != barcode:
         return None
     image = safe_image_url(product.get("image_front_small_url")) or safe_image_url(product.get("image_front_url"))
-    if not image:
+    name = str(product.get("product_name") or "").strip()[:200]
+    if not image and not name:
         return None
-    return {"barcode": barcode, "name": str(product.get("product_name") or ""),
+    return {"barcode": barcode, "name": name,
             "image_url": image,
             "source_url": "https://world.openfoodfacts.org/product/" + barcode,
             "attribution": "Imagen: Open Food Facts (CC BY-SA)"}
