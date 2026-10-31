@@ -1188,7 +1188,7 @@ register_inventory_routes(app, barcode_stock, LOCK)
 
 
 from api_shopping import register_shopping_routes
-register_shopping_routes(app, barcode_stock, shopping_match_queue, LOCK, INGRESS_MODE, csrf_token)
+register_shopping_routes(app, barcode_stock, shopping_match_queue, LOCK, lambda: INGRESS_MODE, csrf_token)
 
 
 @app.get("/")
