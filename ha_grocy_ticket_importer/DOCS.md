@@ -57,3 +57,12 @@ Review this before proposing any explicit merge.
 Purchase factors stored on variants are informational; Grocy's stock unit
 and receipt import conversions are not changed. Alexa ambiguous matches
 remain unresolved and require further integration work and validation.
+
+## Alexa ambiguous-match review queue (development)
+
+With the existing opt-in shopping sync running, candidate suggestions for
+ambiguous Alexa names are persisted to `/config/alexa-match-queue.sqlite3`.
+The Actions → Coincidencias Alexa page allows a manual candidate selection.
+This is **advisory only**: the original free-text shopping entry and sync
+checkpoint are unchanged. Identity-aware conversion is not implemented yet.
+Back up this database along with the generic catalog and receipt ledger.
