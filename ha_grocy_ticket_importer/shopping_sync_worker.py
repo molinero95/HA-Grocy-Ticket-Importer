@@ -5,6 +5,8 @@ Disabled unless SHOPPING_SYNC_ENABLED=1. Run as a single process.
 import fcntl
 import os
 import time
+import threading
+from shopping_sync_events import listen
 from pathlib import Path
 
 from shopping_sync_runtime import load_baseline, reconcile, save_baseline
@@ -54,6 +56,8 @@ def main():
     STATE.parent.mkdir(parents=True, exist_ok=True)
     with open(str(STATE) + ".lock", "a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        wake = threading.Event()
+        threading.Thread(target=listen, args=(wake,), daemon=True).start()
         while True:
             try:
                 result = run_once(dry_run=os.environ.get("SHOPPING_SYNC_ENABLED") != "1")
@@ -64,7 +68,10 @@ def main():
             except Exception as exc:
                 # Do not log exception bodies: remote APIs may include sensitive data.
                 print("Shopping sync failed: " + str(exc)[:180], flush=True)
-            time.sleep(max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
+            wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
+            wake.clear()
+            if wake.wait(timeout=1):
+                wake.clear()
 
 
 if __name__ == "__main__":
