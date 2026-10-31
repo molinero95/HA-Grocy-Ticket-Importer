@@ -34,3 +34,31 @@ The first version is running **locally** in Home Assistant at `/config/grocy_tic
 ## Development
 
 This repository is the intended source of truth for future development. Deployment on Home Assistant should stay separate from source control and keep secrets local.
+
+## Web interface prototype (not yet deployed)
+
+The repository now contains a local-only Flask prototype, `web.py`. It has three inventory actions:
+
+- **Añadir ticket**: upload a PDF or photo, extract with OpenAI, preview the receipt, run a dry-run, then explicitly confirm import.
+- **Añadir producto**: scan/type an EAN/UPC to add one unit to stock; create a new catalog item if the barcode is unknown and a name is supplied.
+- **Eliminar producto (una unidad)**: find a barcode, ask for confirmation, and **consume one stock unit without deleting the catalog product**.
+
+Additional actions: associate a previously unknown barcode to an existing Grocy product (no stock change) and look up a photo by exact barcode from Open Food Facts.
+
+**Image limitation:** photos are shown as a preview in this prototype; they are **not yet persisted to Grocy product pictures**. The Grocy 4.7 image API must be verified before enabling this.
+
+**Deployment limitation:** this currently binds to `127.0.0.1`, is **not a Home Assistant ingress add-on** and is **not reachable from the mobile HA app**. Do not expose the Flask server directly to the internet. A secured HA add-on/ingress deployment is planned.
+
+### Local setup (development only)
+
+Install `Flask` and `python-dotenv`. Keep a local `.env` with the existing `OPENAI_API_KEY`, `GROCY_URL`, `GROCY_API_KEY`, plus a unique `WEB_PASSWORD` and long random `WEB_SESSION_SECRET`. **Do not commit .env.**
+
+Run `python web.py` for local-only access at `127.0.0.1:8765`.
+
+Tests run without calling OpenAI or Grocy:
+
+```bash
+python -m unittest discover -v -p 'test_*.py'
+```
+
+GitHub Actions compiles all Python files and runs tests on push/PR using Python 3.11 and 3.13.
