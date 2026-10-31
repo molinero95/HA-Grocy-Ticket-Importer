@@ -27,6 +27,7 @@ def listen(wake: threading.Event):
                     result = json.loads(ws.recv())
                     if not result.get("success"):
                         raise RuntimeError("HA event subscription failed")
+                ws.settimeout(None)
                 print("Shopping sync HA event listener connected", flush=True)
                 while True:
                     message = json.loads(ws.recv())
