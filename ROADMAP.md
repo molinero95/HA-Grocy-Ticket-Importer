@@ -34,3 +34,16 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
 3. Run tests and inspect CI, including JavaScript syntax checks.
 4. Increment `ha_grocy_ticket_importer/config.yaml` version only when preparing a releasable set of changes.
 5. Report what is committed, what is tested, and what remains unverified; do not imply Home Assistant has installed GitHub's latest version.
+
+
+## P0 — Alexa ↔ Grocy synchronization (PR #2, experimental)
+- [x] Pure normalization/reconciliation planner and initial tests.
+- [x] Initial Alexa/Grocy read/write adapters, durable checkpoint and optional 120-second worker.
+- [x] Package proposed v0.7.11 with `homeassistant_api: true` and disabled-by-default `shopping_sync_enabled`.
+- [ ] Verify `todo.get_items` REST response and Supervisor token access in the actual add-on.
+- [ ] Verify Grocy note-only `objects/shopping_list` create, and delete semantics with actual Grocy 4.7.1.
+- [ ] Test interruption between remote writes and checkpoint, duplicate names, completed items, concurrent edits and quantity preservation.
+- [ ] Run all Python tests and GitHub Actions including packaging/build; verify success explicitly.
+- [ ] Replace hardcoded Alexa entity ID with configurable option and document discovery.
+- [ ] Validate real two-way flow with a disposable item, then activate on Home Assistant; do not touch inventory stock.
+- [ ] Decide how to handle completion vs deletion, rename and quantity changes.
