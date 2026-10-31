@@ -534,10 +534,12 @@ def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", lo
         return {"created": False, "product_id": existing["id"], "name": existing["name"]}
     from product_images import safe_image_url
     safe_url = safe_image_url(image_url)
+    if pack_size > 1:
+        raise BarcodeError("La conversión Pack a Piece aún no es compatible con la API de Grocy; no se ha creado el producto")
     result = grocy("POST", "objects/products", {
         "name": name, "location_id": location_id, "qu_id_stock": unit_id,
         "qu_id_purchase": purchase_id,
-        "qu_factor_purchase_to_stock": pack_size, "min_stock_amount": 0,
+        "min_stock_amount": 0,
         "description": (("[Despensa: imagen=" + safe_url + "]\n") if safe_url else "") +
                        (f"[Despensa: unidades_por_envase={pack_size}]" if pack_size > 1 else ""),
     })
