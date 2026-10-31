@@ -20,6 +20,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
         working-directory: frontend
+      - name: Test React frontend
+        run: npm test
+        working-directory: frontend
       - name: Typecheck and build React frontend
         run: npm run build
         working-directory: frontend
