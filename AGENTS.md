@@ -45,7 +45,7 @@ Check syntax and tests before reporting any stage fixed. GitHub API commit combi
 Check both desktop and narrow mobile layouts. Product-name length must not change the column/position of action buttons.
 
 ## Status / handoff
-As of 2026-10-31 the repository's declared add-on version is **0.7.3** (verify before working); version visibility in Home Assistant can lag GitHub. Recent work includes shopping cart-to-stepper UI, no-scroll updates, Pack/Piece purchase conversion, image previews and fixed raw-Jinja-in-JavaScript syntax. CI success and end-to-end Grocy conversion behavior have **not** been conclusively confirmed from this agent environment. See `ROADMAP.md` for validation work.
+As of 2026-10-31 the repository's declared add-on version is **0.15.0** (verify before working); version visibility in Home Assistant can lag GitHub. Recent work includes shopping cart-to-stepper UI, no-scroll updates, Pack/Piece purchase conversion, image previews and fixed raw-Jinja-in-JavaScript syntax. CI success and end-to-end Grocy conversion behavior have **not** been conclusively confirmed from this agent environment. See `ROADMAP.md` for validation work.
 
 ## Working style
 Favor actionable fixes, tests and concise Spanish summaries with commit/version links. Do not invent successful builds, deployments or real Grocy state. Favor defensive operations that cannot silently corrupt inventory.
@@ -67,3 +67,18 @@ Favor actionable fixes, tests and concise Spanish summaries with commit/version 
 - Do not publish or merge a version bump without corresponding release notes.
 
 - Home Assistant Supervisor displays add-on release notes from `ha_grocy_ticket_importer/CHANGELOG.md` (within the add-on directory), not only the repository-root `CHANGELOG.md`. Maintain both files identically for every version bump.
+
+## Generic variant implementation handoff (PR #5)
+
+- `generic_catalog.py`: additive SQLite metadata with required audited Grocy
+  barcode ownership. Do not bypass the ownership argument.
+- `variant_catalog.py`: verifies a canonical Grocy product, checks both
+  barcode registries, attaches a new barcode only to that canonical product,
+  then persists metadata. Uses `/config/generic_catalog.sqlite3` in ingress.
+- `catalog_audit.py`: GET-only export of Grocy product, barcode, stock, unit,
+  shopping and variant metadata. No automatic product consolidation.
+- Both modules and `web.py` must be mirrored into the add-on and copied by
+  its Dockerfile. CI should compare all mirrors.
+- Product-sheet variant editor has scanner support and CSRF; variant purchase
+  factors are metadata only. The Alexa ambiguity queue and identity mapping
+  are not implemented. Avoid enabling automatic catalog association.
