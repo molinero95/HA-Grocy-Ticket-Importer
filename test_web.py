@@ -174,7 +174,7 @@ class WebTests(unittest.TestCase):
     def test_consume_form_has_amount_and_shopping_checkbox(self):
         self.login()
         r = self.client.get("/?view=remove")
-        self.assertIn(b'/barcode/remove-preview', r.data)
+        self.assertNotIn(b'Consumir producto', r.data)
         self.assertNotIn(b'Confirmar: quitar 1 unidad', r.data)
         self.assertNotIn(b'<strong>Asociar c', self.client.get("/?view=actions").data)
 
@@ -195,7 +195,7 @@ class WebTests(unittest.TestCase):
     def test_action_forms_are_separate(self):
         self.login()
         for view, endpoint in [
-            ("add", b'/barcode/add'), ("remove", b'/barcode/remove-preview'),
+            ("add", b'/barcode/add'),
             ("associate", b'/barcode/associate'), ("photo", b'/barcode/photo'),
             ("ticket", b'/upload')]:
             result = self.client.get("/?view=" + view)
@@ -351,10 +351,10 @@ class WebTests(unittest.TestCase):
                 "unit_id": 2, "units": [{"id": 2, "name": "Unidad"}, {"id": 4, "name": "Kilogramo"}], "stock_amount": "1.25"}):
             sheet = self.client.get("/?view=product&product_id=5")
             self.assertEqual(sheet.status_code, 200)
-            self.assertIn(b'name="pack_size"', sheet.data)
-            self.assertIn(b'value="4"', sheet.data)
-            self.assertIn(b'/product/5/photo', sheet.data)
-            self.assertIn(b'/product/5/edit', sheet.data)
+            self.assertIn(b'id="product-edit-form"', sheet.data)
+            self.assertIn(b'id="product-camera-open"', sheet.data)
+            self.assertIn(b'id="product-photo-upload"', sheet.data)
+            self.assertIn(b'/product/5/edit-all', sheet.data)
             with patch.object(web.barcode_stock, "update_product_info",
                               return_value={"id": 5, "name": "Aroma", "pack_size": 4}) as change:
                 response = self.client.post("/product/5/edit", data={
@@ -396,7 +396,7 @@ class WebTests(unittest.TestCase):
                 "stock_amount": "0", "barcodes": []}):
             r = self.client.get("/?view=product&product_id=5")
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b'id="pack-size-fields" hidden', r.data)
+        self.assertNotIn(b'id="pack-size-fields"', r.data)
 
     def test_product_sheet_displays_quantity_unit_and_barcode_actions(self):
         self.login()
@@ -411,7 +411,7 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'name="unit_id"', response.data)
         self.assertIn(b'name="desired_amount"', response.data)
         self.assertIn(b'step="0.01"', response.data)
-        self.assertIn(b'/product/5/barcode', response.data)
+        self.assertIn(b'/product/5/edit-all', response.data)
 
     def test_stock_edit_saves_without_confirmation(self):
         token = self.login()
@@ -472,7 +472,7 @@ class WebTests(unittest.TestCase):
         self.assertIn(b"1 l\xc3\xadneas", r.data)
         self.assertIn(b"Milk", r.data)
         self.assertIn(b'name="pieces_per_pack_0"', r.data)
-        self.assertIn(b'capture="environment"', r.data)
+        self.assertIn(b'id="ticket-live-camera"', r.data)
         mock_extract.assert_called_once()
         with self.client.session_transaction() as session:
             rid = session["receipt_id"]
