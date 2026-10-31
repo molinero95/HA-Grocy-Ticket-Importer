@@ -16,7 +16,7 @@ def listen(wake: threading.Event):
     ws_url = base.replace("https://", "wss://", 1).replace("http://", "ws://", 1) + "/api/websocket"
     while True:
         try:
-            with websocket.create_connection(ws_url, timeout=30) as ws:
+            with websocket.create_connection(ws_url, timeout=30, http_proxy_host=None, http_proxy_port=None) as ws:
                 if json.loads(ws.recv()).get("type") != "auth_required":
                     raise RuntimeError("Unexpected HA websocket greeting")
                 ws.send(json.dumps({"type": "auth", "access_token": token}))
@@ -41,7 +41,10 @@ def listen(wake: threading.Event):
                           data.get("domain") == "todo" and
                           entity in str(data.get("service_data", {}).get("entity_id", ""))):
                         wake.set()
-        except Exception:
-            # Never log websocket exceptions: they could include authentication details.
-            print("Shopping sync HA event listener disconnected; retrying", flush=True)
+        except Exception as exc:
+            # Diagnostic category only; never expose URLs, tokens or remote error bodies.
+            category = type(exc).__name__
+            if isinstance(exc, websocket.WebSocketBadStatusException):
+                category += " HTTP " + str(exc.status_code)
+            print("Shopping sync HA event listener disconnected (" + category + "); retrying", flush=True)
             time.sleep(15)
