@@ -105,6 +105,44 @@ class WebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'No se ha podido consultar', response.data)
 
+    def test_product_sheet_from_inventory_and_picture_inside_sheet(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "inventory_snapshot", return_value=[
+            {"id": 5, "name": "Aroma de vainilla", "amount": "1", "unit": "Unidad"}]):
+            home = self.client.get("/")
+        self.assertIn(b'view=product', home.data)
+        self.assertIn(b'product_id=5', home.data)
+        self.assertNotIn(b'Buscar fotograf', self.client.get("/?view=actions").data)
+        with patch.object(web.barcode_stock, "product_detail", return_value={
+                "id": 5, "name": "Aroma de vainilla", "pack_size": 4,
+                "description": "", "barcodes": ["1234567890123"]}):
+            sheet = self.client.get("/?view=product&product_id=5")
+            self.assertEqual(sheet.status_code, 200)
+            self.assertIn(b'name="pack_size"', sheet.data)
+            self.assertIn(b'value="4"', sheet.data)
+            self.assertIn(b'/product/5/photo', sheet.data)
+            self.assertIn(b'/product/5/edit', sheet.data)
+            with patch.object(web.barcode_stock, "update_product_info",
+                              return_value={"id": 5, "name": "Aroma", "pack_size": 4}) as change:
+                response = self.client.post("/product/5/edit", data={
+                    "csrf": token, "name": "Aroma", "pack_size": "4"})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(b'Existencias sin cambios', response.data)
+                change.assert_called_once_with(5, "Aroma", "4")
+
+    def test_product_picture_lookup_does_not_edit_product(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "product_detail", return_value={
+                "id": 5, "name": "Aroma", "pack_size": 4, "description": "",
+                "barcodes": ["1234567890123"]}):
+            with patch.object(web.product_images, "lookup_image", return_value={
+                    "name": "Aroma", "image_url": "https://images.openfoodfacts.org/a.jpg",
+                    "source_url": "https://world.openfoodfacts.org/a"}) as lookup:
+                response = self.client.post("/product/5/photo", data={"csrf": token})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(b'https://images.openfoodfacts.org/a.jpg', response.data)
+                lookup.assert_called_once_with("1234567890123")
+
     def test_camera_scanner_available_for_all_barcode_actions(self):
         self.login()
         with patch.object(web.barcode_stock, "list_products", return_value=[]):
