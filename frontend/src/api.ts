@@ -151,3 +151,13 @@ export async function getMergePreview(sourceId: number, targetId: number): Promi
   if (!response.ok) throw new Error(result.error ?? 'No se pudo preparar la comparación');
   return result;
 }
+
+export type MergeProduct = { id: number; name: string; stock_amount: string; unit_id: number; purchase_unit_id: number; pack_size: number; barcodes: string[] };
+export type MergePreview = { source: MergeProduct; target: MergeProduct; source_variants: unknown[]; target_variants: unknown[]; blockers: string[]; can_merge: false };
+export async function getMergePreview(sourceId: number, targetId: number): Promise<MergePreview> {
+  const params = new URLSearchParams({ source_id: String(sourceId), target_id: String(targetId) });
+  const response = await fetch(base + 'catalog/merge-preview?' + params, { credentials: 'same-origin' });
+  const data = await response.json() as MergePreview & { error?: string };
+  if (!response.ok) throw new Error(data.error ?? 'No se pudo comparar los productos');
+  return data;
+}
