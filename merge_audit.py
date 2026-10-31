@@ -25,7 +25,7 @@ def audit_merge(grocy, source, target):
             if not isinstance(rows, list):
                 raise ValueError("Respuesta inesperada")
             refs = [
-                {"id": row.get("id"), "product_id": row.get("product_id"), "field": field}
+                {"id": row.get("id"), "product_id": row.get(field), "field": field}
                 for row in rows if isinstance(row, dict)
                 for field in REFERENCES
                 if str(row.get(field, "")) in {str(x) for x in ids}
