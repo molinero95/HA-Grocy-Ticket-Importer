@@ -1192,7 +1192,7 @@ register_shopping_routes(app, barcode_stock, shopping_match_queue, LOCK, lambda:
 
 
 from api_receipts import register_receipt_routes
-register_receipt_routes(app, DATA, ALLOWED, extract, lambda rid, mode: run_import(rid, mode))
+register_receipt_routes(app, DATA, ALLOWED, extract, lambda rid, mode: run_import(rid, mode), LOCK)
 
 
 @app.get("/")
