@@ -524,5 +524,18 @@ class WebTests(unittest.TestCase):
         self.assertIn("Variante no guardada".encode(), response.data)
         adjust.assert_not_called()
 
+    def test_alexa_match_choice_requires_csrf_and_does_not_touch_stock(self):
+        token = self.login()
+        with patch.object(web.shopping_match_queue, "choose") as choose, \
+             patch.object(web.barcode_stock, "apply_stock_adjustment") as adjust:
+            data = {"key": "arroz", "product_id": "2"}
+            self.assertEqual(self.client.post("/alexa/match/choose", data=data).status_code, 403)
+            data["csrf"] = token
+            response = self.client.post("/alexa/match/choose", data=data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("view=alexa_matches", response.headers["Location"])
+        choose.assert_called_once()
+        adjust.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()
