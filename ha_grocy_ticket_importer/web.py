@@ -1198,6 +1198,28 @@ def product_stock_save(product_id):
     return render("Stock actualizado: " + applied["after"] + ".")
 
 
+def cache_remote_product_photo(product_id, url):
+    from PIL import Image, ImageOps
+    from product_images import safe_image_url
+    if not safe_image_url(url):
+        raise ValueError("Image host not permitted")
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Despensa/0.9"}), timeout=12) as response:
+        if response.geturl() != url or response.headers.get("Content-Length") and int(response.headers["Content-Length"]) > 8 * 1024 * 1024:
+            raise ValueError("Unexpected image response")
+        data = response.read(8 * 1024 * 1024 + 1)
+    if len(data) > 8 * 1024 * 1024:
+        raise ValueError("Image too large")
+    image = Image.open(io.BytesIO(data))
+    if image.format not in ("JPEG", "PNG", "WEBP"):
+        raise ValueError("Unsupported image format")
+    image = ImageOps.exif_transpose(image)
+    image.thumbnail((1200, 1200))
+    PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    temp = PHOTO_DIR / (str(product_id) + ".tmp")
+    image.convert("RGB").save(temp, format="JPEG", quality=85)
+    temp.replace(PHOTO_DIR / (str(product_id) + ".jpg"))
+
+
 @app.get("/product/<int:product_id>/photo/local")
 def local_product_photo(product_id):
     if not (INGRESS_MODE or session.get("auth")):
@@ -1272,6 +1294,7 @@ def product_photo_save(product_id):
         photo = product_images.lookup_image(barcode)
         if photo:
             barcode_stock.save_product_photo(product_id, photo["image_url"])
+            cache_remote_product_photo(product_id, photo["image_url"])
     except Exception:
         return jsonify({"saved": False}), 503
     finally:
