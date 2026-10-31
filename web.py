@@ -323,21 +323,17 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <p class="helper">Máximo dos decimales. Al guardar se actualizarán directamente las existencias en Grocy.</p>
 <button type="submit">Guardar cantidad</button>
 </form>
-<h3>Asociar código de barras</h3>
-<p class="helper">El artículo ya está seleccionado. Asociar un código no cambia las existencias.</p>
+<h3>{% if product.barcodes %}Modificar código de barras{% else %}Añadir código de barras{% endif %}</h3>
+<p class="helper">{% if product.barcodes %}Códigos actuales: {{ product.barcodes|join(", ") }}. Puedes añadir otro código al artículo sin cambiar las existencias.{% else %}El artículo ya está seleccionado. Añadir un código no cambia las existencias.{% endif %}</p>
 <form method="post" action="{{ url_for('product_barcode_add', product_id=product.id) }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <label>Código <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
 <div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía encontrada" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
-<button type="submit">Asociar código a este artículo</button></form>
+<button type="submit">{% if product.barcodes %}Guardar código adicional{% else %}Añadir código{% endif %}</button></form>
 <h3>Fotografía</h3>
 {% if product.image_url %}<p class="helper">Imagen guardada desde Open Food Facts.</p>{% endif %}
 {% if product.barcodes %}
-<form method="post" action="{{ url_for('product_photo', product_id=product.id) }}">
-<input type="hidden" name="csrf" value="{{ csrf }}">
-<button type="submit">📷 Buscar foto por código de barras</button>
-</form>
-<p class="helper">Códigos: {{ product.barcodes|join(', ') }}</p>
+<p class="helper">La foto se busca automáticamente al asociar un código de barras.</p>
 {% else %}
 <p>Este producto aún no tiene un código de barras asociado. Puedes vincularlo en esta misma ficha.</p>
 {% endif %}
@@ -882,6 +878,8 @@ def load_receipt(rid):
 
 @app.get("/")
 def index():
+    if request.args.get("view") == "product" and request.args.get("created") == "1":
+        return render("✅ Producto creado correctamente en Grocy.")
     return render()
 
 @app.post("/login")
@@ -1123,16 +1121,16 @@ def barcode_add():
             image_url=request.form.get("image_url"),
             pack_size=request.form.get("pack_size", "1"))
     except (barcode_stock.BarcodeError, ValueError) as exc:
-        return render("No se pudo crear: " + str(exc)), 400
+        return render("❌ No se pudo crear el producto: " + str(exc)), 400
     except Exception:
         app.logger.exception("catalog_product_create_failed: Grocy product creation or lookup failed")
-        return render("No se pudo completar el alta en Grocy. Comprueba si el producto existe antes de reintentar. Revisa el registro de Despensa (catalog_product_create_failed)."), 502
+        return render("❌ No se pudo completar el alta en Grocy. Comprueba si el producto existe antes de reintentar. Revisa el registro de Despensa (catalog_product_create_failed)."), 502
     finally:
         LOCK.release()
     if not result["created"]:
         return render("El producto ya existe.", existing_product={
             "id": result["product_id"], "name": result["name"]})
-    return redirect(url_for("index", view="product", product_id=result["product_id"]))
+    return redirect(url_for("index", view="product", product_id=result["product_id"], created="1"))
 
 
 @app.post("/barcode/remove-preview")
