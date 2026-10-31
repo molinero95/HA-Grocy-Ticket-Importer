@@ -321,7 +321,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <label for="edit-stock-amount">Cantidad total que tengo</label><input id="edit-stock-amount" name="desired_amount" inputmode="decimal" type="number" step="0.01" min="0" value="{{ product.stock_amount }}" required>
 <h3>Identificación</h3>
 {% if product.barcodes %}<label for="old-product-barcode">Código actual</label><input id="old-product-barcode" name="old_barcode" value="{{ product.barcodes[0] }}" inputmode="numeric" pattern="[0-9]{8,14}">{% endif %}
-<label for="edit-barcode">Nuevo código (opcional)</label><input id="edit-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off">
+<label for="edit-barcode">Nuevo código (opcional)</label><span class="barcode-input-row"><input id="edit-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" placeholder="Escanear o escribir"><button class="scan-trigger" type="button" data-scan-input="edit-barcode" aria-label="Escanear nuevo código de barras con la cámara">📷 Escanear</button></span>
 <p class="helper">Solo se modificará el código de barras si introduces uno nuevo.</p>
 <button id="product-save-all" type="submit">Guardar cambios</button>
 </form>
