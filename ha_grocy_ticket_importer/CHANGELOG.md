@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.2] — 2026-10-31
+
+### Fixed
+- Receipt camera and existing-file pickers now display as distinct labeled buttons rather than native file upload fields.
+- Mobile camera input requests the environment camera via image capture; selection status remains visible.
+
+### Validation
+- Android Home Assistant camera behavior and CI pending.
+
+
 ## [0.8.1] — 2026-10-31
 
 ### Fixed
