@@ -36,6 +36,31 @@ class WebTests(unittest.TestCase):
         self.assertEqual(r.status_code, 302)
         return self.csrf()
 
+    def test_create_product_zero_stock_success(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "create_catalog_product",
+                          return_value={"created": True, "product_id": 42, "name": "Salsa ranchera"} ) as create:
+            response = self.client.post("/barcode/add", data={
+                "csrf": token, "name": "Salsa ranchera", "unit_id": "2",
+                "initial_stock": "0", "barcode": ""
+            })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("product_id=42", response.headers["Location"])
+        self.assertEqual(create.call_args.args[:4], ("Salsa ranchera", "", "2", "0"))
+
+    def test_create_product_backend_error_is_logged(self):
+        token = self.login()
+        with patch.object(web.barcode_stock, "create_catalog_product",
+                          side_effect=RuntimeError("simulated backend failure")):
+            with self.assertLogs(web.app.logger.name, level="ERROR") as logs:
+                response = self.client.post("/barcode/add", data={
+                    "csrf": token, "name": "Salsa ranchera", "unit_id": "2",
+                    "initial_stock": "0"
+                })
+        self.assertEqual(response.status_code, 502)
+        self.assertIn(b"catalog_product_create_failed", response.data)
+        self.assertIn("simulated backend failure", "\\n".join(logs.output))
+
     def test_configuration_needed(self):
         with patch.dict(os.environ, {"WEB_PASSWORD": ""}):
             self.assertEqual(self.client.get("/").status_code, 503)
