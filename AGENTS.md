@@ -54,7 +54,7 @@ Favor actionable fixes, tests and concise Spanish summaries with commit/version 
 ## Alexa ↔ Grocy shopping sync (experimental 0.7.11)
 - Work in PR #2 / `feature/alexa-grocy-sync` until CI and end-to-end integration tests pass; do not enable by default or claim deployed.
 - Source: `shopping_sync.py` (pure planner), `shopping_sync_runtime.py` (checkpoint), `shopping_sync_adapters.py` (HA/Grocy APIs), `shopping_sync_worker.py` (120-second polling).
-- The HA add-on requests `homeassistant_api: true`; use Supervisor token, never commit tokens or list contents. The Alexa entity is currently hardcoded and must become configurable before general release.
+- The HA add-on requests `homeassistant_api: true`; use Supervisor token, never commit tokens or list contents. The Alexa entity is configurable with `alexa_shopping_list_entity`; validate its existence at runtime before enabling.
 - Keep `/data/shopping-sync.json` across upgrades. First run merges, later runs propagate deletions. Do not advance checkpoint after partial failure.
 - IMPORTANT: test Grocy note-only creation and HA `todo.get_items` response parsing against real APIs. Duplicate normalized names, completed items, quantities, external concurrent changes and deletion/re-add conflicts need careful testing. Do not change inventory stock.
 - The runtime is optional behind `shopping_sync_enabled: false`. Do not merge/deploy merely because files compile.
