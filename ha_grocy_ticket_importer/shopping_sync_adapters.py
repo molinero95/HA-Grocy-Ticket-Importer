@@ -115,13 +115,14 @@ def add_grocy_identity(row):
         pid = int(pid)
         if any(int(entry.get("product_id") or 0) == pid for _, entry in current):
             return
-        if any(not entry.get("product_id") and normalize(existing) == normalize(name)
-               for existing, entry in current):
-            raise IdentityConflict("Conflicting Grocy note was added concurrently")
         products = grocy("GET", "objects/products")
         match = next((p for p in products if int(p["id"]) == pid), None)
         if match is None:
             raise IdentityConflict("Selected Grocy product was deleted")
+        reserved_names = {normalize(name), normalize(match["name"])}
+        if any(not entry.get("product_id") and normalize(existing) in reserved_names
+               for existing, entry in current):
+            raise IdentityConflict("Conflicting Grocy note was added concurrently")
         grocy("POST", "stock/shoppinglist/add-product",
               {"product_id": pid, "list_id": 1,
                "product_amount": 1, "qu_id": int(match["qu_id_stock"])})
