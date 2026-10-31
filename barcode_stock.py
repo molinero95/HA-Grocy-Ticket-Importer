@@ -503,6 +503,39 @@ def add_one(barcode, name="", location_id=2, unit_id=2):
            "location_id": int(location_id), "note": "Alta manual por código de barras"})
     return {"product_id": pid, "created": created}
 
+def consume_quantity(barcode, amount, add_to_list=False):
+    """Consume a chosen stock amount; optionally replenish Grocy's shopping list."""
+    name, pid = _get_name_and_id(barcode)
+    try:
+        quantity = Decimal(str(amount).strip().replace(",", "."))
+    except (ValueError, TypeError, ArithmeticError) as exc:
+        raise BarcodeError("Cantidad a consumir no válida") from exc
+    if not quantity.is_finite() or quantity <= 0 or quantity.as_tuple().exponent < -2:
+        raise BarcodeError("Introduce una cantidad mayor que cero, con máximo dos decimales")
+    details = grocy("GET", f"stock/products/{pid}")
+    available = Decimal(str(details.get("stock_amount", 0)))
+    if not available.is_finite() or available < quantity:
+        raise BarcodeError("No hay suficiente stock para consumir esa cantidad")
+    grocy("POST", f"stock/products/{pid}/consume",
+          {"amount": float(quantity), "spoiled": False})
+    shopping_added = False
+    shopping_error = False
+    if add_to_list:
+        try:
+            product = grocy("GET", f"objects/products/{pid}")
+            grocy("POST", "stock/shoppinglist/add-product", {
+                "product_id": pid, "list_id": 1, "product_amount": float(quantity),
+                "qu_id": int(product["qu_id_stock"]),
+            })
+            shopping_added = True
+        except Exception:
+            # Stock was already consumed. Report the partial result, never invite
+            # a blind retry that could consume the same amount a second time.
+            shopping_error = True
+    return {"product_id": pid, "name": name, "amount": str(quantity),
+            "shopping_added": shopping_added, "shopping_error": shopping_error}
+
+
 def remove_one(barcode):
     """Consume exactly one stock unit, preserving the product in the catalog."""
     name, pid = _get_name_and_id(barcode)
