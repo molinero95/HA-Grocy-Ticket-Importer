@@ -202,10 +202,14 @@ def register_catalog_routes(app, barcode_stock, lock):
                 blockers.append("Hay variantes de supermercado que requieren migración de referencias")
             if source["stock_amount"] != "0" or target["stock_amount"] != "0":
                 blockers.append("Las existencias requieren conciliación y verificación de movimientos")
-            blockers.append("Falta auditar referencias en listas de compra, historial y recetas antes de fusionar")
+            from merge_audit import audit_merge
+            audit = audit_merge(barcode_stock.grocy, source, target)
+            blockers.extend(audit["blockers"])
+            if source_variants or target_variants:
+                blockers.append("No existe todavía una migración transaccional de variantes")
             return jsonify({"source": source, "target": target,
                             "source_variants": source_variants, "target_variants": target_variants,
-                            "blockers": blockers, "warnings": blockers, "can_merge": False, "merge_allowed": False})
+                            "audit": audit, "blockers": blockers, "warnings": blockers, "can_merge": False, "merge_allowed": False})
         except (ValueError, TypeError, barcode_stock.BarcodeError) as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception:
