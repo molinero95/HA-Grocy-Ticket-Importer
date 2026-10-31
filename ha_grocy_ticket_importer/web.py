@@ -1179,6 +1179,20 @@ def load_receipt(rid):
         abort(404)
     return json.loads(path.read_text(encoding="utf-8"))
 
+@app.get("/api/v1/products/<int:product_id>/variants")
+def api_v1_product_variants(product_id):
+    """Read variant metadata without changing Grocy's canonical stock."""
+    try:
+        products = barcode_stock.list_products()
+        product = next((p for p in products if p["id"] == product_id), None)
+        if product is None:
+            return jsonify({"error": "product_not_found"}), 404
+        return jsonify({"product": product, "variants": variant_catalog.variants_for_product(product_id)})
+    except Exception:
+        app.logger.exception("api_v1_variants_failed")
+        return jsonify({"error": "variants_unavailable"}), 503
+
+
 @app.get("/api/v1/inventory")
 def api_v1_inventory():
     """Single read-only inventory response; no per-product Grocy requests."""
