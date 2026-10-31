@@ -324,49 +324,36 @@ def update_product_info(product_id, name, pack_size, unit_id=None):
     if not isinstance(product, dict) or int(product.get("id", 0)) != pid:
         raise BarcodeError("Producto inexistente")
     current_unit = int(product["qu_id_stock"])
-    if unit_id in (None, ""):
-        unit_id = current_unit
-    try:
-        unit_id = int(unit_id)
-    except (TypeError, ValueError) as exc:
-        raise BarcodeError("Unidad de medida no válida") from exc
-    if unit_id != current_unit:
-        known_units = {int(unit["id"]) for unit in grocy("GET", "objects/quantity_units")}
-        if unit_id not in known_units:
-            raise BarcodeError("La unidad seleccionada no existe en Grocy")
-        current_stock = Decimal(str(
-            grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
-        if not current_stock.is_finite() or current_stock != 0:
-            raise BarcodeError(
-                "No se puede cambiar de Piece a Pack (ni otras unidades) mientras "
-                "haya existencias. Primero deja el stock a cero en la ficha y "
-                "después cambia la unidad; convierte luego la cantidad manualmente "
-                "para evitar contar piezas como packs.")
     units = {int(u["id"]): str(u["name"]) for u in grocy("GET", "objects/quantity_units")}
     piece_ids = {uid for uid, label in units.items() if label.casefold().strip() in ("piece", "pieces", "unidad", "unidades")}
     pack_ids = {uid for uid, label in units.items() if "pack" in label.casefold()}
     purchase_id = int(product.get("qu_id_purchase") or current_unit)
+    if unit_id in (None, ""):
+        unit_id = purchase_id
+    try:
+        selected_purchase = int(unit_id)
+    except (TypeError, ValueError) as exc:
+        raise BarcodeError("Unidad de medida no válida") from exc
+    if selected_purchase not in units:
+        raise BarcodeError("Unidad de compra no disponible en Grocy")
+    if selected_purchase in pack_ids:
+        if not piece_ids:
+            raise BarcodeError("No existe la unidad Piece en Grocy")
+        desired_stock_unit = sorted(piece_ids)[0]
+    else:
+        desired_stock_unit = selected_purchase
+    if desired_stock_unit != current_unit:
+        current_stock = Decimal(str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
+        if not current_stock.is_finite() or current_stock != 0:
+            raise BarcodeError("No puedes cambiar las unidades de stock con existencias. Si ahora tienes Pack en el inventario, convierte las cantidades a Piece manualmente antes de cambiar.")
+    purchase_id = selected_purchase
+    unit_id = desired_stock_unit
     changes = {"name": name}
     photo_url = saved_photo(product)
     description = PHOTO_MARKER.sub("", PACK_MARKER.sub(
         "", str(product.get("description") or ""))).strip()
     if photo_url:
         description += ("\\n" if description else "") + "[Despensa: imagen=" + photo_url + "]"
-    if unit_id in pack_ids and unit_id != current_unit:
-        if not piece_ids:
-            raise BarcodeError("Crea primero la unidad Piece en Grocy para poder consumir piezas")
-        # Selecting Pack means *purchase* packs, not stock packs.
-        unit_id = sorted(piece_ids)[0]
-        if current_unit != unit_id:
-            current_stock = Decimal(str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
-            if not current_stock.is_finite() or current_stock != 0:
-                raise BarcodeError("La unidad actual tiene existencias. Debes migrarlas a Piece manualmente antes de cambiar a Pack de compra.")
-        purchase_id = next(iter(sorted(pack_ids)))
-    elif purchase_id in pack_ids and unit_id in piece_ids:
-        # Keep the purchasing-unit choice when the stock unit is Piece.
-        purchase_id = purchase_id
-    else:
-        purchase_id = unit_id
     if purchase_id in pack_ids and unit_id in piece_ids:
         changes["qu_id_purchase"] = purchase_id
         changes["qu_factor_purchase_to_stock"] = pack_size
