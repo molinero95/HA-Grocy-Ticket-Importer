@@ -14,6 +14,22 @@ class ShoppingApiTests(unittest.TestCase):
         self.addCleanup(env.stop)
         self.client = web.app.test_client()
 
+
+    def test_receipt_upload_requires_csrf(self):
+        from io import BytesIO
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.extract, "extract") as extract:
+            response = self.client.post("/api/v1/receipts", data={"ticket": (BytesIO(b"sample"), "ticket.pdf")})
+        self.assertEqual(response.status_code, 403)
+        extract.assert_not_called()
+
+    def test_receipt_upload_rejects_invalid_format(self):
+        from io import BytesIO
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.extract, "extract") as extract:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.post("/api/v1/receipts", data={"ticket": (BytesIO(b"sample"), "ticket.exe")}, headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 400)
+        extract.assert_not_called()
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
