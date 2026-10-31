@@ -46,6 +46,7 @@ def identities(alexa_names, grocy_rows, products, choices=None):
 
     grocy = {}
     grocy_notes = set()
+    grocy_display_names = set()
     for name, entry in grocy_rows:
         pid = int(entry.get("product_id") or 0)
         if pid and pid not in by_id:
@@ -53,6 +54,9 @@ def identities(alexa_names, grocy_rows, products, choices=None):
         normalized = normalize(name)
         if not normalized:
             raise IdentityConflict("Empty Grocy shopping entry")
+        if normalized in grocy_display_names:
+            raise IdentityConflict("Duplicate normalized Grocy shopping name")
+        grocy_display_names.add(normalized)
         key = "p:" + str(pid) if pid else "n:" + normalized
         if key in grocy:
             raise IdentityConflict("Duplicate Grocy shopping identity")
