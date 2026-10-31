@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from shopping_match_queue import refresh, pending, choose
+from shopping_match_queue import refresh, pending, choose, resolved_choices
 
 
 class AlexaMatchQueueTests(unittest.TestCase):
@@ -25,6 +25,20 @@ class AlexaMatchQueueTests(unittest.TestCase):
             self.assertEqual(pending(path)[0]["selected_product_id"], 2)
             refresh(path, [], products)
             self.assertEqual(pending(path), [])
+
+    def test_resolved_choices_are_read_only_and_require_live_catalog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "queue.sqlite3"
+            products = [{"id": 1, "name": "Arroz redondo"},
+                        {"id": 2, "name": "Arroz basmati"}]
+            refresh(path, ["Arroz"], products)
+            choose(path, "arroz", 2)
+            expected = {"arroz": {"product_id": 2, "product_name": "Arroz basmati",
+                                  "original_name": "Arroz"}}
+            self.assertEqual(resolved_choices(path, ["Arroz"], products), expected)
+            self.assertEqual(resolved_choices(path, [], products), {})
+            self.assertEqual(resolved_choices(path, ["Arroz"], products[:1]), {})
+            self.assertEqual(pending(path)[0]["selected_product_id"], 2)
 
     def test_exact_and_unmatched_items_are_not_queued(self):
         with tempfile.TemporaryDirectory() as tmp:
