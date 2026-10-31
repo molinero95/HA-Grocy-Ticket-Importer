@@ -454,7 +454,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <a href="{{ url_for('index', view='actions') }}" {% if view not in ('shopping','inventory','product','shopping_add') %}aria-current="page"{% endif %}>⚡ Acciones</a>
 </nav>
 {% endif %}
-<dialog id="scanner-dialog" aria-labelledby="scanner-title">
+<dialog id="scanner-dialog" aria-labelledby="scanner-title" data-photo-lookup-url="{{ url_for('photo_lookup') }}">
 <h2 id="scanner-title">Escanear código de barras</h2>
 <p>Apunta la cámara trasera al código EAN/UPC. No se añadirá ni eliminará stock hasta que confirmes.</p>
 <video id="scanner-video" autoplay muted playsinline></video>
@@ -656,7 +656,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
       }
       if (status) status.textContent = 'Buscando foto automáticamente…';
       try {
-        const url = new URL({{ url_for('photo_lookup')|tojson }}, window.location.href);
+        const url = new URL(dialog.dataset.photoLookupUrl, window.location.href);
         url.searchParams.set('barcode', barcode);
         const response = await fetch(url.toString(), {credentials:'same-origin'});
         if (!response.ok) throw new Error('lookup');
