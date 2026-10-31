@@ -103,6 +103,17 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .section-eyebrow{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:var(--primary);margin:0 0 8px}
 .helper{font-size:.9rem}
 .ticket-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.main-tabs{display:flex;gap:8px;margin:10px 0 18px}
+.main-tabs a{flex:1;display:flex;justify-content:center;align-items:center;text-decoration:none;border:1px solid var(--line);border-radius:13px;background:white;font-weight:700;min-height:52px}
+.main-tabs a[aria-current=page]{background:var(--primary);color:white}
+.action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.back-link{display:inline-flex;align-items:center;min-height:40px;text-decoration:none;font-weight:700}
+.inventory-list{margin-top:14px}
+.inventory-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.inventory-row strong{display:block}
+.inventory-row small{display:block;color:var(--muted);font-size:.79rem;margin-top:3px}
+.inventory-quantity{text-align:right;min-width:80px}
+.quantity-unknown{color:#a34b00;font-size:.85rem}
 .bottom-nav{display:none}
 @media(max-width:600px){
  body{padding:0 12px 96px;font-size:16px}
@@ -119,6 +130,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
  .bottom-nav{position:fixed;display:flex;bottom:0;left:0;right:0;padding:7px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:7px;background:rgba(255,255,255,.97);border-top:1px solid var(--line);box-shadow:0 -5px 18px rgba(0,0,0,.06);z-index:10}
  .bottom-nav a{min-height:49px;flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:.81rem;font-weight:750;color:var(--primary);border-radius:10px;background:var(--soft);text-align:center;padding:4px}
  .bottom-nav a:focus,.bottom-nav a:hover{background:#cfe6d8}
+ .bottom-nav a[aria-current=page]{background:var(--primary);color:#fff}
+ .main-tabs{display:none}
+ .action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .action-link{min-height:108px}
+ .inventory-row{gap:8px}
  #scanner-dialog{padding:14px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -132,12 +148,35 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <button type="submit">Entrar</button></form></section>
 {% else %}
-<div class="hero"><strong>¿Qué quieres hacer?</strong><p>Escanea un producto o sube un ticket de compra.</p>
-<nav class="action-grid" aria-label="Acciones rápidas">
-<a class="action-link" href="#entrada"><span aria-hidden="true">➕</span><strong>Guardar</strong><small>Añadir al stock</small></a>
-<a class="action-link" href="#salida"><span aria-hidden="true">➖</span><strong>Consumir</strong><small>Quitar del stock</small></a>
-<a class="action-link" href="#ticket"><span aria-hidden="true">🧾</span><strong>Ticket</strong><small>Importar compra</small></a>
+<nav class="main-tabs" aria-label="Secciones principales"><a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' %}aria-current="page"{% endif %}>📦 Mi despensa</a><a href="{{ url_for('index', view='actions') }}" {% if view != 'inventory' %}aria-current="page"{% endif %}>⚡ Acciones</a></nav>
+{% if view == 'inventory' %}
+<section class="inventory-panel"><p class="section-eyebrow">Inventario actual</p><h2>Mi despensa</h2>
+{% if inventory_error %}<p role="alert">No se ha podido consultar el inventario de Grocy. Inténtalo más tarde.</p>{% else %}
+<p>{{ inventory|length }} productos registrados. Cantidades leídas de Grocy.</p>
+<label for="inventory-search">Buscar en mi despensa</label><input id="inventory-search" type="search" autocomplete="off" placeholder="Busca leche, arroz, tomate…">
+<div class="inventory-list" id="inventory-list">
+{% for p in inventory %}
+<article class="inventory-row" data-name="{{ p.name }}">
+<div><strong>{{ p.name }}</strong><small>Producto #{{ p.id }}</small></div>
+<div class="inventory-quantity">{% if p.amount is none %}<span class="quantity-unknown">Sin datos</span>{% else %}<strong>{{ p.amount }}</strong><small>{{ p.unit }}</small>{% endif %}</div>
+</article>
+{% endfor %}
+</div><p id="inventory-empty" hidden>No hay productos que coincidan con la búsqueda.</p>
+{% endif %}
+</section>
+{% elif view == 'actions' %}
+<div class="hero"><strong>¿Qué quieres hacer?</strong><p>Elige una operación. Cada una tiene su propia pantalla.</p>
+<nav class="action-grid" aria-label="Acciones de Despensa">
+<a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Guardar producto</strong><small>Añadir al stock</small></a>
+<a class="action-link" href="{{ url_for('index', view='remove') }}"><span aria-hidden="true">➖</span><strong>Consumir producto</strong><small>Quitar del stock</small></a>
+<a class="action-link" href="{{ url_for('index', view='associate') }}"><span aria-hidden="true">🔗</span><strong>Asociar código</strong><small>Producto existente</small></a>
+<a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
+<a class="action-link" href="{{ url_for('index', view='photo') }}"><span aria-hidden="true">📷</span><strong>Buscar fotografía</strong><small>Vista previa</small></a>
 </nav></div>
+{% else %}
+<p><a class="back-link" href="{{ url_for('index', view='actions') }}">← Volver a acciones</a></p>
+{% endif %}
+{% if view == 'add' %}
 <section id="entrada"><p class="section-eyebrow">Entrada de productos</p><h2>Guardar producto en despensa</h2>
 <form method="post" action="{{ url_for('barcode_add') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -145,6 +184,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <label>Nombre (solo si es nuevo) <input name="name" maxlength="200" placeholder="Leche entera 1 L"></label>
 <button type="submit">Añadir 1 al stock</button></form>
 <p>Si el código no está registrado, indica un nombre para crear el producto. Si existe, se reutiliza.</p></section>
+{% endif %}
+{% if view == 'associate' %}
 <section id="asociar"><p class="section-eyebrow">Catálogo</p><h2>Asociar código a producto existente</h2>
 <form method="post" action="{{ url_for('barcode_associate') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -162,6 +203,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <button type="submit" id="associate-submit" disabled>Asociar código sin cambiar stock</button></form>
 <p>Permite reconocer al instante productos ya registrados y evita duplicados.</p>
 </section>
+{% endif %}
+{% if view == 'photo' %}
 <section id="foto"><p class="section-eyebrow">Fotografías</p><h2>Buscar foto por código de barras</h2>
 <form method="post" action="{{ url_for('barcode_photo') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -172,6 +215,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">{{ photo.attribution }}</a></p>
 <p>Esta foto se muestra como vista previa. Todavía no se guarda en la ficha de Grocy.</p>
 {% endif %}</section>
+{% endif %}
+{% if view == 'remove' %}
 <section id="salida"><p class="section-eyebrow">Salida de productos</p><h2>Consumir un producto</h2>
 <form method="post" action="{{ url_for('barcode_remove_preview') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -186,6 +231,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <input type="hidden" name="barcode" value="{{ remove_candidate.barcode }}">
 <button type="submit">Confirmar: quitar 1 unidad</button></form></section>
 {% endif %}
+{% endif %}
+{% if view == 'ticket' %}
 <section id="ticket"><p class="section-eyebrow">Compras</p><h2>Subir ticket</h2><p>PDF, JPG o PNG (máximo 12 MiB). La subida no modifica Grocy.</p>
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -207,8 +254,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <button type="submit">Confirmar importación</button></form>{% endif %}
 {% endif %}
 </section>{% endif %}
+{% endif %}
 <nav class="bottom-nav" aria-label="Navegación móvil">
-<a href="#entrada">➕ Guardar</a><a href="#salida">➖ Consumir</a><a href="#ticket">🧾 Ticket</a>
+<a href="{{ url_for('index', view='inventory') }}" {% if view == 'inventory' %}aria-current="page"{% endif %}>📦 Mi despensa</a>
+<a href="{{ url_for('index', view='actions') }}" {% if view != 'inventory' %}aria-current="page"{% endif %}>⚡ Acciones</a>
 </nav>
 {% endif %}
 <dialog id="scanner-dialog" aria-labelledby="scanner-title">
@@ -322,6 +371,26 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </script>
 <script>
 (() => {
+  const search = document.getElementById('inventory-search');
+  if (!search) return;
+  const items = Array.from(document.querySelectorAll('.inventory-row'));
+  const empty = document.getElementById('inventory-empty');
+  const norm = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+  function update() {
+    const query = norm(search.value.trim());
+    let count = 0;
+    for (const item of items) {
+      const show = norm(item.dataset.name).includes(query);
+      item.hidden = !show;
+      if (show) count++;
+    }
+    empty.hidden = count > 0 || !query;
+  }
+  search.addEventListener('input', update);
+})();
+</script>
+<script>
+(() => {
   const search = document.getElementById('product-search');
   if (!search) return;
   const options = Array.from(document.querySelectorAll('.product-result'));
@@ -377,11 +446,39 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
+VIEWS = {"inventory", "actions", "add", "remove", "associate", "ticket", "photo"}
+POST_VIEWS = {
+    "barcode_add": "add",
+    "barcode_associate": "associate",
+    "barcode_remove_preview": "remove",
+    "barcode_remove": "remove",
+    "barcode_photo": "photo",
+    "upload": "ticket",
+    "preview": "ticket",
+    "commit": "ticket",
+}
+
+def current_view():
+    if request.endpoint == "index":
+        candidate = request.args.get("view", "inventory")
+    else:
+        candidate = POST_VIEWS.get(request.endpoint, "inventory")
+    return candidate if candidate in VIEWS else "inventory"
+
 def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None):
+    view = current_view()
+    inventory, inventory_error = [], False
+    if view == "inventory" and (INGRESS_MODE or session.get("auth")):
+        try:
+            inventory = barcode_stock.inventory_snapshot()
+        except Exception:
+            inventory_error = True
     return render_template_string(PAGE, csrf=csrf_token(), message=message,
                                   receipt=receipt, rid=rid, simulation=simulation,
                                   can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
-                                  products=product_choices(), authenticated=INGRESS_MODE or bool(session.get("auth")),
+                                  view=view, inventory=inventory, inventory_error=inventory_error,
+                                  products=product_choices() if view == "associate" else [],
+                                  authenticated=INGRESS_MODE or bool(session.get("auth")),
                                   ingress_mode=INGRESS_MODE)
 
 def receipt_path(rid):
