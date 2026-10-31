@@ -94,6 +94,21 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         remove.assert_called_once_with(7, "8412345678901")
 
+    def test_merge_preview_rejects_same_product_without_writes(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "product_detail") as detail:
+            response = self.client.get("/api/v1/catalog/merge-preview?source_id=7&target_id=7")
+        self.assertEqual(response.status_code, 400)
+        detail.assert_not_called()
+
+    def test_merge_preview_is_read_only_and_warns_on_different_units(self):
+        source = {"id": 1, "name": "Leche", "stock_amount": "2", "unit_id": 1, "pack_size": 1, "barcodes": ["8412345678901"]}
+        target = {"id": 2, "name": "Leche entera", "stock_amount": "3", "unit_id": 2, "pack_size": 1, "barcodes": []}
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "product_detail", side_effect=[source, target]), patch("variant_catalog.variants_for_product", return_value=[]):
+            response = self.client.get("/api/v1/catalog/merge-preview?source_id=1&target_id=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json["merge_allowed"])
+        self.assertTrue(any("unidades" in warning for warning in response.json["warnings"]))
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
