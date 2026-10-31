@@ -113,9 +113,9 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <button type="submit">Extraer y revisar</button></form></section>
 {% if receipt %}
 <section><h2>{{ receipt.merchant }} · {{ receipt.receipt_date }} · {{ receipt.total }} €</h2>
-<p>{{ receipt.items|length }} líneas. Las marcadas como revisión se omitirán al importar.</p>
+<p>{{ receipt['items']|length }} líneas. Las marcadas como revisión se omitirán al importar.</p>
 <table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio/u</th><th>Estado</th></tr></thead><tbody>
-{% for item in receipt.items %}<tr><td>{{ item.name }}</td><td>{{ item.quantity }}</td>
+{% for item in receipt['items'] %}<tr><td>{{ item.name }}</td><td>{{ item.quantity }}</td>
 <td>{{ item.unit_price }} €</td><td class="{{ 'review' if item.ambiguous else '' }}">
 {{ 'Revisar: ' + item.reason if item.ambiguous else 'Propuesto' }}</td></tr>{% endfor %}
 </tbody></table>
