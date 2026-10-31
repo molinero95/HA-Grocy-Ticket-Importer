@@ -500,5 +500,42 @@ class WebTests(unittest.TestCase):
             run.assert_called_once_with(rid, "--commit")
             self.assertEqual(self.client.post("/commit/" + rid, data={"csrf": token}).status_code, 403)
 
+    def test_variant_save_requires_csrf_and_redirects_to_same_generic(self):
+        token = self.login()
+        with patch.object(web.variant_catalog, "save_variant",
+                          return_value={"product_id": 42, "barcode": "8480000000001", "name": "Leche"}) as save:
+            data = {"barcode": "8480000000001", "name": "Leche", "units_per_purchase": "1"}
+            self.assertEqual(self.client.post("/product/42/variant", data=data).status_code, 403)
+            data["csrf"] = token
+            response = self.client.post("/product/42/variant", data=data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("product_id=42", response.headers["Location"])
+        save.assert_called_once()
+
+    def test_variant_conflict_does_not_write_stock(self):
+        token = self.login()
+        with patch.object(web.variant_catalog, "save_variant",
+                          side_effect=ValueError("Este código pertenece a otro producto")), \
+             patch.object(web.barcode_stock, "product_detail", side_effect=ValueError("not available")), \
+             patch.object(web.barcode_stock, "apply_stock_adjustment") as adjust:
+            response = self.client.post("/product/42/variant", data={
+                "csrf": token, "barcode": "8480000000001", "name": "Leche"})
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Variante no guardada".encode(), response.data)
+        adjust.assert_not_called()
+
+    def test_alexa_match_choice_requires_csrf_and_does_not_touch_stock(self):
+        token = self.login()
+        with patch.object(web.shopping_match_queue, "choose") as choose, \
+             patch.object(web.barcode_stock, "apply_stock_adjustment") as adjust:
+            data = {"key": "arroz", "product_id": "2"}
+            self.assertEqual(self.client.post("/alexa/match/choose", data=data).status_code, 403)
+            data["csrf"] = token
+            response = self.client.post("/alexa/match/choose", data=data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("view=alexa_matches", response.headers["Location"])
+        choose.assert_called_once()
+        adjust.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()

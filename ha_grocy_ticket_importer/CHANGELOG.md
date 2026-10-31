@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.16.0] — 2026-10-31
+
+### Added
+- Generic Grocy products can register supermarket variants with barcode, brand,
+  store, display name and purchase factor in persistent add-on SQLite metadata.
+  Barcode ownership is checked against Grocy before association; no stock
+  consolidation, product deletion or automatic inventory migration is performed.
+- Mobile product sheet supports barcode camera scanning for variants, and
+  Actions offers a read-only JSON audit of products, barcodes, stock, units,
+  shopping references and variant metadata.
+- Alexa review screen persists ambiguous-name suggestions and explicit product
+  selections, without renaming Alexa entries or rewriting Grocy shopping notes.
+- Identity-aware Alexa/Grocy synchronization uses canonical product IDs and
+  distinct free-text notes, with v2 atomic checkpoints and per-list review
+  queues. First v2 sync is a non-destructive union.
+
+### Safety and migration
+- Unresolved Alexa suggestions cannot create duplicate free-text shopping notes
+  when a plausible canonical product is already on Grocy's shopping list;
+  synchronization pauses for manual review instead.
+- Sync remains **disabled by default**. The worker refuses stale choices,
+  duplicate identities, conflicting Grocy notes and concurrent quantity
+  changes; it verifies both remote lists before advancing the checkpoint.
+- Back up `/config/generic_catalog.sqlite3`, existing receipt ledger,
+  `/config/alexa-match-queue*.sqlite3` and `/data/shopping-sync*.json`
+  before upgrading.
+- Legacy v1 checkpoints and unscoped Alexa review choices are retained, not
+  automatically migrated. The first v2 run may reintroduce previously removed
+  free-text items; reselect old manual choices for the configured Alexa list.
+
+### Known limitations / validation
+- Variant purchase factors are informational and do not yet alter receipt
+  conversion. Existing Grocy product IDs and stock are not merged.
+- Automated tests and Docker packaging run in CI; real Grocy 4.7.1 and
+  Home Assistant Alexa todo write semantics, camera UX and persistence across
+  add-on upgrades require end-to-end validation before enabling sync.
+- This entry documents a PR release candidate, **not a confirmed deployment**.
+
 ## [0.15.0] — 2026-10-31
 
 ### Changed

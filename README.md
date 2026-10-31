@@ -8,17 +8,25 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 
 > **Estado:** versión de desarrollo en GitHub; el complemento ya ha sido detectado por Home Assistant, pero cada actualización y cambio de Grocy requiere validación. No considerar el pipeline verde sin comprobar una ejecución concreta.
 
-> **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. No se suben archivos de imagen a Grocy y puede haber productos sin fotografía.\n\n> **Controles rápidos:** los productos fuera de la lista muestran un botón `🛒 Añadir`; al pulsarlo se convierte en `− cantidad +`. Cuando la cantidad vuelve a cero, reaparece el carrito. Todo se actualiza sin recargar la página ni cambiar la posición de desplazamiento. Los cambios se envían a Grocy y se reflejan en la misma fila; si fallan, se muestra un error sin falsear la cantidad.\n\n## Funcionalidades
+> **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. No se suben archivos de imagen a Grocy y puede haber productos sin fotografía.
 
-- **Lista de la compra (inicio):** sincronizada con la lista predeterminada de Grocy; marcar artículos como comprados o quitarlos sin modificar el inventario.\n- **Mi despensa:** búsqueda de productos y cantidades actuales obtenidas de Grocy, con controles `− / +` directamente en cada fila para consultar y modificar la cantidad de la lista de compra. Los productos en kg cambian en pasos de 0,10 kg (100 g) y los demás en pasos de 1 unidad.
-- **Ficha de producto:** editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.\n- **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
+> **Controles rápidos:** los productos fuera de la lista muestran un botón `🛒 Añadir`; al pulsarlo se convierte en `− cantidad +`. Cuando la cantidad vuelve a cero, reaparece el carrito. Todo se actualiza sin recargar la página ni cambiar la posición de desplazamiento. Los cambios se envían a Grocy y se reflejan en la misma fila; si fallan, se muestra un error sin falsear la cantidad.
+
+## Funcionalidades
+
+- **Lista de la compra (inicio):** sincronizada con la lista predeterminada de Grocy; marcar artículos como comprados o quitarlos sin modificar el inventario.
+- **Mi despensa:** búsqueda de productos y cantidades actuales obtenidas de Grocy, con controles `− / +` directamente en cada fila para consultar y modificar la cantidad de la lista de compra. Los productos en kg cambian en pasos de 0,10 kg (100 g) y los demás en pasos de 1 unidad.
+- **Ficha de producto:** editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.
+- **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
 - **Alta de productos nuevos:** desde Acciones → Añadir producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
 - **Acciones separadas:** añadir un producto nuevo, consumir una cantidad elegida (con opción de añadir la misma cantidad a la lista de la compra) e importar un ticket. La asociación de códigos se realiza desde cada ficha de producto.
 - **Escáner de cámara:** lectura EAN/UPC desde un móvil compatible, con entrada manual alternativa.
 - **Tickets:** subir PDF/JPG/PNG, extraer líneas con OpenAI, revisar, simular y confirmar la importación.
 - **Historial de importaciones:** SQLite persistente para evitar registrar de nuevo líneas de tickets ya importadas.
 
-> Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; la edición avanzada puede usar otras unidades si tienen una conversión válida. Añadir a la lista no registra entrada de existencias.\n\n> **Pack y Piece:** Pack es unidad de compra; Piece es unidad de stock y consumo. Un pack de 5 debe registrar 5 piezas al comprarlo, no 1 pack como stock. **No se convierte automáticamente el stock existente** al cambiar configuraciones. Las fotos encontradas por código se guardan como referencias en la descripción del producto y la conversión Pack/Piece sigue pendiente de validación integral en Grocy. Consulta DECISIONS.md y ROADMAP.md.
+> Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; la edición avanzada puede usar otras unidades si tienen una conversión válida. Añadir a la lista no registra entrada de existencias.
+
+> **Pack y Piece:** Pack es unidad de compra; Piece es unidad de stock y consumo. Un pack de 5 debe registrar 5 piezas al comprarlo, no 1 pack como stock. **No se convierte automáticamente el stock existente** al cambiar configuraciones. Las fotos encontradas por código se guardan como referencias en la descripción del producto y la conversión Pack/Piece sigue pendiente de validación integral en Grocy. Consulta DECISIONS.md y ROADMAP.md.
 
 ## Instalar desde Home Assistant (repositorio comunitario)
 
@@ -83,23 +91,71 @@ Este proyecto se distribuye bajo la **licencia MIT**. Consulta el archivo [LICEN
 Documentación específica del complemento: [ha_grocy_ticket_importer/DOCS.md](ha_grocy_ticket_importer/DOCS.md).
 
 
-## Sincronización Alexa ↔ Grocy (experimental, v0.7.11)
+## Sincronización Alexa ↔ Grocy (experimental, PR #5)
 
-La integración **Alexa Devices** de Home Assistant debe estar configurada y mostrar una entidad de lista de compra. La sincronización trabaja exclusivamente con la lista principal de Alexa y la lista predeterminada de Grocy (ID 1). No sincroniza otras listas de Alexa, el historial completado ni las existencias del inventario.
+La integración **Alexa Devices** de Home Assistant necesita una entidad `todo.*`
+para la lista elegida. Despensa sincroniza exclusivamente esa lista y la lista
+predeterminada de Grocy (ID 1). Se excluyen los artículos completados de Alexa.
+Configura `alexa_shopping_list_entity` y habilita `shopping_sync_enabled`
+**solo después de validar el flujo real**. Por defecto sigue desactivado.
+El proceso combina eventos con comprobaciones periódicas (120 segundos por
+defecto). No modifica existencias ni productos del catálogo.
 
-El complemento solicita `homeassistant_api: true` para utilizar el token de Supervisor y comunicarse con Home Assistant internamente; no es necesario copiar tokens a GitHub. La configuración `shopping_sync_enabled` está **desactivada por defecto**. El proceso de sincronización se inicia al arrancar el complemento solo cuando esta opción está activada y revisa los cambios cada 120 segundos.
+### Identidades, notas y conflictos
 
-**No activar aún en producción:** la integración de escritura de Grocy y el formato de respuesta del servicio de listas de Home Assistant requieren una prueba de extremo a extremo. La PR #2 es experimental y no se ha desplegado. La versión instalada puede seguir siendo 0.7.10.
+- Los productos se identifican por su **ID canónico de Grocy**, no por su nombre.
+  Las coincidencias exactas y únicas pueden asociarse a ese ID; los nombres
+  desconocidos o ambiguos se mantienen como **notas de texto libre**.
+- En **Acciones → Coincidencias Alexa**, una elección manual permite asociar
+  un nombre ambiguo a un producto. El nombre original de Alexa no se renombra.
+  La selección puede emplearse en el siguiente ciclo de sincronización, pero
+  **nunca elimina ni convierte una nota de Grocy**.
+- Si una nota existente coincide con el nombre original o canónico de un
+  producto seleccionado, se detiene la operación para revisión; no se crean
+  duplicados ni se fusionan artículos automáticamente.
+- El primer ciclo del nuevo sincronizador une las listas sin borrar artículos.
+  Los siguientes propagan altas y eliminaciones por identidad tras un
+  checkpoint confirmado. Antes de borrar una entrada de Grocy se vuelve a
+  verificar su ID, cantidad y nota. Si cambian, se detiene la operación.
+- Se comprueban de nuevo ambas listas después de escribir y solo entonces se
+  guarda el checkpoint. Las interrupciones no avanzan el estado. Una elección
+  obsoleta o un cambio inesperado de identidad bloquea el ciclo hasta revisarlo.
+- No se sincronizan cantidades, unidades, estados de compra ni cambios de nombre.
+  Una eliminación de la lista no borra productos ni modifica inventario.
 
-### Comportamiento previsto
+### Persistencia y migración
 
-- Primer ciclo: combina los artículos pendientes de ambas listas sin borrar los existentes.
-- Ciclos posteriores: detecta altas y eliminaciones mediante un registro de nombres normalizados; evita duplicados por mayúsculas, espacios y tildes.
-- Un artículo de Alexa sin producto en el catálogo de Grocy se añade como nota de compra, sin generar stock ni crear un producto.
-- Si una escritura falla, no se avanza el registro persistente; se vuelve a comprobar el estado remoto en el siguiente intento.
-- **Limitaciones actuales:** la identidad es por nombre, no por ID; no se sincronizan cantidades, unidades, compras completadas ni renombrados. Los nombres duplicados equivalentes producen error de validación para evitar pérdidas. El borrado propagado elimina la entrada de la lista, no el producto del catálogo.
+Cada entidad Alexa tiene su propio checkpoint v2 en
+`/data/shopping-sync-<hash>-identity-v2.json` y su cola de revisión en
+`/config/alexa-match-queue-<hash>.sqlite3`. Los nombres de archivo se
+derivan de un hash del identificador de la entidad; no se registra su contenido.
+Los archivos v1 y la cola antigua **se conservan sin migración automática**.
+Al actualizar desde v1, el primer ciclo v2 vuelve a ser una unión conservadora;
+puede reintroducir una nota que se había eliminado anteriormente. Las elecciones
+manuales de la cola antigua deberán revisarse de nuevo, evitando asignarlas
+accidentalmente a otra lista Alexa. Incluye ambos directorios en la copia de
+seguridad de Home Assistant.
 
-El estado se guarda en `/data/shopping-sync.json`. Conservar este archivo durante las actualizaciones; eliminarlo provoca una nueva unión inicial y puede reintroducir artículos. Ver [DOCS.md](ha_grocy_ticket_importer/DOCS.md) y [ROADMAP.md](ROADMAP.md) antes de activar la función.
+**Pendiente para publicar:** validar respuestas de Home Assistant, endpoints de
+Grocy 4.7.1, persistencia tras actualización y pruebas de extremo a extremo con
+artículos descartables. No habilitar el sincronizador únicamente porque pase CI.
 
+## Productos genéricos y variantes (desarrollo, PR #5)
 
-**Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.
+Un artículo de Grocy es el **producto genérico** (por ejemplo, «Leche entera»).
+En su ficha pueden registrarse variantes por supermercado con nombre, marca,
+EAN/UPC y unidades por compra. El escáner de cámara introduce el código.
+Todas las variantes pertenecen al **mismo ID de Grocy**, por lo que comparten
+existencias. La asociación exige comprobar la propiedad del código en Grocy y
+en la base local, y rechaza conflictos sin fusionar artículos.
+
+El metadato se conserva en `/config/generic_catalog.sqlite3`. En
+**Acciones → Detectar duplicados** se puede descargar una auditoría JSON de
+solo lectura con productos, códigos, unidades, existencias, referencias de
+compra y variantes. Es necesaria una revisión y autorización explícita antes
+de consolidar productos existentes. No subas exportaciones reales a GitHub.
+
+**Limitación:** las unidades por compra de cada variante son informativas;
+no modifican todavía la conversión de Grocy ni la importación de tickets.
+No se migran existencias automáticamente. El editor y la persistencia deben
+validarse en la instalación real antes de publicar la versión.

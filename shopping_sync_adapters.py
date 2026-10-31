@@ -99,3 +99,80 @@ def remove_grocy(name):
     for existing_name, entry in grocy_entries():
         if normalize(existing_name) == normalize(name):
             grocy("DELETE", "objects/shopping_list/" + str(int(entry["id"])))
+
+
+def add_grocy_identity(row):
+    """Add a canonical Grocy product by ID, or a genuine free-text note.
+
+    Do not rewrite existing entries or amounts. A concurrent note/product
+    collision fails closed rather than silently converting shopping items.
+    """
+    from shopping_identity_sync import IdentityConflict
+    pid = row.get("product_id")
+    name = row["name"]
+    current = grocy_entries()
+    if pid is not None:
+        pid = int(pid)
+        if any(int(entry.get("product_id") or 0) == pid for _, entry in current):
+            return
+        products = grocy("GET", "objects/products")
+        match = next((p for p in products if int(p["id"]) == pid), None)
+        if match is None:
+            raise IdentityConflict("Selected Grocy product was deleted")
+        reserved_names = {normalize(name), normalize(match["name"])}
+        if any(not entry.get("product_id") and normalize(existing) in reserved_names
+               for existing, entry in current):
+            raise IdentityConflict("Conflicting Grocy note was added concurrently")
+        grocy("POST", "stock/shoppinglist/add-product",
+              {"product_id": pid, "list_id": 1,
+               "product_amount": 1, "qu_id": int(match["qu_id_stock"])})
+    else:
+        if any(normalize(existing) == normalize(name) for existing, _ in current):
+            # An existing product with the same name is not an equivalent note.
+            if any(entry.get("product_id") for existing, entry in current
+                   if normalize(existing) == normalize(name)):
+                raise IdentityConflict("A Grocy product now conflicts with the note")
+            return
+        products = grocy("GET", "objects/products")
+        if any(normalize(p["name"]) == normalize(name) for p in products):
+            raise IdentityConflict("Grocy catalog changed while adding a note")
+        grocy("POST", "objects/shopping_list",
+              {"shopping_list_id": 1, "note": name, "amount": 1})
+
+
+def remove_grocy_identity(row):
+    """Delete only the exact shopping-list entry originally observed.
+
+    Never change inventory; fail if quantity, note or product ownership changed
+    after planning. This also prevents deleting another row with a similar name.
+    """
+    from decimal import Decimal, InvalidOperation
+    from shopping_identity_sync import IdentityConflict
+    current = [(name, entry) for name, entry in grocy_entries()
+               if int(entry["id"]) == int(row["entry_id"])]
+    if not current:
+        return  # Already deleted; final snapshot verification still required.
+    _, entry = current[0]
+    try:
+        expected_amount = Decimal(str(row["amount"]))
+        actual_amount = Decimal(str(entry.get("amount")))
+    except (InvalidOperation, TypeError):
+        raise IdentityConflict("Cannot verify shopping quantity") from None
+    if (int(entry.get("product_id") or 0) != int(row.get("product_id") or 0)
+            or str(entry.get("note") or "") != str(row.get("note") or "")
+            or actual_amount != expected_amount):
+        raise IdentityConflict("Shopping entry changed since planning")
+    grocy("DELETE", "objects/shopping_list/" + str(int(entry["id"])))
+
+
+def remove_alexa_identity(row):
+    """Remove one uniquely identified active Alexa item, never duplicates."""
+    from shopping_identity_sync import IdentityConflict
+    matches = [item for item in alexa_items()
+               if normalize(item["summary"]) == normalize(row["name"])]
+    if len(matches) > 1:
+        raise IdentityConflict("Duplicate Alexa entries appeared during sync")
+    if matches:
+        item = matches[0]
+        ha_service("remove_item", {"entity_id": ALEXA_LIST,
+                                   "item": item.get("uid") or item["summary"]})

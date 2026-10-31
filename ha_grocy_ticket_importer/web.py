@@ -20,6 +20,9 @@ from werkzeug.utils import secure_filename
 import extract
 import barcode_stock
 import product_images
+import variant_catalog
+import catalog_audit
+import shopping_match_queue
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(os.environ.get("GROCY_ENV_FILE", str(ROOT / ".env")))
@@ -261,7 +264,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <section class="inventory-panel"><p class="section-eyebrow">Inventario actual</p><h2>Mi despensa</h2>
 {% if inventory_error %}<p role="alert">No se ha podido consultar el inventario de Grocy. Inténtalo más tarde.</p>{% else %}
 <p>{{ inventory|length }} productos registrados. Cantidades leídas de Grocy.</p>
-<label for="inventory-search">Buscar por nombre o código de barras</label><div class="barcode-input-row"><input id="inventory-search" type="search" autocomplete="off" placeholder="Nombre o código EAN / UPC"><button type="button" class="scan-trigger" data-scan-input="inventory-search">📷 Escanear</button></div><p id="inventory-barcode-status" role="status" aria-live="polite"></p><div class="inventory-list" id="inventory-list">
+<label for="inventory-search">Buscar por nombre o código de barras</label><div class="barcode-input-row"><input id="inventory-search" data-lookup-url="{{ url_for('inventory_barcode_lookup') }}" type="search" autocomplete="off" placeholder="Nombre o código EAN / UPC"><button type="button" class="scan-trigger" data-scan-input="inventory-search">📷 Escanear</button></div><p id="inventory-barcode-status" role="status" aria-live="polite"></p><div class="inventory-list" id="inventory-list">
 {% for p in inventory %}
 <article class="inventory-row pantry-row" data-name="{{ p.name }}" data-product-id="{{ p.id }}">
 <div class="pantry-info product-name-with-photo">{% if p.image_url %}<img class="product-thumb" src="{{ p.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}<a class="product-detail-link" href="{{ url_for('index', view='product', product_id=p.id) }}"><strong>{{ p.name }}</strong><small>Ficha →</small></a></div>
@@ -286,9 +289,30 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <a class="action-link" href="{{ url_for('index', view='add') }}"><span aria-hidden="true">➕</span><strong>Añadir producto</strong><small>Crear artículo nuevo</small></a>
 <a class="action-link" href="{{ url_for('index', view='ticket') }}"><span aria-hidden="true">🧾</span><strong>Subir ticket</strong><small>Importar compra</small></a>
 <a class="action-link" href="{{ url_for('index', view='duplicates') }}"><span aria-hidden="true">🔎</span><strong>Detectar duplicados</strong><small>Revisar artículos similares</small></a>
+<a class="action-link" href="{{ url_for('index', view='alexa_matches') }}"><span aria-hidden="true">🗣️</span><strong>Coincidencias Alexa</strong><small>Revisar nombres ambiguos</small></a>
 </nav></div>
 {% else %}
 <p><a class="back-link" href="{{ url_for('index', view='inventory') if view == 'product' else url_for('index', view='actions') }}">← {{ 'Volver a mi despensa' if view == 'product' else 'Volver a acciones' }}</a></p>
+{% endif %}
+{% if view == 'alexa_matches' %}
+<section><p class="section-eyebrow">Alexa · Revisión segura</p><h2>Coincidencias pendientes</h2>
+<p class="helper">Se conservan los nombres originales de Alexa y las notas de Grocy. Elegir un producto guarda una propuesta. Si la sincronización está activada, se usará solo cuando no haya conflictos; nunca convierte notas existentes ni modifica existencias.</p>
+{% if pending_matches_error %}<p role="alert">No se pudo leer la cola de coincidencias.</p>
+{% elif not pending_matches %}<p>No hay coincidencias ambiguas pendientes. La lista se analiza cuando está activa la sincronización con Alexa.</p>
+{% else %}
+{% for match in pending_matches %}
+<div class="ticket-review-item"><strong>{{ match.name }}</strong>
+{% if match.selection_stale %}<p role="alert">La propuesta anterior ya no es válida. Selecciona de nuevo un producto antes de sincronizar.</p>{% endif %}
+<form method="post" action="{{ url_for('alexa_match_choose') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ match.key }}">
+<label>Producto genérico propuesto<select name="product_id" required>
+<option value="">Selecciona manualmente</option>
+{% for candidate in match.candidates %}<option value="{{ candidate.id }}" {% if candidate.id == match.selected_product_id %}selected{% endif %}>{{ candidate.name }}</option>{% endfor %}
+</select></label><button type="submit">Guardar propuesta sin cambiar listas</button></form>
+{% if match.selected_product_id %}<p class="helper">Propuesta guardada. Se conserva el nombre original de Alexa; la sincronización aplicará la identidad solo si supera las comprobaciones.</p>{% endif %}
+</div>
+{% endfor %}{% endif %}
+</section>
 {% endif %}
 {% if view == 'about' %}
 <section><p class="section-eyebrow">Información</p><h2>Acerca de Despensa</h2>
@@ -326,6 +350,24 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <p class="helper">Solo se modificará el código de barras si introduces uno nuevo.</p>
 <button id="product-save-all" type="submit">Guardar cambios</button>
 </form>
+<h3>Variantes por supermercado</h3>
+<p class="helper">Todas las variantes comparten las existencias de este producto genérico en Grocy. No se fusionan artículos ni se modifican cantidades.</p>
+{% if variants_error %}<p role="alert">No se pudieron consultar las variantes guardadas.</p>{% endif %}
+{% if variants %}
+<div class="inventory-list">{% for v in variants %}
+<div class="inventory-row"><div class="pantry-info"><strong>{{ v.name }}</strong><small>{{ v.brand }}{% if v.brand and v.supermarket %} · {% endif %}{{ v.supermarket }}</small><small>Código: {{ v.barcode }} · Unidades por compra: {{ v.units_per_purchase }}</small></div></div>
+{% endfor %}</div>
+{% else %}<p class="helper">Aún no hay variantes asociadas.</p>{% endif %}
+<form method="post" action="{{ url_for('product_variant_add', product_id=product.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label for="variant-name">Nombre de la variante</label><input id="variant-name" name="name" maxlength="200" required placeholder="Leche entera Hacendado">
+<label for="variant-barcode">Código de barras</label><span class="barcode-input-row"><input id="variant-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required autocomplete="off"><button type="button" class="scan-trigger" data-scan-input="variant-barcode">📷 Escanear</button></span>
+<label for="variant-supermarket">Supermercado</label><input id="variant-supermarket" name="supermarket" maxlength="120" placeholder="Mercadona">
+<label for="variant-brand">Marca</label><input id="variant-brand" name="brand" maxlength="120" placeholder="Hacendado">
+<label for="variant-factor">Unidades por compra (solo metadatos)</label><input id="variant-factor" name="units_per_purchase" type="number" min="0.01" max="999999" step="0.01" value="1" required>
+<p class="helper">Se comprobará que el código no pertenezca a otro producto de Grocy. El factor no cambia las conversiones de stock existentes.</p>
+<button type="submit">Guardar variante sin cambiar stock</button>
+</form>
 <details class="product-danger-zone"><summary>Opciones avanzadas · Eliminar artículo</summary><h3>Eliminar artículo</h3>
 <p class="helper">Al confirmar, las existencias se descontarán hasta cero y después se eliminará el artículo definitivamente. Esta operación no se puede deshacer.</p>
 <form method="post" action="{{ url_for('product_delete', product_id=product.id) }}" onsubmit="return confirm('¿Confirmas poner sus existencias a cero y eliminar definitivamente este artículo de Grocy?');">
@@ -339,6 +381,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if view == 'duplicates' %}
 <section><p class="section-eyebrow">Catálogo · Solo lectura</p><h2>🔎 Posibles duplicados</h2>
 <p>Compara códigos de barras y nombres. No se modifica ni elimina ningún artículo.</p>
+<p><a class="back-link" href="{{ url_for('download_catalog_audit') }}">⬇ Descargar auditoría completa de Grocy (JSON)</a></p>
 {% if duplicates_error %}<p role="alert">No se ha podido consultar el catálogo de Grocy.</p>
 {% elif not duplicates %}<p>Sin posibles duplicados detectados.</p>
 {% else %}<p>{{ duplicates|length }} grupos para revisar.</p>
@@ -809,9 +852,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   if (!section) return;
   let pending = false;
   let previous = section.innerHTML;
-  const button = document.getElementById('shopping-refresh');
   let touchStart = null;
-  button.addEventListener('click', refresh);
+  section.addEventListener('click', event => {
+    if (event.target.closest('#shopping-refresh')) refresh();
+  });
   document.addEventListener('touchstart', e => {
     if (window.scrollY <= 5 && e.touches.length === 1) touchStart = e.touches[0].clientY;
     else touchStart = null;
@@ -823,6 +867,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   async function refresh() {
     if (pending || document.hidden || section.querySelector('form:focus-within')) return;
     pending = true;
+    const button = section.querySelector('#shopping-refresh');
+    if (!button) { pending = false; return; }
     button.disabled = true;
     button.textContent = 'Actualizando…';
     try {
@@ -840,8 +886,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
       // Keep the current list on transient network errors.
     } finally {
       pending = false;
-      button.disabled = false;
-      button.textContent = '↻ Actualizar';
+      const currentButton = section.querySelector('#shopping-refresh');
+      if (currentButton) {
+        currentButton.disabled = false;
+        currentButton.textContent = '↻ Actualizar';
+      }
     }
   }
   setInterval(refresh, 10000);
@@ -864,7 +913,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
     if (/^\\d{8,14}$/.test(query)) {
       status.textContent = 'Buscando código…';
       try {
-        const response = await fetch('{{ url_for("inventory_barcode_lookup") }}?barcode=' + encodeURIComponent(query), {credentials:'same-origin'});
+        const response = await fetch(search.dataset.lookupUrl + '?barcode=' + encodeURIComponent(query), {credentials:'same-origin'});
         const result = await response.json();
         if (token !== lookupToken) return;
         if (response.ok && result.product_id) matchingId = String(result.product_id);
@@ -940,7 +989,7 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-VIEWS = {"shopping", "shopping_add", "inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about", "duplicates"}
+VIEWS = {"shopping", "shopping_add", "inventory", "actions", "add", "remove", "associate", "ticket", "photo", "product", "about", "duplicates", "alexa_matches"}
 POST_VIEWS = {
     "barcode_add": "add",
     "barcode_associate": "associate",
@@ -951,6 +1000,8 @@ POST_VIEWS = {
     "product_delete": "product",
     "product_photo": "product",
     "product_barcode_add": "product",
+    "product_variant_add": "product",
+    "alexa_match_choose": "alexa_matches",
     "product_stock_save": "product",
     "shopping_add": "shopping",
     "shopping_toggle": "shopping",
@@ -1034,6 +1085,18 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
             pass
         except Exception:
             pass
+    pending_matches, pending_matches_error = [], False
+    if view == "alexa_matches" and (INGRESS_MODE or session.get("auth")):
+        try:
+            pending_matches = shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
+        except Exception:
+            pending_matches_error = True
+    variants, variants_error = [], False
+    if product:
+        try:
+            variants = variant_catalog.variants_for_product(product["id"])
+        except Exception:
+            variants_error = True
     if product and (PHOTO_DIR / (str(product["id"]) + ".jpg")).is_file():
         product["image_url"] = url_for("local_product_photo", product_id=product["id"])
     if view == "inventory" and (INGRESS_MODE or session.get("auth")):
@@ -1065,7 +1128,8 @@ def render(message="", receipt=None, rid=None, simulation=None, can_commit=False
                                   shopping_product=shopping_product,
                                   new_product_units=new_product_units,
                                   existing_product=existing_product,
-                                  product=product,
+                                  product=product, variants=variants, variants_error=variants_error,
+                                  pending_matches=pending_matches, pending_matches_error=pending_matches_error,
                                   app_version=os.environ.get("DESPENSA_VERSION", "dev"),
                                   app_distribution=os.environ.get("DESPENSA_DISTRIBUTION", "Instalación de desarrollo"),
                                   grocy_configured=bool(os.environ.get("GROCY_URL") and os.environ.get("GROCY_API_KEY")),
@@ -1112,6 +1176,33 @@ def product_choices():
         return barcode_stock.list_products()
     except Exception:
         return []
+
+@app.post("/alexa/match/choose")
+def alexa_match_choose():
+    try:
+        shopping_match_queue.choose(
+            shopping_match_queue.DEFAULT_PATH,
+            request.form.get("key", ""), request.form.get("product_id", ""))
+    except (ValueError, TypeError):
+        return render("La propuesta ya no es válida. Actualiza y vuelve a elegir."), 409
+    except Exception:
+        app.logger.exception("alexa_match_choice_failed")
+        return render("No se pudo guardar la propuesta; las listas no se han modificado."), 502
+    return redirect(url_for("index", view="alexa_matches"))
+
+
+@app.get("/catalog/audit")
+def download_catalog_audit():
+    try:
+        payload = catalog_audit.build_snapshot()
+    except Exception:
+        app.logger.exception("catalog_audit_failed")
+        return render("No se pudo generar la auditoría. No se ha modificado Grocy."), 502
+    response = jsonify(payload)
+    response.headers["Content-Disposition"] = 'attachment; filename="despensa-catalog-audit.json"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
 
 @app.get("/inventory/barcode-lookup")
 def inventory_barcode_lookup():
@@ -1267,6 +1358,11 @@ def product_barcode_add(product_id):
     if not LOCK.acquire(blocking=False):
         abort(409, "Otra operación está en marcha")
     try:
+        if (request.form.get("old_barcode") and
+                request.form.get("old_barcode") != request.form.get("barcode") and
+                variant_catalog.is_registered_variant(request.form["old_barcode"])):
+            raise barcode_stock.BarcodeError(
+                "Este código pertenece a una variante. No lo sustituyas desde el editor general.")
         if request.form.get("old_barcode"):
             result = barcode_stock.replace_product_barcode(
                 product_id, request.form["old_barcode"], request.form.get("barcode", ""))
@@ -1288,6 +1384,26 @@ def product_barcode_add(product_id):
     return render("Código sin cambios." if result["already_linked"] else
                   ("Código sustituido correctamente sin modificar existencias." if result.get("replaced")
                    else "Código asociado sin modificar existencias."))
+
+
+@app.post("/product/<int:product_id>/variant")
+def product_variant_add(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = variant_catalog.save_variant(
+            product_id, request.form.get("barcode"), request.form.get("name"),
+            supermarket=request.form.get("supermarket"),
+            brand=request.form.get("brand"),
+            units_per_purchase=request.form.get("units_per_purchase", "1"))
+    except (ValueError, barcode_stock.BarcodeError) as exc:
+        return render("❌ Variante no guardada: " + str(exc)), 409
+    except Exception:
+        app.logger.exception("variant_save_failed")
+        return render("No se pudo guardar la variante. Comprueba el código en Grocy antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="product", product_id=result["product_id"]))
 
 
 @app.post("/product/<int:product_id>/stock-save")
@@ -1348,6 +1464,9 @@ def product_edit_all(product_id):
         if new_barcode:
             barcode_stock.validate_barcode(new_barcode)
         # Detect conflicts before any writes: never partially save an edit.
+        if (old_barcode and new_barcode and old_barcode != new_barcode and
+                variant_catalog.is_registered_variant(old_barcode)):
+            raise ValueError("El código pertenece a una variante. Edítala por separado.")
         if new_barcode and new_barcode != old_barcode:
             owner = barcode_stock.find_product(new_barcode)
             if owner and int(owner["id"]) != int(product_id):

@@ -48,3 +48,70 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
 - [ ] Validate configured entity exists and belongs to Alexa Devices (not an unrelated todo list).
 - [ ] Validate real two-way flow with a disposable item, then activate on Home Assistant; do not touch inventory stock.
 - [ ] Decide how to handle completion vs deletion, rename and quantity changes.
+
+## P0 — Generic catalog and supermarket variants (PR #5)
+
+- [x] Additive SQLite metadata for canonical Grocy products and variants.
+- [x] Reject cross-product barcode ownership in both Grocy and local metadata.
+- [x] Product-sheet variant form with camera scanner; no stock writes.
+- [x] Read-only JSON audit export of Grocy stock, units, barcodes, shopping
+  references and locally registered variants.
+- [ ] Verify current PR head CI and Docker image build (do not infer from earlier commits).
+- [ ] Verify real Grocy barcode association and persistence across an HA upgrade.
+- [ ] Implement identity-aware Alexa sync with durable ambiguity queue,
+  manual selection and no loss of original free-text items.
+- [ ] Validate duplicate product migration plan and obtain explicit approval
+  before any product consolidation or deletion.
+- [ ] Prepare version bump and identical root/add-on changelogs only when
+  shipping a tested increment.
+
+### Alexa review progress (PR #5)
+- [x] Persist ambiguous Alexa candidate suggestions without modifying the
+  original Alexa/Grocy shopping entry.
+- [x] Allow manual selection in an authenticated CSRF-protected screen.
+- [ ] Consume explicit selections in an identity-aware reconciliation planner
+  without changing/removing original notes until the full operation is verified.
+- [ ] Handle concurrent edits, quantity preservation and restart recovery.
+
+### Identity-aware Alexa v2 progress (PR #5)
+
+- [x] Implement ID-keyed planner with free-text notes, explicit choices and
+  collision detection for both original and canonical product names.
+- [x] Implement atomic v2 checkpoint and persisted Alexa name-to-product
+  bindings, with fail-closed checks for stale choices and changed identities.
+- [x] Add adapter guards against concurrent Grocy quantity/note edits and
+  duplicate Alexa removals, plus network-free regression coverage.
+- [x] Scope manual-choice queues and v2 checkpoints to the configured Alexa
+  entity; preserve legacy data without unsafe automatic migration.
+- [ ] Validate CI for the final PR head after all edits and inspect Docker build.
+- [ ] Verify live Home Assistant todo service and Grocy 4.7.1 shopping API
+  read/write semantics with disposable items, including restart recovery.
+- [ ] Validate mobile variant editor, camera, stock invariants and persistent
+  app_config metadata on the installed add-on before enabling sync.
+- [ ] Prepare a release version with identical root/add-on changelogs and
+  merge only after the above release gates pass.
+
+### Read-only integration verification — 2026-10-31
+- [x] Home Assistant MCP access recovered; installed Grocy and Despensa add-ons both report started.
+- [x] Main Alexa todo entity is discoverable and readable via Home Assistant; 8 active items observed. Do not store their names or personal data in the repository.
+- [x] Installed Despensa remains 0.15.0; PR candidate 0.16.0 is **not** deployed.
+- [ ] Validate add/remove and restart recovery against disposable items on the candidate build. Read-only access alone does not establish write semantics.
+- [ ] Validate variant camera, Grocy barcode persistence and shopping API on the installed candidate before merge.
+
+
+## PR #5 finalization handoff — 2026-10-31
+
+- Removed unused duplicate `shopping_sync_identity.py` preview and its mirror/test;
+  `shopping_identity_sync.py` is the single authoritative v2 planner.
+- Added fail-closed protection when an unresolved Alexa suggestion overlaps a
+  product already present in Grocy's shopping list, plus regression tests.
+  Do not create a duplicate free-text note or infer the product automatically.
+- The preceding GitHub Actions run 41240799152 passed Python 3.11/3.13,
+  embedded JS checks, source mirrors, Docker build and tests. **The newer
+  commit requires its own successful CI run** (41240890623 was running when
+  last inspected); recheck the current PR head before merging.
+- Home Assistant MCP returned HTTP 403 when rechecking the live todo list and
+  add-on logs in this run. Treat it as a connection blocker, not evidence of
+  broken Grocy/Alexa behavior. Do not expose private add-on configuration.
+- Do not merge until live API smoke tests, camera and upgrade persistence
+  checks have passed. No production stock or shopping entries were changed.
