@@ -32,7 +32,7 @@ def run_once(*, dry_run=True):
     except Exception as exc:
         raise RuntimeError("Alexa read failed: " + (str(exc) if isinstance(exc, RuntimeError) and str(exc).startswith("Home Assistant API token unavailable") else type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else ""))) from None
     try:
-        grocy = grocy_shopping_names()
+        grocy_names = grocy_shopping_names()
     except Exception as exc:
         raise RuntimeError("Grocy read failed: " + type(exc).__name__ + ((" HTTP " + str(exc.code)) if hasattr(exc, "code") else "")) from None
     # Suggestions are advisory only: keep the original Alexa/Grocy text
@@ -43,7 +43,7 @@ def run_once(*, dry_run=True):
     refresh_matches(MATCH_QUEUE, alexa, products)
     baseline = load_baseline(STATE)
     result = reconcile(
-        alexa, grocy, baseline, dry_run=dry_run,
+        alexa, grocy_names, baseline, dry_run=dry_run,
         add_alexa=add_alexa, add_grocy=add_grocy,
         remove_alexa=remove_alexa, remove_grocy=remove_grocy,
     )
