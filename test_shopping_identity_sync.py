@@ -39,6 +39,15 @@ class IdentityPlannerTests(unittest.TestCase):
         p = plan_identity(["Arroz"], [], PRODUCTS)
         self.assertEqual(p["add_grocy"][0]["key"], "n:arroz")
 
+    def test_ambiguous_name_does_not_duplicate_existing_grocy_product(self):
+        with self.assertRaisesRegex(IdentityConflict, "Ambiguous Alexa item"):
+            plan_identity(["Arroz"], [entry(2)], PRODUCTS)
+
+    def test_unmatched_name_still_adds_free_text_with_existing_products(self):
+        plan = plan_identity(["Platanos verdes"], [entry(2)], PRODUCTS)
+        self.assertEqual(plan["add_grocy"][0]["key"], "n:platanos verdes")
+        self.assertEqual(plan["add_alexa"][0]["key"], "p:2")
+
     def test_existing_note_conflict_blocks_conversion(self):
         note = ("Arroz", {"id": 10, "product_id": None,
                           "note": "Arroz", "amount": 3})
