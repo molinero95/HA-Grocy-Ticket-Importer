@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Inventory } from './Inventory';
+import { Inventory } from './Inventory';
 import { ShoppingBasket, Package, ScanBarcode, RefreshCw } from 'lucide-react';
 import { chooseAlexaMatch, getShopping, removeShopping, toggleShopping } from './api';
 import type { AlexaMatch } from './types';
