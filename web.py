@@ -1179,6 +1179,27 @@ def load_receipt(rid):
         abort(404)
     return json.loads(path.read_text(encoding="utf-8"))
 
+@app.get("/api/v1/shopping")
+def api_v1_shopping():
+    """Read-only shopping snapshot for the v1 frontend; never expose Grocy secrets."""
+    if not (INGRESS_MODE or session.get("auth")):
+        return jsonify({"error": "authentication_required"}), 401
+    try:
+        items = barcode_stock.shopping_list_snapshot()
+    except Exception:
+        app.logger.exception("api_v1_shopping_failed")
+        return jsonify({"items": [], "pending_matches": [], "shopping_error": True,
+                        "pending_matches_error": False}), 503
+    try:
+        matches = shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
+        matches_error = False
+    except Exception:
+        app.logger.exception("api_v1_alexa_matches_failed")
+        matches, matches_error = [], True
+    return jsonify({"items": items, "pending_matches": matches,
+                    "shopping_error": False, "pending_matches_error": matches_error})
+
+
 @app.get("/")
 def index():
     if request.args.get("view") == "inventory" and request.args.get("deleted") == "1":
