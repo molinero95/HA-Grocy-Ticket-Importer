@@ -39,30 +39,35 @@ def list_products():
     )
 
 def inventory_snapshot():
-    """Read-only stock overview, including zero-stock catalog entries.
+    """Read-only stock overview in three Grocy requests, not one per product.
 
-    Each product's stock endpoint is used for its authoritative quantity.
-    If one quantity cannot be read, show it as unavailable rather than zero.
+    GET /stock returns the current stock for stocked products; catalog products
+    absent from that response have zero stock. Any malformed response fails
+    rather than incorrectly showing zero quantities.
     """
     products = grocy("GET", "objects/products")
-    try:
-        units = {int(unit["id"]): str(unit["name"]) for unit in grocy("GET", "objects/quantity_units")}
-    except Exception:
-        units = {}
+    units_data = grocy("GET", "objects/quantity_units")
+    current_stock = grocy("GET", "stock")
+    if not all(isinstance(value, list) for value in (products, units_data, current_stock)):
+        raise BarcodeError("Respuesta inesperada de Grocy al consultar el inventario")
+    units = {int(unit["id"]): str(unit["name"]) for unit in units_data}
+    stock_amounts = {}
+    for entry in current_stock:
+        pid = int(entry["product_id"])
+        amount = Decimal(str(entry["amount"]))
+        if not amount.is_finite():
+            raise BarcodeError("Cantidad de stock no válida en Grocy")
+        if pid in stock_amounts:
+            raise BarcodeError("Grocy devolvió un producto duplicado en el stock")
+        stock_amounts[pid] = amount
     rows = []
     for product in products:
         pid = int(product["id"])
-        amount = None
-        try:
-            details = grocy("GET", f"stock/products/{pid}")
-            quantity = Decimal(str(details.get("stock_amount", 0)))
-            amount = format(quantity.normalize(), "f")
-        except Exception:
-            pass
+        quantity = stock_amounts.get(pid, Decimal("0"))
         rows.append({
             "id": pid,
             "name": str(product["name"]),
-            "amount": amount,
+            "amount": format(quantity.normalize(), "f"),
             "unit": units.get(int(product.get("qu_id_stock") or 0), "ud. stock"),
         })
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))
