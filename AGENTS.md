@@ -58,3 +58,10 @@ Favor actionable fixes, tests and concise Spanish summaries with commit/version 
 - Keep `/data/shopping-sync.json` across upgrades. First run merges, later runs propagate deletions. Do not advance checkpoint after partial failure.
 - IMPORTANT: test Grocy note-only creation and HA `todo.get_items` response parsing against real APIs. Duplicate normalized names, completed items, quantities, external concurrent changes and deletion/re-add conflicts need careful testing. Do not change inventory stock.
 - The runtime is optional behind `shopping_sync_enabled: false`. Do not merge/deploy merely because files compile.
+
+
+## Mandatory release notes for every version
+- Every change to `ha_grocy_ticket_importer/config.yaml` `version` MUST include an entry for that exact version at the top of `CHANGELOG.md` in the same PR/commit set.
+- Describe user-visible additions, fixes, configuration or migration steps, and known limitations honestly. Never claim deployment or validated behavior without evidence.
+- Keep `ha_grocy_ticket_importer/DOCS.md` and `README.md` aligned when configuration changes.
+- Do not publish or merge a version bump without corresponding release notes.
