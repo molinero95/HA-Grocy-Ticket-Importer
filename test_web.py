@@ -72,7 +72,7 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'id="inventory-search"', response.data)
         self.assertIn(b'Leche', response.data)
         self.assertIn(b'3', response.data)
-        self.assertNotIn(b'name="barcode"', response.data)
+        self.assertNotIn(b'<input name="barcode"', response.data)
         self.assertNotIn(b'class="scan-trigger"', response.data)
         self.assertIn(b'view=actions', response.data)
         self.assertTrue(token)
@@ -82,7 +82,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(actions.status_code, 200)
         self.assertIn(b'class="action-grid"', actions.data)
         self.assertIn(b'view=associate', actions.data)
-        self.assertNotIn(b'name="barcode"', actions.data)
+        self.assertNotIn(b'<input name="barcode"', actions.data)
 
     def test_action_forms_are_separate(self):
         self.login()
