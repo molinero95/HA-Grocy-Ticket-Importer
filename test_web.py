@@ -83,7 +83,7 @@ class WebTests(unittest.TestCase):
             actions = self.client.get("/?view=actions")
         self.assertEqual(actions.status_code, 200)
         self.assertIn(b'class="action-grid"', actions.data)
-        self.assertIn(b'view=associate', actions.data)
+        self.assertNotIn(b'<strong>Asociar c', actions.data)
         self.assertNotIn(b'<input name="barcode"', actions.data)
 
     def test_new_product_form_has_unit_optional_barcode_and_initial_stock(self):
@@ -242,6 +242,28 @@ class WebTests(unittest.TestCase):
         self.assertIn(b'class="shopping-stepper-message"', response.data)
         self.assertIn(b'0.3', response.data)
         self.assertIn(b'view=inventory', response.data)
+
+    def test_pantry_shows_cart_only_for_products_not_on_shopping_list(self):
+        self.login()
+        products = [
+            {"id": 5, "name": "Leche", "amount": "3", "unit": "Piece",
+             "shopping_amount": "0", "shopping_unit": "Piece", "shopping_step": "1",
+             "shopping_can_subtract": False},
+            {"id": 8, "name": "Tomate", "amount": "1.5", "unit": "Kilogram",
+             "shopping_amount": "0.3", "shopping_unit": "kg", "shopping_step": "0.10",
+             "shopping_can_subtract": True},
+        ]
+        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=products):
+            response = self.client.get("/?view=inventory")
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode()
+        self.assertIn('class="shopping-cart-form"', html)
+        self.assertIn('class="shopping-cart-form" method="post"', html)
+        self.assertIn('class="shopping-cart-form" method="post" action="/shopping/step/5/plus"', html)
+        self.assertIn('class="shopping-cart-form" method="post" action="/shopping/step/8/plus" hidden', html)
+        self.assertIn('class="shopping-stepper" aria-label="Cantidad de Leche en lista de compra" hidden', html)
+        self.assertIn('class="shopping-stepper" aria-label="Cantidad de Tomate en lista de compra"', html)
+        self.assertIn('class="shopping-quick"', html)
 
     def test_shopping_toggle_and_remove(self):
         token = self.login()
