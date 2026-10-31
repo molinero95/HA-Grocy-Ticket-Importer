@@ -15,6 +15,7 @@ from werkzeug.utils import secure_filename
 
 import extract
 import barcode_stock
+import product_images
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env")
@@ -56,6 +57,27 @@ td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 <label>Nombre (solo si es nuevo) <input name="name" maxlength="200" placeholder="Leche entera 1 L"></label>
 <button type="submit">Añadir 1 al stock</button></form>
 <p>Si el código no está registrado, indica un nombre para crear el producto. Si existe, se reutiliza.</p></section>
+<section><h2>Asociar código a producto existente</h2>
+<form method="post" action="{{ url_for('barcode_associate') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<label>Producto existente <select name="product_id" required>
+<option value="">Selecciona un producto</option>
+{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+</select></label>
+<button type="submit">Asociar código sin cambiar stock</button></form>
+<p>Permite reconocer al instante productos ya registrados y evita duplicados.</p>
+</section>
+<section><h2>Buscar foto por código de barras</h2>
+<form method="post" action="{{ url_for('barcode_photo') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Código de barras <input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" required></label>
+<button type="submit">Buscar imagen</button></form>
+{% if photo %}<p><strong>{{ photo.name }}</strong></p>
+<img src="{{ photo.image_url }}" alt="Fotografía de {{ photo.name }}" width="180" loading="lazy">
+<p><a href="{{ photo.source_url }}" target="_blank" rel="noopener noreferrer">{{ photo.attribution }}</a></p>
+<p>Esta foto se muestra como vista previa. Todavía no se guarda en la ficha de Grocy.</p>
+{% endif %}</section>
 <section><h2>Eliminar una unidad del stock</h2>
 <form method="post" action="{{ url_for('barcode_remove_preview') }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -112,10 +134,11 @@ def csrf_token():
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
 
-def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None):
+def render(message="", receipt=None, rid=None, simulation=None, can_commit=False, remove_candidate=None, photo=None):
     return render_template_string(PAGE, csrf=csrf_token(), message=message,
                                   receipt=receipt, rid=rid, simulation=simulation,
-                                  can_commit=can_commit, remove_candidate=remove_candidate)
+                                  can_commit=can_commit, remove_candidate=remove_candidate, photo=photo,
+                                  products=product_choices())
 
 def receipt_path(rid):
     if len(rid) != 32 or any(c not in "0123456789abcdef" for c in rid):
@@ -144,6 +167,42 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("index"))
+
+def product_choices():
+    if not session.get("auth"):
+        return []
+    try:
+        return barcode_stock.list_products()
+    except Exception:
+        return []
+
+@app.post("/barcode/associate")
+def barcode_associate():
+    if not LOCK.acquire(blocking=False):
+        abort(409, "Otra operación está en marcha")
+    try:
+        result = barcode_stock.associate_barcode(request.form.get("barcode", ""),
+                                                 request.form.get("product_id", ""))
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("Error de Grocy. Comprueba la asociación antes de reintentar."), 502
+    finally:
+        LOCK.release()
+    return render(("El código ya estaba asociado a " if result["already_linked"]
+                   else "Código asociado a ") + result["name"] + ". Stock sin cambios.")
+
+@app.post("/barcode/photo")
+def barcode_photo():
+    try:
+        photo = product_images.lookup_image(request.form.get("barcode", ""))
+    except barcode_stock.BarcodeError as exc:
+        return render(str(exc)), 400
+    except Exception:
+        return render("No se ha podido consultar Open Food Facts."), 502
+    if not photo:
+        return render("No se ha encontrado una imagen para ese código.")
+    return render("Foto encontrada por código exacto", photo=photo)
 
 @app.post("/barcode/add")
 def barcode_add():
