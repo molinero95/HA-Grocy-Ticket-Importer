@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.20] — 2026-10-31
+
+### Fixed
+- Fix immediate Home Assistant WebSocket listener `TypeError`: websocket-client's WebSocket object is not a context manager. Close the connection explicitly in a `finally` block.
+- Preserve the polling fallback and existing shopping-list configuration; no inventory changes.
+
+### Validation
+- Requires CI and live event synchronization confirmation after installation.
+
+
 ## [0.7.19] — 2026-10-31
 
 ### Fixed
