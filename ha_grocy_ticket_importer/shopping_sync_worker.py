@@ -58,20 +58,20 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         wake = threading.Event()
         threading.Thread(target=listen, args=(wake,), daemon=True).start()
+        trigger = "startup"
         while True:
             try:
                 result = run_once(dry_run=os.environ.get("SHOPPING_SYNC_ENABLED") != "1")
-                print("Shopping sync checked: " +
+                print("Shopping sync checked (" + trigger + "): " +
                       ", ".join(key + "=" + str(len(result[key])) for key in (
                           "add_alexa", "add_grocy", "remove_alexa", "remove_grocy")),
                       flush=True)
             except Exception as exc:
                 # Do not log exception bodies: remote APIs may include sensitive data.
                 print("Shopping sync failed: " + str(exc)[:180], flush=True)
-            wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
+            triggered = wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
             wake.clear()
-            if wake.wait(timeout=1):
-                wake.clear()
+            trigger = "event" if triggered else "polling"
 
 
 if __name__ == "__main__":
