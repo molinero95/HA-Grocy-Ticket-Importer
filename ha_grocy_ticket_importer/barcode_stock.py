@@ -200,8 +200,8 @@ def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
         raise BarcodeError("Introduce una cantidad válida") from exc
     if not target.is_finite() or not expected.is_finite() or target < 0 or expected < 0:
         raise BarcodeError("La cantidad debe ser un número positivo o cero")
-    if target.as_tuple().exponent < -3:
-        raise BarcodeError("Máximo tres decimales")
+    if target.as_tuple().exponent < -2:
+        raise BarcodeError("Máximo dos decimales")
     details = grocy("GET", f"stock/products/{pid}")
     current = Decimal(str(details.get("stock_amount", 0)))
     if not current.is_finite() or current != expected:
