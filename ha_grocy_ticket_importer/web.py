@@ -708,7 +708,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   });
   document.querySelectorAll('.scan-trigger').forEach(button => {
     button.addEventListener('click', () => {
-      const input = button.closest('form')?.querySelector('input[name="barcode"]');
+      const input = button.dataset.scanInput ? document.getElementById(button.dataset.scanInput) : button.closest('form')?.querySelector('input[name="barcode"]');
       if (input) start(input);
     });
   });
@@ -747,7 +747,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
         const response = await fetch('{{ url_for("inventory_barcode_lookup") }}?barcode=' + encodeURIComponent(code), {credentials:'same-origin'});
         const result = await response.json();
         if (!response.ok || !result.product_id) { status.textContent = result.error || 'Producto no encontrado en tu despensa.'; return; }
-        window.location.href = '{{ url_for("index", view="product") }}&product_id=' + encodeURIComponent(result.product_id);
+        const destination = new URL('{{ url_for("index", view="product") }}', window.location.href);
+        destination.searchParams.set('product_id', result.product_id);
+        window.location.href = destination.toString();
       } catch (_) { status.textContent = 'No se pudo consultar el código.'; }
     }
     button.addEventListener('click', lookup);
