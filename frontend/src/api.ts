@@ -179,3 +179,23 @@ export async function checkCatalogDeletion(id: number, expectedName: string): Pr
   if (!response.ok) throw new Error(result.details ?? result.error ?? 'No se pudo comprobar la eliminación');
   return result;
 }
+
+export type AuthStatus = { authenticated: boolean; ingress: boolean; csrf_token: string };
+export async function getAuthStatus(): Promise<AuthStatus> {
+  const response = await fetch(base + 'auth/status', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se pudo comprobar la sesión');
+  const status = await response.json() as AuthStatus;
+  csrfToken = status.csrf_token;
+  return status;
+}
+export async function loginStandalone(password: string): Promise<void> {
+  const response = await fetch(base + 'auth/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await token() }, body: JSON.stringify({ password }) });
+  const result = await response.json() as { csrf_token?: string; error?: string };
+  if (!response.ok) throw new Error(response.status === 401 ? 'Contraseña incorrecta' : result.error ?? 'Error al iniciar sesión');
+  csrfToken = result.csrf_token;
+}
+export async function logoutStandalone(): Promise<void> {
+  const response = await fetch(base + 'auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': await token() } });
+  if (!response.ok) throw new Error('No se pudo cerrar la sesión');
+  csrfToken = undefined;
+}
