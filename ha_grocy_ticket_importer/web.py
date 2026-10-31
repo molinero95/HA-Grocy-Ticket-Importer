@@ -1003,7 +1003,7 @@ def protect():
         token = session.get("csrf")
         if not token or not hmac.compare_digest((request.headers.get("X-CSRF-Token", "") if request.path.startswith("/api/v1/") else request.form.get("csrf", "")), token):
             abort(403)
-    if request.endpoint not in ("index", "login", "static") and not (INGRESS_MODE or session.get("auth")):
+    if request.endpoint not in ("index", "login", "static", "api_v1_auth_status", "api_v1_auth_login") and not (INGRESS_MODE or session.get("auth")):
         abort(401)
 
 def csrf_token():
