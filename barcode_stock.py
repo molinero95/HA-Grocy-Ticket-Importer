@@ -409,6 +409,25 @@ def replace_product_barcode(product_id, old_barcode, new_barcode):
     return {"already_linked": False, "replaced": True}
 
 
+def remove_product_barcode(product_id, barcode):
+    """Remove only a plain barcode mapping, preserving product and stock."""
+    barcode = validate_barcode(barcode)
+    pid = int(product_id)
+    if pid <= 0:
+        raise BarcodeError("Producto no válido")
+    from variant_catalog import is_registered_variant
+    if is_registered_variant(barcode):
+        raise BarcodeError("Este código pertenece a una variante. No se puede eliminar desde el producto genérico")
+    rows = grocy("GET", "objects/product_barcodes")
+    if not isinstance(rows, list):
+        raise BarcodeError("No se pudieron comprobar los códigos de Grocy")
+    matching = [row for row in rows if str(row.get("barcode")) == barcode]
+    if len(matching) != 1 or int(matching[0].get("product_id", 0)) != pid:
+        raise BarcodeError("El código no pertenece únicamente a este producto. Recarga la ficha")
+    grocy("DELETE", f"objects/product_barcodes/{int(matching[0]['id'])}")
+    return {"removed": True, "barcode": barcode, "product_id": pid}
+
+
 def delete_catalog_product(product_id, expected_name):
     """Consume remaining stock, verify zero, then delete the confirmed product."""
     pid = int(product_id)
