@@ -28,6 +28,11 @@ async function mutate(path: string, method: 'POST' | 'DELETE', body?: object): P
   }
 }
 export const toggleShopping = (id: number, done: boolean) => mutate('shopping/' + id + '/toggle', 'POST', { done });
+export async function clearCompletedShopping(): Promise<{ removed: number }> {
+  const response = await fetch(base + 'shopping/clear-completed', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': await token() } });
+  if (!response.ok) { const data = await response.json().catch(() => ({})) as { error?: string }; throw new Error(data.error ?? 'No se han podido eliminar los comprados'); }
+  return response.json() as Promise<{ removed: number }>;
+}
 export const removeShopping = (id: number) => mutate('shopping/' + id, 'DELETE');
 export const chooseAlexaMatch = (key: string, productId: number) => mutate('alexa/matches/' + encodeURIComponent(key) + '/choose', 'POST', { product_id: productId });
 
