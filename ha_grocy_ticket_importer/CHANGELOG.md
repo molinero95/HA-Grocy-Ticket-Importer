@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.18] — 2026-10-31
+
+### Added
+- Hybrid Alexa/Grocy shopping sync: Home Assistant todo state and service events wake the worker immediately, while the configurable polling interval remains a safety fallback.
+- Automatic Home Assistant WebSocket reconnect; no new configuration required when the existing access token is configured.
+
+
 ## [0.7.17] — 2026-10-31
 
 ### Added
