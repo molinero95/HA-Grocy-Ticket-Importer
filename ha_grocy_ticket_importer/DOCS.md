@@ -26,3 +26,17 @@ The session key and receipt upload working files are in `/data` and managed by H
 ## Updates
 
 Home Assistant detects a new version when the app's `config.yaml` version changes in the added GitHub repository. Choose **Check for updates** in the app store if necessary. The repository must be publicly readable by Supervisor; keeping GitHub source public does **not** make Grocy API keys public.
+
+
+## Alexa Devices shopping synchronization (experimental)
+
+Requires Home Assistant Alexa Devices with the primary shopping-list `todo` entity working. The add-on declares `homeassistant_api: true` and uses its Supervisor token internally. **Do not manually expose a long-lived token.**
+
+New option: `shopping_sync_enabled` (boolean, default `false`). The background process runs only when enabled and checks every two minutes. It uses the default Grocy shopping list (ID 1), not the Home Assistant generic shopping list. The main Alexa shopping entity is currently fixed in code and must be made configurable before shipping generally.
+
+The state file `/data/shopping-sync.json` is persistent across restarts. Preserve it in backups. The first run merges pending items; subsequent runs propagate adds/removes. Historical completed Alexa items are excluded. Existing catalog stock is never changed. Unknown items may be added as Grocy shopping-list notes.
+
+**Release gate:** do not enable this feature until HA service responses, Grocy writes, error recovery and CI have been tested against the installed versions. The proposed 0.7.11 release is not installed merely because GitHub contains the code.
+
+
+**Selección de lista Alexa:** configura `alexa_shopping_list_entity` con el identificador `todo.*` de la lista deseada (por ejemplo, desde Herramientas para desarrolladores → Estados). Es obligatorio cuando `shopping_sync_enabled` está activado; vacío por defecto. Cada entidad tiene su propio archivo de estado para no reutilizar eliminaciones de otra lista. Cambiar de lista inicia una nueva unión inicial sin borrar los artículos existentes.

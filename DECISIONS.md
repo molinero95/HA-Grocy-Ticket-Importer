@@ -33,3 +33,13 @@ Last reviewed: 2026-10-31. This records the user's explicitly requested behavior
 - Changes should be accompanied by regression tests and an add-on version bump. GitHub Actions green status must be observed, not assumed.
 - The Pack-to-Piece implementation and some Grocy shopping API endpoints need integration validation against the installed Grocy instance; actual production data must not be modified during exploratory tests.
 - Developer action items, test gaps and potential stale documentation are tracked in `ROADMAP.md`.
+
+
+## Alexa shopping list integration — 2026-10-31
+- Synchronize **only the main Alexa shopping list** with Grocy's default shopping list; other Alexa lists remain independent.
+- Exclude Alexa's completed/historical entries; do not resurrect old purchases.
+- Bidirectional creation and removal; avoid duplicate items and synchronization loops using persistent checkpoints.
+- First sync must preserve Grocy's existing shopping list, even when Alexa is empty.
+- Items spoken to Alexa that are not yet in the Grocy catalog must be supported as free-text shopping notes, without inventing stock.
+- Keep sync disabled until validated end to end. Do not silently remove products or modify inventory.
+- Initial implementation intentionally does not synchronize quantities, units or completion states; this remains a future product decision.
