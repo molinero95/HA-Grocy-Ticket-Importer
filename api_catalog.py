@@ -171,3 +171,12 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify({"saved": True, "photo_url": f"product/{product_id}/photo/local"})
+
+    @app.get("/api/v1/catalog/duplicates")
+    def api_v1_catalog_duplicates():
+        try:
+            from duplicate_candidates import detect_duplicates
+            return jsonify({"groups": detect_duplicates()})
+        except Exception:
+            app.logger.exception("api_v1_catalog_duplicates_failed")
+            return jsonify({"error": "duplicates_unavailable"}), 503
