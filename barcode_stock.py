@@ -38,7 +38,7 @@ def list_products():
         key=lambda p: (p["name"].casefold(), p["id"]),
     )
 
-PHOTO_MARKER = re.compile(r"(?:\\n|^)\\[Despensa: imagen=(https://images\\.openfoodfacts\\.org/[^\\]\\s]+)\\]\\s*")
+PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://images\.openfoodfacts\.org/[^\]\s]+)\]\s*")
 
 
 def saved_photo(product):
@@ -59,7 +59,7 @@ def save_product_photo(product_id, image_url):
     if not isinstance(product, dict) or int(product.get("id") or 0) != pid:
         raise BarcodeError("Producto inexistente")
     description = PHOTO_MARKER.sub("", str(product.get("description") or "")).rstrip()
-    description += ("\\n" if description else "") + "[Despensa: imagen=" + url + "]"
+    description += ("\n" if description else "") + "[Despensa: imagen=" + url + "]"
     grocy("PUT", f"objects/products/{pid}", {"description": description})
     return url
 
