@@ -109,6 +109,19 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.json["removed"], 2)
         self.assertEqual([call.args[0] for call in remove.call_args_list], [1, 3])
 
+    def test_catalog_audit_is_read_only(self):
+        snapshot = {"schema_version": 1, "products": [], "barcode_conflicts": [], "unlinked_shopping_entries": []}
+        with patch.object(web, "INGRESS_MODE", True), patch("catalog_audit.build_snapshot", return_value=snapshot) as build:
+            response = self.client.get("/api/v1/catalog/audit")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["schema_version"], 1)
+        build.assert_called_once_with()
+
+    def test_catalog_audit_failure_is_not_silently_empty(self):
+        with patch.object(web, "INGRESS_MODE", True), patch("catalog_audit.build_snapshot", side_effect=RuntimeError("Grocy unavailable")):
+            response = self.client.get("/api/v1/catalog/audit")
+        self.assertEqual(response.status_code, 503)
+
     def test_merge_preview_rejects_same_product_without_writes(self):
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "product_detail") as detail:
             response = self.client.get("/api/v1/catalog/merge-preview?source_id=7&target_id=7")
