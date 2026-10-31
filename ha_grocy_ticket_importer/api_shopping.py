@@ -63,6 +63,25 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         return jsonify({"ok": True})
 
 
+    @app.post("/api/v1/shopping/clear-completed")
+    def api_v1_clear_completed_shopping():
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        removed = 0
+        try:
+            completed = [row["id"] for row in barcode_stock.shopping_list_snapshot() if row["done"]]
+            for item_id in completed:
+                barcode_stock.remove_shopping_list_item(item_id)
+                removed += 1
+        except Exception:
+            app.logger.exception("api_v1_shopping_clear_completed_failed")
+            return jsonify({"error": "partial_clear_uncertain", "removed": removed,
+                            "details": "Actualiza la lista antes de reintentar."}), 502
+        finally:
+            lock.release()
+        return jsonify({"removed": removed})
+
+
     @app.get("/api/v1/shopping")
     def api_v1_shopping():
         """Read-only shopping snapshot for the v1 frontend; never expose Grocy secrets."""
