@@ -282,17 +282,21 @@ def product_detail(product_id):
     marker = PACK_MARKER.search(description)
     codes = [str(item["barcode"]) for item in grocy("GET", "objects/product_barcodes")
              if int(item["product_id"]) == pid]
+    units = sorted(
+        [{"id": int(unit["id"]), "name": str(unit["name"])}
+         for unit in grocy("GET", "objects/quantity_units")],
+        key=lambda unit: unit["name"].casefold())
+    is_pack = any(u["id"] == int(product["qu_id_stock"]) and "pack" in u["name"].casefold()
+                  for u in units)
     return {
         "id": pid, "name": str(product["name"]),
+        "is_pack": is_pack,
         "pack_size": int(marker.group(1)) if marker else 1,
         "description": PHOTO_MARKER.sub("", PACK_MARKER.sub("", description)).strip(),
         "image_url": saved_photo(product),
         "barcodes": codes,
         "unit_id": int(product["qu_id_stock"]),
-        "units": sorted(
-            [{"id": int(unit["id"]), "name": str(unit["name"])}
-             for unit in grocy("GET", "objects/quantity_units")],
-            key=lambda unit: unit["name"].casefold()),
+        "units": units,
         "stock_amount": str(grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)),
     }
 
@@ -329,11 +333,16 @@ def update_product_info(product_id, name, pack_size, unit_id=None):
             grocy("GET", f"stock/products/{pid}").get("stock_amount", 0)))
         if not current_stock.is_finite() or current_stock != 0:
             raise BarcodeError(
-                "No se puede cambiar la unidad con existencias. "
-                "Primero hay que convertir o ajustar el stock en Grocy, "
-                "para no interpretar unidades como kilogramos.")
+                "No se puede cambiar de Piece a Pack (ni otras unidades) mientras "
+                "haya existencias. Primero deja el stock a cero en la ficha y "
+                "después cambia la unidad; convierte luego la cantidad manualmente "
+                "para evitar contar piezas como packs.")
+    unit_names = {int(u["id"]): str(u["name"]) for u in grocy("GET", "objects/quantity_units")}
+    is_pack = "pack" in unit_names.get(unit_id, "").casefold()
+    if not is_pack:
+        pack_size = 1
     description = PACK_MARKER.sub("", str(product.get("description") or "")).strip()
-    if pack_size != 1:
+    if is_pack and pack_size != 1:
         description = (description + "\n" if description else "") + (
             f"[Despensa: unidades_por_envase={pack_size}]")
     changes = {"name": name, "description": description}
