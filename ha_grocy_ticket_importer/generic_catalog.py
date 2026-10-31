@@ -52,7 +52,17 @@ def register_variant(db, generic_id, barcode, name, *, supermarket="", brand="",
         raise ValueError("Invalid barcode")
     if not str(name).strip() or not 0 < float(units_per_purchase) < 1000000:
         raise ValueError("Invalid variant")
-    # Barcode ownership must be checked against a fresh Grocy snapshot by the caller.\n    if grocy_barcode_owners is None:\n        raise ValueError("Grocy barcode ownership audit required")\n    canonical = db.execute(\n        "SELECT grocy_product_id FROM generic_products WHERE id=?",\n        (int(generic_id),)).fetchone()\n    if canonical is None:\n        raise ValueError("Unknown generic product")\n    if {int(owner) for owner in grocy_barcode_owners} - {canonical[0]}:\n        raise ValueError("Barcode belongs to another Grocy product")\n    # A barcode already linked to another generic must never be reassigned.
+    # Barcode ownership must be checked against a fresh Grocy snapshot by the caller.
+    if grocy_barcode_owners is None:
+        raise ValueError("Grocy barcode ownership audit required")
+    canonical = db.execute(
+        "SELECT grocy_product_id FROM generic_products WHERE id=?",
+        (int(generic_id),)).fetchone()
+    if canonical is None:
+        raise ValueError("Unknown generic product")
+    if {int(owner) for owner in grocy_barcode_owners} - {canonical[0]}:
+        raise ValueError("Barcode belongs to another Grocy product")
+    # A barcode already linked to another generic must never be reassigned.
     existing = db.execute(
         "SELECT generic_id FROM product_variants WHERE barcode=?", (barcode,)).fetchone()
     if existing and existing[0] != int(generic_id):
