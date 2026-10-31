@@ -298,43 +298,25 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if product %}
 <p class="section-eyebrow">Ficha del artículo</p>
 <h2>{{ product.name }}</h2>
-<form method="post" action="{{ url_for('product_photo_upload', product_id=product.id) }}" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ csrf }}"><label for="product-photo-upload">📷 Subir foto o hacer una foto</label><input id="product-photo-upload" name="photo" type="file" accept="image/*" required><button type="submit">Guardar fotografía</button></form><div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
+<div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
+<button type="button" id="product-camera-open">📷 Hacer foto del artículo</button>
+<div id="product-camera-panel" hidden><video id="product-camera-video" autoplay playsinline muted style="width:100%;max-height:420px"></video><button type="button" id="product-camera-snapshot">Capturar foto</button><button type="button" id="product-camera-close">Cancelar</button></div>
 {% if not product.image_url and product.barcodes %}<div id="product-photo-autoload" data-barcode="{{ product.barcodes[0] }}" data-save-url="{{ url_for('product_photo_save', product_id=product.id) }}" data-csrf="{{ csrf }}"></div>{% endif %}
-<p>Gestiona el producto por unidades o kilogramos. Los packs existentes no se convertirán automáticamente.</p>
-<form method="post" action="{{ url_for('product_update', product_id=product.id) }}">
+<form id="product-edit-form" method="post" action="{{ url_for('product_edit_all', product_id=product.id) }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="edit-product-name">Nombre del artículo</label>
-<input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
-<label for="edit-unit">Unidad de medida</label>
-<select id="edit-unit" name="unit_id" required>
-{% for u in product.units if u.name|lower in ("piece", "pieces", "unidad", "unidades", "kg", "kilogram", "kilogramo", "kilogramos") %}<option value="{{ u.id }}" {% if u.id == product.purchase_unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
-</select>
-<p class="helper">No se convierten automáticamente las existencias ni las unidades históricas.</p>
-<div id="pack-size-fields" hidden>
-<label for="edit-pack-size">Piezas por pack</label>
-<input id="edit-pack-size" name="pack_size" type="number" min="1" max="1000" step="1" value="{{ product.pack_size }}" required>
-<p class="helper">1 Pack equivale a este número de Piece. No cambia automáticamente las existencias anteriores.</p>
-</div>
-<button type="submit">Guardar cambios</button>
-</form>
-<h3>Ajustar cantidad disponible</h3>
-<p>Stock actual: <strong>{{ product.stock_amount }} {{ product.units|selectattr('id', 'equalto', product.unit_id)|map(attribute='name')|first|default('unidades') }}</strong></p>
-<form method="post" action="{{ url_for('product_stock_save', product_id=product.id) }}">
-<input type="hidden" name="csrf" value="{{ csrf }}">
+<input id="product-photo-upload" name="photo" type="file" accept="image/jpeg" hidden>
+<label for="edit-product-name">Nombre del artículo</label><input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
+<label for="edit-unit">Unidad de medida</label><select id="edit-unit" name="unit_id" required>
+{% for u in product.units if u.name|lower in ("piece", "pieces", "unidad", "unidades", "kg", "kilogram", "kilogramo", "kilogramos") %}<option value="{{ u.id }}" {% if u.id == product.purchase_unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select>
+<h3>Cantidad disponible</h3><p>Stock actual: {{ product.stock_amount }}</p>
 <input type="hidden" name="expected_amount" value="{{ product.stock_amount }}">
-<label for="edit-stock-amount">Cantidad total que tengo</label>
-<input id="edit-stock-amount" name="desired_amount" inputmode="decimal" type="number" step="0.01" min="0" value="{{ product.stock_amount }}" required>
-<p class="helper">Máximo dos decimales. Al guardar se actualizarán directamente las existencias en Grocy.</p>
-<button type="submit">Guardar cantidad</button>
+<label for="edit-stock-amount">Cantidad total que tengo</label><input id="edit-stock-amount" name="desired_amount" inputmode="decimal" type="number" step="0.01" min="0" value="{{ product.stock_amount }}" required>
+<h3>Código de barras</h3>
+{% if product.barcodes %}<label for="old-product-barcode">Código actual</label><input id="old-product-barcode" name="old_barcode" value="{{ product.barcodes[0] }}" inputmode="numeric" pattern="[0-9]{8,14}">{% endif %}
+<label for="edit-barcode">Nuevo código (opcional)</label><input id="edit-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off">
+<p class="helper">Solo se modificará el código de barras si introduces uno nuevo.</p>
+<button id="product-save-all" type="submit">Guardar cambios</button>
 </form>
-<h3>{% if product.barcodes %}Modificar código de barras{% else %}Añadir código de barras{% endif %}</h3>
-<p class="helper">{% if product.barcodes %}Selecciona el código que quieres sustituir. El código anterior dejará de estar asociado a este artículo; las existencias no cambian.{% else %}El artículo ya está seleccionado. Añadir un código no cambia las existencias.{% endif %}</p>
-<form method="post" action="{{ url_for('product_barcode_add', product_id=product.id) }}">
-<input type="hidden" name="csrf" value="{{ csrf }}">
-{% if product.barcodes %}<label for="old-product-barcode">Código actual</label><input id="old-product-barcode" name="old_barcode" value="{{ product.barcodes[0] }}" inputmode="numeric" pattern="[0-9]{8,14}" required><p class="helper">Puedes editar el código actual directamente para sustituirlo.</p>{% endif %}
-<label>{% if product.barcodes %}Nuevo código{% else %}Código{% endif %} <span class="barcode-input-row"><input name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off" required><button class="scan-trigger" type="button" aria-label="Escanear código para este artículo">📷 Escanear</button></span></label>
-<div class="photo-preview"><img class="barcode-photo-preview" hidden alt="Fotografía encontrada" referrerpolicy="no-referrer"><p class="photo-status helper" aria-live="polite"></p></div>
-<button type="submit">{% if product.barcodes %}Sustituir código{% else %}Añadir código{% endif %}</button></form>
 <h3>Eliminar artículo</h3>
 <p class="helper">Al confirmar, las existencias se descontarán hasta cero y después se eliminará el artículo definitivamente. Esta operación no se puede deshacer.</p>
 <form method="post" action="{{ url_for('product_delete', product_id=product.id) }}" onsubmit="return confirm('¿Confirmas poner sus existencias a cero y eliminar definitivamente este artículo de Grocy?');">
@@ -1271,6 +1253,51 @@ def cache_remote_product_photo(product_id, url):
     temp = PHOTO_DIR / (str(product_id) + ".tmp")
     image.convert("RGB").save(temp, format="JPEG", quality=85)
     temp.replace(PHOTO_DIR / (str(product_id) + ".jpg"))
+
+
+@app.post("/product/<int:product_id>/edit-all")
+def product_edit_all(product_id):
+    if not LOCK.acquire(blocking=False):
+        abort(409)
+    try:
+        current = barcode_stock.product_detail(product_id)
+        name = request.form.get("name", "").strip()
+        unit = request.form.get("unit_id")
+        amount = request.form.get("desired_amount")
+        old_amount = request.form.get("expected_amount")
+        new_barcode = request.form.get("barcode", "").strip()
+        old_barcode = request.form.get("old_barcode", "").strip()
+        photo = request.files.get("photo")
+        from decimal import Decimal
+        if not name or len(name) > 200 or Decimal(amount) < 0 or Decimal(old_amount) < 0:
+            raise ValueError("Datos inválidos")
+        if new_barcode:
+            barcode_stock.validate_barcode(new_barcode)
+        barcode_stock.update_product_info(product_id, name, "1", unit)
+        if Decimal(amount) != Decimal(old_amount):
+            barcode_stock.set_product_stock(product_id, amount, old_amount)
+        if new_barcode and new_barcode != old_barcode:
+            barcode_stock.add_product_barcode(product_id, new_barcode, old_barcode)
+        if photo and photo.filename:
+            from PIL import Image, ImageOps
+            data = photo.read(8 * 1024 * 1024 + 1)
+            if len(data) > 8 * 1024 * 1024:
+                raise ValueError("Fotografía demasiado grande")
+            image = Image.open(io.BytesIO(data))
+            if image.format not in ("JPEG", "PNG", "WEBP"):
+                raise ValueError("Formato no admitido")
+            image = ImageOps.exif_transpose(image)
+            image.thumbnail((1200, 1200))
+            PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+            temp = PHOTO_DIR / (str(product_id) + ".tmp")
+            image.convert("RGB").save(temp, format="JPEG", quality=85)
+            temp.replace(PHOTO_DIR / (str(product_id) + ".jpg"))
+    except Exception:
+        app.logger.exception("Product combined edit failed for %s", product_id)
+        return render("No se pudieron guardar todos los cambios. Comprueba la ficha antes de reintentar."), 400
+    finally:
+        LOCK.release()
+    return redirect(url_for("index", view="product", product_id=product_id))
 
 
 @app.get("/product/<int:product_id>/photo/local")
