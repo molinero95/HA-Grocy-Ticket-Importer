@@ -49,6 +49,19 @@ class WebTests(unittest.TestCase):
     def test_requires_login_for_upload(self):
         self.assertEqual(self.client.post("/upload", data={"csrf": self.csrf()}).status_code, 401)
 
+    def test_product_association_uses_searchable_list(self):
+        with patch.object(web.barcode_stock, "list_products", return_value=[
+                {"id": 12, "name": "Nutella 350 g"},
+                {"id": 14, "name": "Leche Asturiana"}]):
+            self.login()
+            response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'id="product-search"', response.data)
+        self.assertIn(b'data-product-id="12"', response.data)
+        self.assertIn(b'Nutella 350 g', response.data)
+        self.assertIn(b'id="selected-product-id"', response.data)
+        self.assertNotIn(b'<select name="product_id"', response.data)
+
     def test_invalid_file_type_blocked(self):
         token = self.login()
         r = self.client.post("/upload", data={"csrf": token,
