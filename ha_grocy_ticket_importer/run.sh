@@ -1,12 +1,15 @@
 #!/bin/sh
 set -eu
-CONFIG_DIR="/ha_config/grocy_ticket_importer"
+CONFIG_DIR="/config"
 if [ ! -f "$CONFIG_DIR/.env" ]; then
     echo "Missing $CONFIG_DIR/.env — retain the existing local credentials file."
     exit 1
 fi
-cp "$CONFIG_DIR/.env" /app/.env
-chmod 600 /app/.env
+if [ ! -f "$CONFIG_DIR/grocy_imports.sqlite3" ]; then
+    echo "Missing import history database. Migrate the existing grocy_imports.sqlite3 before first start to prevent duplicate imports."
+    exit 1
+fi
+export GROCY_ENV_FILE="$CONFIG_DIR/.env"
 mkdir -p /data/receipts
 if [ ! -s /data/session_secret ]; then
     /venv/bin/python -c 'import secrets;open("/data/session_secret","w").write(secrets.token_urlsafe(48))'
