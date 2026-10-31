@@ -1,19 +1,35 @@
 # Grocy Ticket Importer — Home Assistant app (experimental)
 
-The interface uses Home Assistant Ingress. It is intended to appear as **Despensa** in the sidebar.
+This experimental Home Assistant add-on uses Ingress, with the sidebar title **Despensa**. Its Python logic and container packaging are checked by GitHub Actions, but it has not yet been smoke-tested on a real Home Assistant OS instance.
 
-**Not ready for production installation.** This initial packaging has not yet been built and smoke-tested on Home Assistant OS. It has privileged read/write access to the Home Assistant configuration directory, including other integration credentials. A narrower storage strategy is planned.
+## Isolated configuration and safe migration
 
-## Migration and prerequisites
+The add-on maps **only its own app configuration** (type `app_config`) as `/config`, rather than the whole Home Assistant configuration. This limits exposure to unrelated Home Assistant credentials.
 
-- Home Assistant OS, aarch64 or amd64.
-- Existing Grocy in Home Assistant, with `/config/grocy_ticket_importer/.env` containing `OPENAI_API_KEY`, `GROCY_URL`, and `GROCY_API_KEY`.
-- Existing `/config/grocy_ticket_importer/grocy_imports.sqlite3` must be preserved. **Do not delete or overwrite it**, otherwise the deduplication ledger is lost.
-- Grocy URL inside an app container must resolve to the Grocy add-on on the internal network.
-- This repository is private. HA Supervisor may not be able to add it as a normal remote app repository; local installation or publishing a compatible release mechanism must be arranged first.
+Before starting the add-on, **copy (do not move)** these two existing files from the old local working directory `/config/grocy_ticket_importer/` into this add-on's dedicated `app_configs/local_ha_grocy_ticket_importer/` directory, once Home Assistant has created it:
 
-## Security
+- `.env` containing `OPENAI_API_KEY`, `GROCY_URL`, `GROCY_API_KEY` (never add it to GitHub).
+- `grocy_imports.sqlite3` — the existing receipt import ledger. Preserve it to avoid duplicate imports.
 
-Requests enter through Ingress on port 8099; nginx allows the Supervisor gateway only. No app port is exposed to the LAN. Authentication is provided by Home Assistant. CSRF protection is enforced for changes. The app copies `.env` into its ephemeral container at startup. Personal receipt JSON files are kept under persistent `/data/receipts`, not in Git. Keep backups of the ledger.
+**If the ledger is missing, the add-on deliberately refuses to start.** Do not create an empty database or retry imported tickets without checking prior state.
 
-The interface currently supports receipt upload/review/commit, adding and consuming a stock unit by barcode, associating a barcode to an existing product, and searching a public product image by EAN. The image is not yet saved to Grocy.
+Depending on your editor's add-on access, the dedicated folder may appear under `/addon_configs/local_ha_grocy_ticket_importer/` or `/app_configs/local_ha_grocy_ticket_importer/`. Confirm the actual folder in your Home Assistant editor before copying anything.
+
+Personal uploaded receipts are written only to the add-on's own persistent `/data/receipts` directory. Its generated web session key is stored at `/data/session_secret`.
+
+## Installation warning
+
+This GitHub repository is private. Home Assistant Supervisor may not be able to fetch it as a standard remote repository. The packaged ZIP is intended for manual local-app installation, not a directly installable remote repository. The exact local placement and reboot/reload steps must be verified on your device before proceeding.
+
+Do not open port 8099 on your router. Ingress requests enter via the Supervisor gateway; the internal nginx only allows that gateway. Authentication comes from Home Assistant.
+
+## Current actions
+
+Upload and preview receipt, dry-run then confirm Grocy changes; scan/type barcodes for stock addition or one-unit consumption; associate barcodes with existing products; search photos by exact barcode via Open Food Facts. Pictures are previewed, but **not yet saved** into Grocy.
+
+## Further checks before production
+
+- Verify installing and starting with Home Assistant OS on aarch64.
+- Verify Ingress path and authentication.
+- Verify import ledger migration and repeat-import blocking without modifying stock.
+- Verify Grocy API stock consumption and creation behavior on the installed Grocy version.
