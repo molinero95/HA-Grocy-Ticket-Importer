@@ -181,6 +181,45 @@ def register_catalog_routes(app, barcode_stock, lock):
             app.logger.exception("api_v1_catalog_duplicates_failed")
             return jsonify({"error": "duplicates_unavailable"}), 503
 
+    @app.get("/api/v1/catalog/products/<int:product_id>/deletion-check")
+    def api_v1_check_catalog_deletion(product_id):
+        """Read-only deletion eligibility report; never consume stock or delete."""
+        payload = {"expected_name": request.args.get("expected_name")}
+        if not isinstance(payload, dict) or not isinstance(payload.get("expected_name"), str):
+            return jsonify({"error": "expected_name_required"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            from decimal import Decimal
+            from variant_catalog import variants_for_product
+            from merge_audit import COLLECTIONS, REFERENCES
+            product = barcode_stock.grocy("GET", f"objects/products/{product_id}")
+            if not isinstance(product, dict) or int(product.get("id", 0)) != product_id:
+                return jsonify({"error": "product_not_found"}), 404
+            if product.get("name") != payload["expected_name"]:
+                return jsonify({"error": "stale_product_name"}), 409
+            stock = barcode_stock.grocy("GET", f"stock/products/{product_id}")
+            amount = Decimal(str(stock["stock_amount"]))
+            if not amount.is_finite() or amount != 0:
+                return jsonify({"error": "nonzero_or_invalid_stock"}), 409
+            if variants_for_product(product_id):
+                return jsonify({"error": "product_has_variants"}), 409
+            for collection, _ in COLLECTIONS:
+                rows = barcode_stock.grocy("GET", "objects/" + collection)
+                if not isinstance(rows, list):
+                    return jsonify({"error": "reference_audit_unavailable"}), 409
+                if any(isinstance(row, dict) and any(str(row.get(field)) == str(product_id) for field in REFERENCES) for row in rows):
+                    return jsonify({"error": "product_has_references", "collection": collection}), 409
+            # Historical and external references cannot be audited exhaustively.
+            return jsonify({"error": "historical_references_not_audited",
+                            "details": "No se elimina el producto hasta verificar historial y referencias externas."}), 409
+        except Exception:
+            app.logger.exception("api_v1_catalog_delete_audit_failed")
+            return jsonify({"error": "product_delete_audit_unavailable"}), 503
+        finally:
+            lock.release()
+
+
     @app.delete("/api/v1/catalog/products/<int:product_id>")
     def api_v1_delete_catalog_product(product_id):
         """Fail-closed deletion: never consume stock or discard linked records."""
