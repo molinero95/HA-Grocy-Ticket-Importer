@@ -404,6 +404,74 @@ def _get_name_and_id(barcode):
         raise BarcodeError("No existe un producto con este código")
     return product["name"], int(product["id"])
 
+def new_product_units():
+    """Offer real Grocy stock units when creating a catalog product."""
+    units = grocy("GET", "objects/quantity_units")
+    if not isinstance(units, list):
+        raise BarcodeError("No se han podido cargar las unidades de Grocy")
+    return sorted(
+        [{"id": int(u["id"]), "name": str(u["name"])} for u in units],
+        key=lambda u: u["name"].casefold())
+
+
+def _new_product_match(name, barcode, products, barcodes):
+    """Find an existing product by exact normalized name or scanned barcode."""
+    folded = " ".join(name.casefold().split())
+    by_id = {int(p["id"]): p for p in products}
+    if barcode:
+        for row in barcodes:
+            if str(row.get("barcode")) == barcode:
+                pid = int(row["product_id"])
+                if pid in by_id:
+                    return {"id": pid, "name": str(by_id[pid]["name"])}
+                raise BarcodeError("El código ya está asociado en Grocy, pero no se encuentra su producto")
+    for product in products:
+        if " ".join(str(product["name"]).casefold().split()) == folded:
+            return {"id": int(product["id"]), "name": str(product["name"])}
+    return None
+
+
+def create_catalog_product(name, barcode="", unit_id=None, initial_stock="0", location_id=2):
+    """Create only new products; an existing match is returned without any writes."""
+    name = (name or "").strip()
+    if not name or len(name) > 200:
+        raise BarcodeError("Introduce un nombre de producto de 1 a 200 caracteres")
+    barcode = (barcode or "").strip()
+    if barcode:
+        barcode = validate_barcode(barcode)
+    try:
+        unit_id = int(unit_id)
+        location_id = int(location_id)
+        amount = Decimal(str(initial_stock).strip().replace(",", "."))
+    except (ValueError, TypeError, ArithmeticError) as exc:
+        raise BarcodeError("Unidad o cantidad inicial no válida") from exc
+    if not amount.is_finite() or amount < 0 or amount.as_tuple().exponent < -2:
+        raise BarcodeError("La cantidad inicial debe ser positiva o cero, con máximo dos decimales")
+    units = new_product_units()
+    if unit_id not in {u["id"] for u in units}:
+        raise BarcodeError("Selecciona una unidad de medida válida de Grocy")
+    products = grocy("GET", "objects/products")
+    barcodes = grocy("GET", "objects/product_barcodes")
+    if not isinstance(products, list) or not isinstance(barcodes, list):
+        raise BarcodeError("No se ha podido verificar el catálogo de Grocy")
+    existing = _new_product_match(name, barcode, products, barcodes)
+    if existing:
+        return {"created": False, "product_id": existing["id"], "name": existing["name"]}
+    result = grocy("POST", "objects/products", {
+        "name": name, "location_id": location_id, "qu_id_stock": unit_id,
+        "qu_id_purchase": unit_id, "min_stock_amount": 0,
+    })
+    pid = int(result["created_object_id"])
+    if barcode:
+        grocy("POST", "objects/product_barcodes", {"product_id": pid, "barcode": barcode})
+    if amount > 0:
+        grocy("POST", f"stock/products/{pid}/add", {
+            "amount": float(amount), "price": 0, "best_before_date": "2999-12-31",
+            "location_id": location_id, "note": "Stock inicial al crear el producto desde Despensa",
+        })
+    return {"created": True, "product_id": pid, "name": name}
+
+
 def add_one(barcode, name="", location_id=2, unit_id=2):
     """Create a product if missing, associate barcode, then increase stock by one."""
     barcode = validate_barcode(barcode)
