@@ -64,3 +64,11 @@ Last reviewed: 2026-10-31. Prioritized by correctness/safety, not by release dat
   before any product consolidation or deletion.
 - [ ] Prepare version bump and identical root/add-on changelogs only when
   shipping a tested increment.
+
+### Alexa review progress (PR #5)
+- [x] Persist ambiguous Alexa candidate suggestions without modifying the
+  original Alexa/Grocy shopping entry.
+- [x] Allow manual selection in an authenticated CSRF-protected screen.
+- [ ] Consume explicit selections in an identity-aware reconciliation planner
+  without changing/removing original notes until the full operation is verified.
+- [ ] Handle concurrent edits, quantity preservation and restart recovery.
