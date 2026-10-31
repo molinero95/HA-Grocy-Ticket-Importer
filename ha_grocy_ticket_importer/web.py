@@ -107,6 +107,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .section-eyebrow{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:var(--primary);margin:0 0 8px}
 .helper{font-size:.9rem}
 .ticket-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.product-photo-hero{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;border:1px solid var(--line);border-radius:16px;margin:12px 0 22px;background:var(--surface,#fff)}
+.product-photo-hero .photo-preview{width:100%;display:flex;flex-direction:column;align-items:center}
+.product-photo-hero img:not([hidden]){max-width:200px;max-height:180px;object-fit:contain;border-radius:12px}
+.product-photo-hero button{max-width:280px}
+.product-sheet h3{margin-top:24px;margin-bottom:8px}
+.product-danger-zone{margin-top:28px;padding:12px;border-top:1px solid var(--line)}
+.product-danger-zone summary{cursor:pointer;font-size:.9rem}
 .ticket-review-item{border-bottom:1px solid var(--line);padding:14px 0}
 .ticket-review-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media(max-width:520px){.ticket-review-fields{grid-template-columns:1fr}}
@@ -296,41 +303,35 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 {% if view == 'product' %}
 <section class="product-sheet">
 {% if product %}
-<p class="section-eyebrow">Ficha del artículo</p>
+<p class="section-eyebrow">Editar artículo</p>
 <h2>{{ product.name }}</h2>
-<div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
-<button type="button" id="product-camera-open">📷 Hacer foto del artículo</button>
+<p class="helper">Actualiza los datos y guarda todos los cambios de una vez.</p>
+<div class="product-photo-hero"><div class="photo-preview"><img id="product-photo-display" {% if product.image_url %}src="{{ product.image_url }}"{% else %}hidden{% endif %} alt="Imagen del producto {{ product.name }}" loading="lazy" referrerpolicy="no-referrer"><p id="product-photo-status" class="helper" aria-live="polite"></p></div>
+<button type="button" id="product-camera-open">📷 {{ "Cambiar foto" if product.image_url else "Hacer foto" }}</button></div>
 <div id="product-camera-panel" hidden><video id="product-camera-video" autoplay playsinline muted style="width:100%;max-height:420px"></video><button type="button" id="product-camera-snapshot">Capturar foto</button><button type="button" id="product-camera-close">Cancelar</button></div>
 {% if not product.image_url and product.barcodes %}<div id="product-photo-autoload" data-barcode="{{ product.barcodes[0] }}" data-save-url="{{ url_for('product_photo_save', product_id=product.id) }}" data-csrf="{{ csrf }}"></div>{% endif %}
 <form id="product-edit-form" method="post" action="{{ url_for('product_edit_all', product_id=product.id) }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <input id="product-photo-upload" name="photo" type="file" accept="image/jpeg" hidden>
-<label for="edit-product-name">Nombre del artículo</label><input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
+<h3>Datos del artículo</h3><label for="edit-product-name">Nombre del artículo</label><input id="edit-product-name" name="name" maxlength="200" value="{{ product.name }}" required>
 <label for="edit-unit">Unidad de medida</label><select id="edit-unit" name="unit_id" required>
 {% for u in product.units if u.name|lower in ("piece", "pieces", "unidad", "unidades", "kg", "kilogram", "kilogramo", "kilogramos") %}<option value="{{ u.id }}" {% if u.id == product.purchase_unit_id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select>
-<h3>Cantidad disponible</h3><p>Stock actual: {{ product.stock_amount }}</p>
+<h3>Existencias</h3>
 <input type="hidden" name="expected_amount" value="{{ product.stock_amount }}">
 <label for="edit-stock-amount">Cantidad total que tengo</label><input id="edit-stock-amount" name="desired_amount" inputmode="decimal" type="number" step="0.01" min="0" value="{{ product.stock_amount }}" required>
-<h3>Código de barras</h3>
+<h3>Identificación</h3>
 {% if product.barcodes %}<label for="old-product-barcode">Código actual</label><input id="old-product-barcode" name="old_barcode" value="{{ product.barcodes[0] }}" inputmode="numeric" pattern="[0-9]{8,14}">{% endif %}
 <label for="edit-barcode">Nuevo código (opcional)</label><input id="edit-barcode" name="barcode" inputmode="numeric" pattern="[0-9]{8,14}" autocomplete="off">
 <p class="helper">Solo se modificará el código de barras si introduces uno nuevo.</p>
 <button id="product-save-all" type="submit">Guardar cambios</button>
 </form>
-<h3>Eliminar artículo</h3>
+<details class="product-danger-zone"><summary>Opciones avanzadas · Eliminar artículo</summary><h3>Eliminar artículo</h3>
 <p class="helper">Al confirmar, las existencias se descontarán hasta cero y después se eliminará el artículo definitivamente. Esta operación no se puede deshacer.</p>
 <form method="post" action="{{ url_for('product_delete', product_id=product.id) }}" onsubmit="return confirm('¿Confirmas poner sus existencias a cero y eliminar definitivamente este artículo de Grocy?');">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <input type="hidden" name="expected_name" value="{{ product.name }}">
 <button type="submit">🗑️ Eliminar artículo</button>
-</form>
-<h3>Fotografía</h3>
-{% if product.image_url %}<p class="helper">Imagen guardada desde Open Food Facts.</p>{% endif %}
-{% if product.barcodes %}
-<p class="helper">La foto se busca automáticamente al asociar un código de barras.</p>
-{% else %}
-<p>Este producto aún no tiene un código de barras asociado. Puedes vincularlo en esta misma ficha.</p>
-{% endif %}
+</form></details>
 {% else %}<p role="alert">No se ha podido cargar la ficha del producto.</p>{% endif %}
 </section>
 {% endif %}
