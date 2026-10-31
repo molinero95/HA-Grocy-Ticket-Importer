@@ -1,4 +1,4 @@
-import type { ShoppingResponse } from './types';
+import type { ShoppingResponse, InventoryResponse } from './types';
 
 /** Relative paths preserve the Home Assistant ingress prefix. */
 const base = 'api/v1/';
@@ -30,3 +30,18 @@ async function mutate(path: string, method: 'POST' | 'DELETE', body?: object): P
 export const toggleShopping = (id: number, done: boolean) => mutate('shopping/' + id + '/toggle', 'POST', { done });
 export const removeShopping = (id: number) => mutate('shopping/' + id, 'DELETE');
 export const chooseAlexaMatch = (key: string, productId: number) => mutate('alexa/matches/' + encodeURIComponent(key) + '/choose', 'POST', { product_id: productId });
+
+export async function getInventory(): Promise<InventoryResponse> {
+  const response = await fetch(base + 'inventory', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se ha podido cargar el inventario');
+  return response.json() as Promise<InventoryResponse>;
+}
+export async function lookupBarcode(code: string): Promise<number | null> {
+  const response = await fetch(base + 'barcodes/' + encodeURIComponent(code), { credentials: 'same-origin' });
+  if (!response.ok) throw new Error('No se ha podido buscar el código de barras');
+  const result = await response.json() as { product_id: number | null };
+  return result.product_id;
+}
+export async function stepShopping(productId: number, direction: 'plus' | 'minus'): Promise<void> {
+  await mutate('shopping/products/' + productId + '/step', 'POST', { direction });
+}
