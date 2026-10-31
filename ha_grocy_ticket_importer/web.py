@@ -1195,6 +1195,10 @@ from api_receipts import register_receipt_routes
 register_receipt_routes(app, DATA, ALLOWED, extract, lambda rid, mode: run_import(rid, mode), LOCK)
 
 
+from api_catalog import register_catalog_routes
+register_catalog_routes(app, barcode_stock, LOCK)
+
+
 @app.get("/")
 def index():
     if request.args.get("view") == "inventory" and request.args.get("deleted") == "1":
