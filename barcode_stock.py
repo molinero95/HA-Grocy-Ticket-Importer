@@ -73,7 +73,7 @@ def inventory_snapshot():
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))
 
 
-PACK_MARKER = re.compile(r"(?:\\n|^)[[]Despensa: unidades_por_envase=(\\d+)[]]\\s*")
+PACK_MARKER = re.compile(r"(?:\n|^)\[Despensa: unidades_por_envase=(\d+)\]\s*")
 
 def product_detail(product_id):
     """Get one product's editable metadata and known barcodes."""
@@ -114,7 +114,7 @@ def update_product_info(product_id, name, pack_size):
         raise BarcodeError("Producto inexistente")
     description = PACK_MARKER.sub("", str(product.get("description") or "")).strip()
     if pack_size != 1:
-        description = (description + "\\n" if description else "") + (
+        description = (description + "\n" if description else "") + (
             f"[Despensa: unidades_por_envase={pack_size}]")
     grocy("PUT", f"objects/products/{pid}", {"name": name, "description": description})
     return {"id": pid, "name": name, "pack_size": pack_size}
