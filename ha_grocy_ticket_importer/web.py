@@ -1357,6 +1357,11 @@ def product_edit_all(product_id):
             raise ValueError("Datos inválidos")
         if new_barcode:
             barcode_stock.validate_barcode(new_barcode)
+        # Detect conflicts before any writes: never partially save an edit.
+        if new_barcode and new_barcode != old_barcode:
+            owner = barcode_stock.find_product(new_barcode)
+            if owner and int(owner["id"]) != int(product_id):
+                return redirect(url_for("product_merge_preview", product_id=product_id, barcode=new_barcode))
         barcode_stock.update_product_info(product_id, name, "1", unit)
         if Decimal(amount) != Decimal(old_amount):
             barcode_stock.apply_stock_adjustment(barcode_stock.prepare_stock_adjustment(product_id, amount, old_amount))
@@ -1382,6 +1387,28 @@ def product_edit_all(product_id):
     finally:
         LOCK.release()
     return redirect(url_for("index", view="product", product_id=product_id))
+
+
+@app.get("/product/<int:product_id>/merge-preview")
+def product_merge_preview(product_id):
+    if not (INGRESS_MODE or session.get("auth")):
+        abort(401)
+    try:
+        barcode = barcode_stock.validate_barcode(request.args.get("barcode", ""))
+        source = barcode_stock.product_detail(product_id)
+        owner = barcode_stock.find_product(barcode)
+        if not owner or int(owner["id"]) == int(product_id):
+            return redirect(url_for("index", view="product", product_id=product_id))
+        destination = barcode_stock.product_detail(owner["id"])
+    except (ValueError, TypeError, barcode_stock.BarcodeError):
+        abort(400)
+    return render_template_string("""<!doctype html><html lang="es"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Posible combinación · Despensa</title>
+    <style>body{font:16px/1.5 system-ui;background:#f5f7f5;color:#182925;max-width:600px;margin:24px auto;padding:18px}section{background:white;padding:20px;border-radius:16px;margin:16px 0}a{color:#126948}h1{font-size:1.5rem}</style>
+    <h1>⚠️ Código ya registrado</h1><p>El código <strong>{{ barcode }}</strong> pertenece a otro artículo. No se ha guardado ningún cambio.</p>
+    <section><h2>Artículo que estabas editando</h2><p>{{ source.name }} · ID {{ source.id }}</p><p>Existencias: {{ source.stock_amount }} · unidad {{ source.unit_id }}</p></section>
+    <section><h2>Artículo que ya tiene el código</h2><p>{{ destination.name }} · ID {{ destination.id }}</p><p>Existencias: {{ destination.stock_amount }} · unidad {{ destination.unit_id }}</p></section>
+    <p>La combinación aún no está habilitada: primero hay que comprobar unidades, existencias y referencias para evitar pérdidas.</p>
+    <p><a href="{{ url_for('index', view='product', product_id=source.id) }}">← Volver a editar</a> · <a href="{{ url_for('index', view='product', product_id=destination.id) }}">Ver artículo existente</a></p></html>""", source=source, destination=destination, barcode=barcode)
 
 
 @app.get("/product/<int:product_id>/photo/local")
