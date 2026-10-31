@@ -11,6 +11,12 @@ with patch.dict(os.environ, {"WEB_PASSWORD": "test-password", "WEB_SESSION_SECRE
 
 class WebTests(unittest.TestCase):
     def setUp(self):
+        # Keep credentials active throughout each test, not just during module import.
+        env_patch = patch.dict(os.environ, {"WEB_PASSWORD": "test-password",
+                                           "WEB_SESSION_SECRET": "test-secret-key",
+                                           "HA_INGRESS_MODE": "0"})
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.patcher = patch.object(web, "DATA", Path(self.temp.name))
