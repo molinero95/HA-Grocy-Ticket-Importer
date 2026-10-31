@@ -67,6 +67,20 @@ class ShoppingApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         edit.assert_called_once_with(3, "Arroz integral", "1", None)
 
+    def test_catalog_barcode_rejects_conflict_without_writing(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "associate_product_barcode", side_effect=web.barcode_stock.BarcodeError("Código en otro producto")) as save:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.post("/api/v1/catalog/products/7/barcodes", json={"barcode": "8412345678901"}, headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 409)
+        save.assert_called_once()
+
+    def test_catalog_stock_rejects_stale_quantity_without_writing(self):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "prepare_stock_adjustment", side_effect=web.barcode_stock.BarcodeError("stock changed")), patch.object(web.barcode_stock, "apply_stock_adjustment") as apply:
+            token = self.client.get("/api/v1/session").json["csrf_token"]
+            response = self.client.post("/api/v1/catalog/products/7/stock", json={"desired_amount": "5", "expected_amount": "2"}, headers={"X-CSRF-Token": token})
+        self.assertEqual(response.status_code, 409)
+        apply.assert_not_called()
+
     def test_anonymous_request_is_rejected_without_reading_grocy(self):
         with patch.object(web, "INGRESS_MODE", False), patch.object(web.barcode_stock, "shopping_list_snapshot") as read:
             response = self.client.get("/api/v1/shopping")
