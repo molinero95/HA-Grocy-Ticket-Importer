@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1] — 2026-11-01
+
+### Fixed
+- Surface disabled or unconfigured Alexa synchronization instead of silently showing unsynchronized shopping lists.
+- Persist sanitized worker health and last synchronization errors for troubleshooting.
+- Warn when the sync worker is stale or has failed, without exposing secrets.
+
+
 ## [1.5.0] — 2026-11-01
 
 ### Changed
