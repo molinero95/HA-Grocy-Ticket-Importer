@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1] — 2026-11-01
+
+### Fixed
+- Align action card icons and labels consistently on mobile.
+- Style the Alexa alias editor with shared product-form controls, responsive spacing and consistent buttons.
+
+
 ## [1.4.0] — 2026-11-01
 
 ### Added
