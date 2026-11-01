@@ -16,6 +16,17 @@ CHOICE = {"leche": {"product_id": 7}}
 
 
 class AlexaPurchaseAliasRegression(unittest.TestCase):
+    def test_persistent_alias_matches_without_fuzzy_candidate(self):
+        products = [{"id": 7, "name": "Leche entera"}]
+        alias = {"bebida blanca": {"product_id": 7, "trusted_alias": True}}
+        plan = plan_identity(["Bebida blanca"], [], products, ["p:7"], alias)
+        self.assertEqual([r["name"] for r in plan["remove_alexa"]], ["Bebida blanca"])
+
+    def test_untrusted_manual_choice_still_requires_candidate(self):
+        with self.assertRaises(IdentityConflict):
+            plan_identity(["Bebida blanca"], [], PRODUCTS, ["p:7"],
+                          {"bebida blanca": {"product_id": 7}})
+
     def test_purchased_alias_is_removed_from_alexa(self):
         # The shopping row disappeared from Grocy after being marked done.
         plan = plan_identity(["Leche"], [], PRODUCTS, ["p:7"], CHOICE)
