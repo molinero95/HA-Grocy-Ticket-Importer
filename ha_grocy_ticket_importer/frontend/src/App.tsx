@@ -4,12 +4,14 @@ import { ProductDetail } from "./ProductDetail";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
 import { Duplicates } from "./Duplicates";
+import { AlexaAliases } from "./AlexaAliases";
 import {
   ShoppingBasket,
   Package,
   ScanBarcode,
   RefreshCw,
   Archive,
+  Tags,
   Copy,
 } from "lucide-react";
 import {
@@ -85,6 +87,7 @@ function AuthenticatedApp() {
     | "actions"
     | "receipts"
     | "duplicates"
+    | "aliases"
     | "archived"
   >("shopping");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
@@ -183,7 +186,7 @@ function AuthenticatedApp() {
         </button>
         <button
           className={
-            ["actions", "receipts", "duplicates", "archived"].includes(view)
+            ["actions", "receipts", "duplicates", "archived", "aliases"].includes(view)
               ? "active"
               : ""
           }
@@ -235,8 +238,14 @@ function AuthenticatedApp() {
                 </small>
               </span>
             </button>
+            <button aria-label="Administrar alias de Alexa" onClick={() => setView("aliases")}>
+              <Tags size={24} aria-hidden="true" />
+              <span>Alias de Alexa<small>Administrar nombres asociados a productos</small></span>
+            </button>
           </div>
         </main>
+      ) : view === "aliases" ? (
+        <AlexaAliases />
       ) : view === "inventory" || view === "archived" ? (
         <Inventory key={view} archived={view === "archived"} />
       ) : view === "receipts" ? (
