@@ -117,11 +117,9 @@ def deletion_preview(product_id):
         blockers.append('una versión de Grocy cuyas cascadas de borrado aún no se han verificado')
     if is_active(product):
         blockers.append('el producto no está archivado')
-    stock = barcode_stock.grocy('GET', f'stock/products/{pid}')
-    amount = Decimal(str(stock['stock_amount']))
-    if not amount.is_finite() or amount != 0:
-        blockers.append('existencias distintas de cero')
-    snapshot = {'product': product, 'stock': str(amount), 'grocy_version': version}
+    # Grocy's stock/products detail endpoint rejects inactive products. Audit
+    # the complete authoritative stock rows instead; an empty set proves zero.
+    snapshot = {'product': product, 'grocy_version': version}
     checks = [('stock', 'product_id', 'lotes de existencias'),
               ('stock_log', 'product_id', 'historial de movimientos'),
               ('shopping_list', 'product_id', 'referencias en listas de compra'),
@@ -139,6 +137,9 @@ def deletion_preview(product_id):
         snapshot[collection] = linked
         if reason and linked:
             blockers.append(reason)
+    amounts = [Decimal(str(row['amount'])) for row in snapshot['stock']]
+    if any(not amount.is_finite() or amount != 0 for amount in amounts):
+        blockers.append('existencias distintas de cero o desconocidas')
     blockers.extend(_local_deletion_blockers(pid))
     snapshot['local_blockers'] = blockers
     token = hashlib.sha256(json.dumps(snapshot, sort_keys=True, ensure_ascii=False).encode()).hexdigest()

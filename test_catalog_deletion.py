@@ -52,7 +52,8 @@ class DeletionFixture:
         self.assertEqual(method, 'GET')
         if path == 'system/info': return {'grocy_version': {'Version': self.version}}
         if path == 'objects/products/7': return dict(self.product)
-        if path == 'stock/products/7': return {'stock_amount': self.amount}
+        if path == 'objects/stock' and self.amount != '0':
+            return [{'id': 30, 'product_id': 7, 'amount': self.amount}]
         if path == 'objects/products': return [] if self.deleted else [dict(self.product), *copy.deepcopy(self.rows['products'])]
         return copy.deepcopy(self.rows[path.removeprefix('objects/')])
 
@@ -76,7 +77,7 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         for collection in ('stock', 'stock_log', 'shopping_list', 'recipes_pos', 'recipes', 'meal_plan', 'products'):
             with self.subTest(collection=collection):
                 field = 'parent_product_id' if collection == 'products' else 'product_id'
-                self.rows[collection] = [{'id': 50, field: 7}]
+                self.rows[collection] = [{'id': 50, field: 7, **({'amount': 0} if collection == 'stock' else {})}]
                 preview = lifecycle.deletion_preview(7)
                 self.assertFalse(preview['allowed'])
                 with self.assertRaises(barcode_stock.BarcodeError):
