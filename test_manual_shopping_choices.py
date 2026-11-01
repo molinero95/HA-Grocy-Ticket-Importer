@@ -260,6 +260,58 @@ class ManualShoppingChoiceTests(unittest.TestCase):
         save.assert_not_called()
         self.assertTrue(queue.pending(self.path)[0]['removed'])
 
+    def test_exact_note_resolution_preserves_quantity_and_unblocks_both_sync_directions(self):
+        import shopping_sync_worker as worker
+        from shopping_sync_status import snapshot
+        self.products += [{"id": 9, "name": "Huevos", "qu_id_stock": 2},
+                          {"id": 10, "name": "Tomate", "qu_id_stock": 2}]
+        self.note(note="Arroz redondo", amount=2.5)
+        self.note(id=2, note="", product_id=10, qu_id=2, amount=4)
+        source = ["Arroz redondo", "Huevos"]
+        def rows():
+            by_id = {p["id"]: p["name"] for p in self.products}
+            return [(by_id.get(r.get("product_id"), r["note"]), copy.deepcopy(r)) for r in self.rows]
+        def add_grocy(row):
+            self.rows.append({"id": 3, "product_id": row["product_id"], "amount": 1,
+                              "note": "", "done": 0, "qu_id": 2, "shopping_list_id": 1})
+        with patch.dict(os.environ, {"ALEXA_SHOPPING_LIST_ENTITY": "todo.test", "SHOPPING_SYNC_ENABLED": "1"}), \
+             patch.object(worker, "MATCH_QUEUE", self.path), \
+             patch.object(worker, "STATE_V2", Path(self.temp.name) / "checkpoint.json"), \
+             patch.object(worker, "ha_todo_items", side_effect=lambda: list(source)), \
+             patch.object(worker, "grocy_entries", side_effect=rows), \
+             patch.object(worker, "grocy", self.grocy), \
+             patch.object(worker, "add_alexa", side_effect=source.append) as alexa_write, \
+             patch.object(worker, "add_grocy_identity", side_effect=add_grocy) as grocy_write:
+            with self.assertRaisesRegex(ValueError, "canonical product"):
+                worker.run_once(dry_run=False)
+            self.assertEqual(snapshot(self.path)["reason"], "note_conflict")
+            self.assertEqual(self.writes, [])
+            alexa_write.assert_not_called()
+            grocy_write.assert_not_called()
+            review = queue.pending(self.path)[0]
+            self.assertTrue(review["requires_product"])
+            self.assertEqual(review["candidates"][0]["id"], 7)
+            manual_choice(self.grocy, queue, self.path, "arroz redondo", 7, self.operation)
+            self.assertEqual(self.rows[0]["id"], 1)
+            self.assertEqual(self.rows[0]["note"], "Arroz redondo")
+            self.assertEqual(self.rows[0]["amount"], 2.5)
+            result = worker.run_once(dry_run=False)
+            self.assertEqual(result["next_baseline"], ["p:10", "p:7", "p:9"])
+            self.assertEqual(snapshot(self.path)["state"], "ok")
+            alexa_write.assert_called_once_with("Tomate")
+            self.assertEqual(grocy_write.call_args.args[0]["product_id"], 9)
+            self.assertEqual([w[0] for w in self.writes], ["PUT"])
+
+    def test_exact_note_cannot_be_kept_as_unresolved_text_or_merged_with_existing_product(self):
+        self.note(note="Arroz redondo")
+        queue.refresh(self.path, ["Arroz redondo"], self.products, [("Arroz redondo", self.rows[0])])
+        with self.assertRaisesRegex(ValueError, "Asocia"):
+            manual_choice(self.grocy, queue, self.path, "arroz redondo", 0, self.operation)
+        self.note(id=2, product_id=7, note="")
+        with self.assertRaisesRegex(ValueError, "ya está en la lista"):
+            manual_choice(self.grocy, queue, self.path, "arroz redondo", 7, self.operation)
+        self.assertEqual(self.writes, [])
+
     def worker(self, dry_run):
         import shopping_sync_worker as worker
         source = ["Arroz"]

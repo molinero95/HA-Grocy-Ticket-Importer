@@ -2,11 +2,8 @@
 
 Run with: python -m unittest discover -s tests -p 'test_alexa_purchase_alias_regression.py'
 """
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ha_grocy_ticket_importer"))
 
 from shopping_identity_sync import plan_identity, IdentityConflict
 

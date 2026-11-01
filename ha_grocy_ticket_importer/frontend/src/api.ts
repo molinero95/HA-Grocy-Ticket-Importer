@@ -24,6 +24,10 @@ async function token(): Promise<string> {
 }
 
 const errorMessages: Record<string, string> = {
+  aliases_unavailable: "No se pudieron guardar o consultar los alias. Actualiza antes de reintentar.",
+  alias_conflict: "El alias ya pertenece a otro producto o ha cambiado. Actualiza los alias.",
+  product_not_found: "El producto ya no está disponible. Elige otro producto.",
+  catalog_unavailable: "No se pudo verificar el catálogo de Grocy.",
   operation_in_progress:
     "Hay otra operación en curso. Actualiza los datos antes de continuar.",
   invalid_credentials: "Contraseña incorrecta.",
@@ -116,8 +120,8 @@ export type AlexaAlias = { key: string; name: string; product_id: number };
 export const getAlexaAliases = () => request<{ aliases: AlexaAlias[] }>("alexa/aliases");
 export const saveAlexaAlias = (name: string, product_id: number) =>
   request("alexa/aliases", "POST", { name, product_id });
-export const deleteAlexaAlias = (key: string) =>
-  request("alexa/aliases/" + encodeURIComponent(key), "DELETE");
+export const deleteAlexaAlias = (key: string, productId: number) =>
+  request("alexa/aliases/" + encodeURIComponent(key), "DELETE", { product_id: productId });
 export const getInventory = () => request<InventoryResponse>("inventory");
 export async function lookupBarcode(code: string): Promise<number | null> {
   return (

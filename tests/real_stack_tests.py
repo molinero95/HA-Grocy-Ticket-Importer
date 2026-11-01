@@ -37,6 +37,38 @@ class RealStackTests(unittest.TestCase):
             self.assertEqual(self.client.delete('/api/v1/alexa/matches/pasta', headers=self.headers).status_code, 200)
         self.assertEqual(self.client.get('/api/v1/shopping').json['pending_matches'], [])
 
+    def test_exact_note_review_preserves_real_row_quantity_and_stock(self):
+        import shopping_match_queue
+        from shopping_choice_conversion import manual_choice
+        from shopping_identity_sync import plan_identity, IdentityConflict
+        from shopping_sync_adapters import grocy_entries
+        products = self.instance.http('GET', 'objects/products')
+        product = next(p for p in products if p['name'] == 'Leche de prueba')
+        pid = int(product['id'])
+        before = self.instance.http('GET', f'stock/products/{pid}')['stock_amount']
+        rid = int(self.instance.http('POST', 'objects/shopping_list',
+            {'shopping_list_id': 1, 'note': product['name'], 'amount': 2.5})['created_object_id'])
+        rows = grocy_entries()
+        shopping_match_queue.refresh(shopping_match_queue.DEFAULT_PATH, [product['name']], products, rows)
+        review = next(row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
+                      if row['name'] == product['name'])
+        self.assertTrue(review['requires_product'])
+        with self.assertRaises(IdentityConflict):
+            plan_identity([product['name']], [(product['name'], self.instance.http('GET', f'objects/shopping_list/{rid}'))], products)
+        result = manual_choice(self.instance.http, shopping_match_queue, shopping_match_queue.DEFAULT_PATH,
+                               review['key'], pid, str(uuid.uuid4()))
+        self.assertEqual(result['item_id'], rid)
+        row = self.instance.http('GET', f'objects/shopping_list/{rid}')
+        self.assertEqual(float(row['amount']), 2.5)
+        self.assertEqual(row['note'], product['name'])
+        self.assertEqual(int(row['product_id']), pid)
+        plan = plan_identity([product['name']], [(product['name'], row)], products)
+        self.assertEqual(plan['add_grocy'], [])
+        self.assertEqual(plan['add_alexa'], [])
+        self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], before)
+        self.instance.http('DELETE', f'objects/shopping_list/{rid}')
+        shopping_match_queue.refresh(shopping_match_queue.DEFAULT_PATH, [], products)
+
     def test_pack_stock_shopping_and_consumption(self):
         units = self.client.get('/api/v1/catalog/units').json['units']
         pack = next(u['id'] for u in units if u['name'] == 'Pack')

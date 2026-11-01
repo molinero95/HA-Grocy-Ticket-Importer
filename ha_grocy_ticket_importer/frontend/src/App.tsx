@@ -36,7 +36,7 @@ function Suggestions({
 }) {
   const client = useQueryClient();
   const [selected, setSelected] = useState(
-    String(match.selected_product_id ?? ""),
+    String(match.selected_product_id ?? (match.requires_product ? match.candidates[0]?.id ?? "" : "")),
   );
   const [operationId] = useState(() => crypto.randomUUID());
   const mutation = useMutation({
@@ -54,6 +54,7 @@ function Suggestions({
     <details className="suggestions">
       <summary>Elegir producto para «{match.name}»</summary>
       <div className="suggestion-options">
+        {match.requires_product && <p>Este artículo está guardado como texto. Puedes asociarlo al producto conservando su cantidad, o quitarlo de la lista.</p>}
         <label htmlFor={"choice-" + match.key}>Producto sugerido</label>
         <select
           id={"choice-" + match.key}
@@ -61,7 +62,7 @@ function Suggestions({
           disabled={mutation.isPending || mutation.isSuccess}
           onChange={(event) => setSelected(event.target.value)}
         >
-          <option value="">Mantener artículo original</option>
+          {!match.requires_product && <option value="">Mantener artículo original</option>}
           {match.candidates.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {candidate.name}
@@ -128,6 +129,7 @@ function AuthenticatedApp() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["shopping"],
     queryFn: getShopping,
+    refetchInterval: 30_000,
   });
   const matches = new Map(
     (data?.pending_matches ?? []).map((match) => [match.key, match]),
@@ -313,6 +315,17 @@ function AuthenticatedApp() {
               volver a intentarlo.
             </p>
           )}
+          {data?.sync && !["ok", "unconfigured"].includes(data.sync.state) && (
+            <p role="alert" className="notice">
+              {data.sync.state === "disabled"
+                ? "La sincronización con Alexa está desactivada; las sugerencias se consultan en modo lectura."
+                : data.sync.state === "stale" || data.sync.state === "unknown"
+                  ? "No se ha confirmado una sincronización reciente con Alexa. Revisa los logs del complemento."
+                  : data.sync.reason === "note_conflict"
+                    ? "Alexa no se ha sincronizado: hay artículos de texto que coinciden con productos. Asócialos con Elegir producto para conservar sus cantidades, o quita el artículo original de la lista."
+                    : "Alexa no se ha sincronizado. Revisa las asociaciones y los logs del complemento antes de reintentar."}
+            </p>
+          )}
           {data?.shopping_error && (
             <p role="alert" className="notice">
               Grocy no está disponible en este momento.
@@ -448,7 +461,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.5.0</footer>
+      <footer>Despensa 1.6.0</footer>
     </div>
   );
 }

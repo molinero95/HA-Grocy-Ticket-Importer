@@ -181,7 +181,9 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         except Exception:
             app.logger.exception("api_v1_alexa_matches_failed")
             matches, matches_error = [], True
+        from shopping_sync_status import snapshot
         return jsonify({"items": items, "pending_matches": matches,
+                        "sync": snapshot(shopping_match_queue.DEFAULT_PATH),
                         "shopping_error": False, "pending_matches_error": matches_error})
 
 

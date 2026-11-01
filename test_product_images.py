@@ -46,7 +46,7 @@ class ProductImageTests(unittest.TestCase):
         req = self.open.call_args.args[0]
         self.assertIn("/api/v3/product/" + CODE + "?product_type=all", req.full_url)
         self.assertIn("product_type,product_name", req.full_url)
-        self.assertIn("Despensa/1.3.0", req.get_header("User-agent"))
+        self.assertIn("Despensa/1.6.0", req.get_header("User-agent"))
         self.assertEqual(self.open.call_args.kwargs["timeout"], 8)
 
     def test_universal_food_and_general_products_keep_their_source(self):

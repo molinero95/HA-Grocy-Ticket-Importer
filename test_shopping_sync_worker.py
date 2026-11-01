@@ -12,7 +12,7 @@ class ShoppingWorkerTests(unittest.TestCase):
         products = [{"id": 1, "name": "Arroz basmati"}]
         result = {"add_alexa": [], "add_grocy": [], "remove_alexa": [],
                   "remove_grocy": [], "next_baseline": [], "next_bindings": {}}
-        def record_queue(path, names, catalog):
+        def record_queue(path, names, catalog, rows):
             events.append("queue")
             self.assertEqual(names, ["Arroz"])
             self.assertEqual(catalog, products)

@@ -18,7 +18,7 @@ export function AlexaAliases() {
     },
   });
   const remove = useMutation({
-    mutationFn: deleteAlexaAlias,
+    mutationFn: (alias: { key: string; product_id: number }) => deleteAlexaAlias(alias.key, alias.product_id),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["alexa-aliases"] });
     },
@@ -38,11 +38,13 @@ export function AlexaAliases() {
         <label className="alias-field" htmlFor="alexa-alias-product">
           Producto de Despensa
           <select id="alexa-alias-product" value={productId}
-            disabled={inventory.isLoading}
+            disabled={inventory.isLoading || save.isPending || remove.isPending}
             onChange={(event) => {
               setProductId(event.target.value);
               setName("");
               setAdding(false);
+              save.reset();
+              remove.reset();
             }}>
             <option value="">Selecciona un producto</option>
             {products.map((product) => (
@@ -65,7 +67,7 @@ export function AlexaAliases() {
               <li className="alias-item" key={alias.key}>
                 <span className="alias-item-text"><strong>{alias.name}</strong></span>
                 <button className="secondary-button" type="button" disabled={remove.isPending}
-                  onClick={() => remove.mutate(alias.key)}
+                  onClick={() => remove.mutate(alias)}
                   aria-label={`Eliminar alias ${alias.name}`}>Eliminar</button>
               </li>
             ))}
@@ -73,7 +75,8 @@ export function AlexaAliases() {
           {remove.isError && <p role="alert">{remove.error.message}</p>}
           {!adding ? (
             <button className="primary-button alias-add-button" type="button"
-              onClick={() => setAdding(true)}>Añadir nuevo alias</button>
+              disabled={remove.isPending || aliases.isError}
+              onClick={() => { save.reset(); setAdding(true); }}>Añadir nuevo alias</button>
           ) : (
             <form className="alias-form alias-add-form" onSubmit={(event) => {
               event.preventDefault();
@@ -87,7 +90,8 @@ export function AlexaAliases() {
               </label>
               <div className="alias-form-actions">
                 <button className="secondary-button" type="button"
-                  onClick={() => { setAdding(false); setName(""); }}>Cancelar</button>
+                  disabled={save.isPending}
+                  onClick={() => { save.reset(); setAdding(false); setName(""); }}>Cancelar</button>
                 <button className="primary-button" type="submit"
                   disabled={save.isPending || !name.trim()}>
                   {save.isPending ? "Guardando…" : "Guardar alias"}
@@ -96,6 +100,21 @@ export function AlexaAliases() {
               {save.isError && <p role="alert">{save.error.message}</p>}
             </form>
           )}
+        </section>
+      )}
+      {inventory.isSuccess && !aliases.isError && (aliases.data?.aliases ?? []).some((alias) => !products.some((p) => p.id === alias.product_id)) && (
+        <section className="alias-product-section" aria-label="Alias de productos no disponibles">
+          <h3>Productos no disponibles</h3>
+          <p>Estos alias pertenecen a productos archivados o ausentes. Puedes retirarlos para evitar asociaciones obsoletas.</p>
+          <ul className="alias-list">
+            {(aliases.data?.aliases ?? []).filter((alias) => !products.some((p) => p.id === alias.product_id)).map((alias) => (
+              <li className="alias-item" key={alias.key}>
+                <span className="alias-item-text"><strong>{alias.name}</strong></span>
+                <button className="secondary-button" type="button" disabled={remove.isPending} onClick={() => remove.mutate(alias)} aria-label={`Eliminar alias ${alias.name}`}>Eliminar</button>
+              </li>
+            ))}
+          </ul>
+          {remove.isError && <p role="alert">{remove.error.message}</p>}
         </section>
       )}
     </main>

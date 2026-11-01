@@ -13,12 +13,14 @@ export type AlexaMatch = {
   name: string;
   candidates: MatchCandidate[];
   selected_product_id?: number | null;
+  requires_product?: boolean;
 };
 export type ShoppingResponse = {
   items: ShoppingItem[];
   pending_matches: AlexaMatch[];
   shopping_error: boolean;
   pending_matches_error: boolean;
+  sync?: { state: "unconfigured" | "disabled" | "unknown" | "stale" | "error" | "ok"; reason?: string | null };
 };
 export type InventoryItem = {
   id: number;

@@ -38,8 +38,15 @@ STATE_V2 = STATE.with_name(STATE.stem + "-identity-v2.json")
 
 def run_once(*, dry_run=True):
     from shopping_match_queue import mutation_lock
+    from shopping_sync_status import record
     with mutation_lock(MATCH_QUEUE):
-        return _run_once(dry_run=dry_run)
+        try:
+            result = _run_once(dry_run=dry_run)
+        except Exception as exc:
+            record(MATCH_QUEUE, dry_run=dry_run, error=exc)
+            raise
+        record(MATCH_QUEUE, dry_run=dry_run)
+        return result
 
 
 def _run_once(*, dry_run=True):
@@ -56,7 +63,7 @@ def _run_once(*, dry_run=True):
         raise RuntimeError("Grocy catalog unavailable for Alexa review")
     from shopping_sync_adapters import _grocy_done
     products = [p for p in products if _grocy_done(p.get("active", True))]
-    refresh_matches(MATCH_QUEUE, alexa, products)
+    refresh_matches(MATCH_QUEUE, alexa, products, grocy_rows)
     removals = [row for row in pending_matches(MATCH_QUEUE) if row.get("removed")]
     if removals:
         # Explicit manual deletion wins even before the first union/checkpoint.
@@ -80,7 +87,7 @@ def _run_once(*, dry_run=True):
     choices = resolved_choices(MATCH_QUEUE, alexa, products)
     # Persistent aliases are explicit user mappings, not fuzzy suggestions.
     from shopping_aliases import choices as alias_choices
-    for alias, selected in alias_choices(MATCH_QUEUE, products).items():
+    for alias, selected in alias_choices(MATCH_QUEUE, products, names=alexa).items():
         if alias in choices and int(choices[alias]["product_id"]) != int(selected["product_id"]):
             raise IdentityConflict("Alexa alias conflicts with a pending manual choice")
         choices[alias] = {**selected, "trusted_alias": True}

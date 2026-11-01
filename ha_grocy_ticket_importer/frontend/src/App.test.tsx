@@ -285,3 +285,19 @@ it("shows login and clears private queries immediately after logout", async () =
   expect(screen.queryByText("Leche")).toBeNull();
   expect(client.getQueryData(["product", 7])).toBeUndefined();
 });
+
+it("explains a blocked Alexa cycle and offers explicit exact-note association", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({
+    ...shopping,
+    items: [{ ...shopping.items[0], name: "Leche entera", amount: 2.5 }],
+    pending_matches: [{ key: "leche entera", name: "Leche entera", candidates: [{ id: 7, name: "Leche entera" }], requires_product: true }],
+    sync: { state: "error", reason: "note_conflict" },
+  });
+  vi.mocked(api.chooseAlexaMatch).mockResolvedValue({});
+  renderWithClient(<App />);
+  expect(await screen.findByText(/Alexa no se ha sincronizado: hay artículos de texto/)).toBeTruthy();
+  await userEvent.click(screen.getByText("Elegir producto para «Leche entera»"));
+  expect(screen.queryByRole("option", { name: "Mantener artículo original" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Guardar elección" }));
+  expect(api.chooseAlexaMatch).toHaveBeenCalledExactlyOnceWith("leche entera", 7, expect.any(String));
+});
