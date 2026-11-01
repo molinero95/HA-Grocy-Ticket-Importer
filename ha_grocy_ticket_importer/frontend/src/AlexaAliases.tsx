@@ -27,17 +27,17 @@ export function AlexaAliases() {
       <h2>Alias de Alexa</h2>
       <p>Asocia diferentes nombres de Alexa a un mismo producto de Despensa.</p>
       <form className="alias-form" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
-        <label className="alias-field" htmlFor="alexa-alias-name">Nombre en Alexa</label>
+        <label className="alias-field" htmlFor="alexa-alias-name">Nombre en Alexa
         <input id="alexa-alias-name" required maxLength={200} value={name}
           onChange={(event) => setName(event.target.value)} placeholder="Ej. leche normal" /></label>
-        <label className="alias-field" htmlFor="alexa-alias-product">Producto de Despensa</label>
+        <label className="alias-field" htmlFor="alexa-alias-product">Producto de Despensa
         <select id="alexa-alias-product" required value={productId}
           onChange={(event) => setProductId(event.target.value)}>
           <option value="">Selecciona un producto</option>
           {products.map((product) => (
             <option key={product.id} value={product.id}>{product.name}</option>
           ))}
-        </select>
+        </select></label>
         <button className="primary-button alias-submit" type="submit" disabled={save.isPending || !productId || !name.trim()}>
           {save.isPending ? "Guardando…" : "Guardar alias"}
         </button>
