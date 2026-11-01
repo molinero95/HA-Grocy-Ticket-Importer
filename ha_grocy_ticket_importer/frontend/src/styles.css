@@ -868,3 +868,88 @@ select:focus-visible {
     gap: 4px;
   }
 }
+
+
+/* Action cards use a consistent icon column on narrow and wide screens. */
+.action-grid button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+  width: 100%;
+  text-align: left;
+  gap: 14px;
+}
+.action-grid button > svg {
+  width: 24px;
+  justify-self: center;
+}
+.action-grid button > span {
+  min-width: 0;
+  display: block;
+}
+.action-grid button small {
+  overflow-wrap: anywhere;
+}
+
+/* Alias management follows the same surfaces and controls as product forms. */
+.aliases-page > p {
+  color: #60756a;
+  line-height: 1.5;
+  margin: 10px 0 20px;
+}
+.alias-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #d2dfd5;
+  border-radius: 16px;
+}
+.alias-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #1b3029;
+}
+.alias-field input,
+.alias-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: 1px solid #d2dfd5;
+  border-radius: 10px;
+  background: #fff;
+  color: #1b3029;
+  font: inherit;
+  font-weight: 400;
+}
+.alias-submit { width: 100%; }
+.alias-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 18px 0 0;
+}
+.alias-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #d2dfd5;
+  border-radius: 14px;
+}
+.alias-item-text { min-width: 0; overflow-wrap: anywhere; }
+.alias-item-text strong, .alias-item-text small { display: block; }
+.alias-item-text small { margin-top: 5px; color: #60756a; }
+.alias-item button { flex-shrink: 0; }
+@media (max-width: 580px) {
+  .action-grid { grid-template-columns: minmax(0, 1fr); }
+  .alias-form { padding: 16px; }
+}
