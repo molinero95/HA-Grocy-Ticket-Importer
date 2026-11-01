@@ -400,3 +400,41 @@ test("an unused archived product can be permanently removed through the reviewed
   await expect(page.getByRole("heading", { name: "Productos archivados", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Archive deletion E2E", exact: true })).toHaveCount(0);
 });
+
+test("duplicate review persists differences and combines through the native Grocy transaction", async ({ page }) => {
+  await page.goto(base + "react/");
+  for (const name of ["Zumo naranja e2e", "Zumo naranjas e2e"]) {
+    await pantry(page);
+    await page.getByRole("button", {name: "Nuevo producto", exact: true}).click();
+    await page.getByLabel("Nombre", {exact: true}).fill(name);
+    await page.getByLabel("Unidad", {exact: true}).selectOption({label: "Piece"});
+    await page.getByLabel("Stock inicial").fill("2");
+    await page.getByRole("button", {name: "Guardar producto", exact: true}).click();
+    await page.getByRole("button", {name: "Abrir ficha del producto"}).click();
+    await page.getByRole("button", {name: "Cerrar ficha"}).click();
+  }
+  const open = async () => {
+    await page.getByRole("button", {name: "Acciones", exact: true}).click();
+    await page.getByRole("button", {name: "Revisar duplicados y auditoría", exact: true}).click();
+  };
+  await open();
+  const pair = page.locator(".duplicate-group").filter({hasText: "Zumo naranja e2e"});
+  await pair.getByRole("button", {name: "Son diferentes", exact: true}).click();
+  await expect(pair).toHaveCount(0);
+  await page.reload(); await open();
+  await expect(pair).toHaveCount(0);
+  await page.getByText(/Productos marcados como diferentes/).click();
+  await page.locator(".difference-row").filter({hasText: "Zumo naranja e2e"}).getByRole("button", {name: "Deshacer diferencia"}).click();
+  await pair.getByRole("button", {name: "Revisar combinación", exact: true}).click();
+  const keep = await page.getByLabel("Producto que conservarás").inputValue();
+  const target = await page.getByLabel("Producto que conservarás").locator("option:checked").textContent();
+  const name = target!.replace(/ \(ID \d+\)$/, "");
+  await page.getByLabel(`Escribe «${name}» para conservarlo`, {exact: true}).fill(name);
+  await page.getByRole("button", {name: "Combinar definitivamente", exact: true}).click();
+  await expect(page.getByText("Productos combinados. Se ha conservado el producto elegido.")).toBeVisible();
+  await expect(pair).toHaveCount(0);
+  await pantry(page);
+  await page.getByRole("button", {name, exact: true}).click();
+  await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("4");
+  expect(Number(keep)).toBeGreaterThan(0);
+});

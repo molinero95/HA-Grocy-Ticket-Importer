@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.8.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.9.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.8.0
+## Despensa 1.9.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.8.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.9.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -176,8 +176,8 @@ El registro `stock-commands.sqlite3` reside junto al historial (configurable con
 consumo se confirma y falla la reposición, añadir solo la compra pendiente.
 
 La búsqueda por nombre o código funciona al escribir; la barra solo tiene el campo de texto y la cámara. El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha permite **Archivar** productos sin existencias ni dependencias y
-**Restaurar** desde Acciones → Productos archivados. Archivar/restaurar conserva historial e identidad. Detectar duplicados sigue siendo una auditoría de solo lectura.
-No hay migración automática de stock Pack antiguo ni consolidación de productos.
+**Restaurar** desde Acciones → Productos archivados. Archivar/restaurar conserva historial e identidad. Duplicados permite marcar diferencias o revisar una combinación nativa.
+No hay migración automática de stock Pack antiguo ni combinación automática de productos.
 Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).
 
 ## Alias y estado de Alexa (1.6.0)
@@ -204,3 +204,14 @@ Para eliminar un producto sin uso: **Acciones → Productos archivados → ficha
 La auditoría de borrado cubre las cascadas de Grocy 4.7.1 y serializa los escritores de Despensa con su worker. Grocy no ofrece un borrado condicional transaccional: evita editar ese producto directamente en Grocy u otras aplicaciones mientras confirmas la eliminación.
 
 La eliminación solo se habilita en Grocy 4.7.1, cuya cascada está verificada; otras versiones conservan el archivado hasta revisar sus reglas de borrado.
+
+
+## Resolver duplicados (1.9.0)
+
+En **Acciones → Revisar duplicados y auditoría**, cada pareja ofrece **Son diferentes**: guarda esa decisión por ID para no volver a sugerirla, incluso tras renombrar. En **Productos marcados como diferentes** puedes deshacerla. Con tres productos, descartar una pareja conserva las demás.
+
+**Revisar combinación** permite elegir **Producto que conservarás**. Se mantienen su nombre, descripción, foto y configuración, y Grocy reúne los lotes, historial, códigos y referencias del otro producto. Es irreversible: revisa los datos y escribe el nombre exacto del producto que conservarás. Las existencias de ambos se conservan, sin consumo ni ajustes ficticios.
+
+La combinación está verificada para Grocy 4.7.1 y unidades/conversiones compatibles. Si el origen tiene tickets importados, variantes locales, alias o vínculos Alexa, debes conservar ese producto como destino o resolver esas dependencias antes. También se bloquean jerarquías, tara, campos personalizados de origen, cantidades desconocidas y filas de ambos productos en la lista de compra predeterminada. La revisión explica los bloqueos. No se modifican registros locales para forzar una combinación.
+
+Ante una respuesta incierta, comprueba ambos productos en Grocy antes de volver a intentarlo; la misma operación no se reenvía. Evita editar esos productos desde otras aplicaciones durante la confirmación.

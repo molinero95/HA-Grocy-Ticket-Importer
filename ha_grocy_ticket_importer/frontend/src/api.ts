@@ -330,7 +330,8 @@ export type MergePreview = {
       }[];
     }[];
   };
-  can_merge: false;
+  can_merge: boolean;
+  token: string;
 };
 export type CatalogAudit = {
   schema_version: number;
@@ -405,3 +406,9 @@ export type ProductDeletion = {
 export const getProductDeletion = (id: number) => request<ProductDeletion>("catalog/products/" + id + "/deletion");
 export const deleteArchivedProduct = (id: number, expectedName: string, confirmation: string, token: string, operationId: string) =>
   request("catalog/products/" + id, "DELETE", { expected_name: expectedName, confirmation, token, operation_id: operationId });
+
+export type DuplicateDifference = { left_id: number; right_id: number; left_name: string; right_name: string };
+export const getDuplicateDifferences = () => request<{ differences: DuplicateDifference[] }>("catalog/duplicates/differences");
+export const markProductsDifferent = (left: DuplicateCandidate, right: DuplicateCandidate) => request("catalog/duplicates/differences", "PUT", { left_id: left.id, right_id: right.id, left_name: left.name, right_name: right.name });
+export const undoProductDifference = (left: number, right: number) => request("catalog/duplicates/differences/" + left + "/" + right, "DELETE");
+export const mergeCatalogProducts = (preview: MergePreview, confirmation: string, operationId: string) => request("catalog/products/merge", "POST", { source_id: preview.source.id, target_id: preview.target.id, expected_source: preview.source.name, expected_target: preview.target.name, token: preview.token, confirmation, operation_id: operationId });

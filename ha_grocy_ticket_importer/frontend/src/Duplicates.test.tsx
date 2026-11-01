@@ -1,96 +1,90 @@
-import { screen } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { Duplicates } from "./Duplicates";
-import { renderWithClient } from "./test/helpers";
-
-const json = (value: unknown, status = 200) =>
-  new Response(JSON.stringify(value), { status });
-afterEach(() => vi.unstubAllGlobals());
-
-it("compares duplicates and shows stock/reference blockers using only read requests", async () => {
-  const product = {
-    id: 1,
-    name: "Leche",
-    stock_amount: "3",
-    unit_id: 2,
-    purchase_unit_id: 2,
-    pack_size: 1,
-    barcodes: [],
-  };
-  const fetch = vi.fn(async (url: string) =>
-    url.includes("merge-preview")
-      ? json({
-          source: product,
-          target: { ...product, id: 2, name: "Leche entera" },
-          source_variants: [],
-          target_variants: [],
-          can_merge: false,
-          blockers: ["Hay existencias: consolidación bloqueada"],
-          audit: {
-            collections: [
-              {
-                collection: "recipes",
-                label: "Recetas",
-                status: "error",
-                count: null,
-                references: [],
-              },
-            ],
-          },
-        })
-      : json({
-          groups: [
-            {
-              reason: "Nombre similar",
-              items: [
-                { id: 1, name: "Leche", barcodes: [] },
-                { id: 2, name: "Leche entera", barcodes: [] },
-              ],
-            },
-          ],
-        }),
-  );
-  vi.stubGlobal("fetch", fetch);
-  renderWithClient(<Duplicates />);
-  await userEvent.click(
-    await screen.findByRole("button", { name: "Comparar los dos primeros" }),
-  );
-  await screen.findByText("Hay existencias: consolidación bloqueada");
-  await screen.findByText("Recetas: No disponible");
-  expect(screen.queryByRole("button", { name: /^Fusionar/ })).toBeNull();
-  expect(fetch.mock.calls).toHaveLength(2);
-  for (const call of vi.mocked(globalThis.fetch).mock.calls) {
-    expect(call[1]).toMatchObject({ method: "GET" });
-  }
+import * as api from "./api";
+import { deferred, renderWithClient } from "./test/helpers";
+vi.mock("./api", async original => ({ ...(await original<typeof api>()), getDuplicateCandidates: vi.fn(), getDuplicateDifferences: vi.fn(), markProductsDifferent: vi.fn(), undoProductDifference: vi.fn(), getMergePreview: vi.fn(), mergeCatalogProducts: vi.fn(), getCatalogAudit: vi.fn() }));
+const left = { id: 1, name: "Leche entera", barcodes: [] };
+const right = { id: 2, name: "Leche enteras", barcodes: [] };
+const product = { ...left, stock_amount: "2", unit_id: 2, purchase_unit_id: 2, pack_size: 1 };
+const preview: api.MergePreview = { source: product, target: { ...product, ...right, stock_amount: "3" }, source_variants: [], target_variants: [], can_merge: true, blockers: [], token: "a".repeat(64) };
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(api.getDuplicateCandidates).mockResolvedValue([{ reason: "Nombres parecidos", items: [left, right] }]);
+  vi.mocked(api.getDuplicateDifferences).mockResolvedValue({ differences: [] });
+  vi.mocked(api.getMergePreview).mockResolvedValue(preview);
 });
-
-it("recovers a failed analysis and loads the full audit only on explicit request", async () => {
-  const fetch = vi
-    .fn()
-    .mockResolvedValueOnce(json({ error: "catalog_unavailable" }, 503))
-    .mockResolvedValueOnce(json({ groups: [] }))
-    .mockResolvedValueOnce(
-      json({
-        schema_version: 1,
-        source: "Grocy",
-        products: [],
-        barcode_conflicts: [],
-        unlinked_shopping_entries: [],
-      }),
-    );
-  vi.stubGlobal("fetch", fetch);
+it("reviews stock-bearing duplicates without writing and shows blockers from the server", async () => {
+  vi.mocked(api.getMergePreview).mockResolvedValue({ ...preview, can_merge: false, blockers: ["El origen conserva historial de tickets"] });
+  renderWithClient(<Duplicates />);
+  expect(api.getMergePreview).not.toHaveBeenCalled();
+  await userEvent.click(await screen.findByRole("button", { name: "Revisar combinación" }));
+  await screen.findByText("El origen conserva historial de tickets");
+  expect(screen.queryByRole("button", { name: "Combinar definitivamente" })).toBeNull();
+  expect(api.mergeCatalogProducts).not.toHaveBeenCalled();
+});
+it("persists a difference, removes the suggestion and can undo the pair", async () => {
+  let different = false;
+  vi.mocked(api.markProductsDifferent).mockImplementation(async () => { different = true; });
+  vi.mocked(api.undoProductDifference).mockImplementation(async () => { different = false; });
+  vi.mocked(api.getDuplicateCandidates).mockImplementation(async () => different ? [] : [{ reason: "Nombres parecidos", items: [left, right] }]);
+  vi.mocked(api.getDuplicateDifferences).mockImplementation(async () => ({ differences: different ? [{left_id: 1, right_id: 2, left_name: left.name, right_name: right.name}] : [] }));
+  renderWithClient(<Duplicates />);
+  await userEvent.click(await screen.findByRole("button", { name: "Son diferentes" }));
+  await screen.findByText("No se han detectado posibles duplicados.");
+  await userEvent.click(screen.getByText("Productos marcados como diferentes (1)"));
+  await userEvent.click(await screen.findByRole("button", { name: "Deshacer diferencia" }));
+  await screen.findByRole("button", { name: "Son diferentes" });
+  expect(api.markProductsDifferent).toHaveBeenCalledExactlyOnceWith(left, right);
+  expect(api.undoProductDifference).toHaveBeenCalledExactlyOnceWith(1, 2);
+});
+it("requires the exact destination name, dispatches once and refreshes after combining", async () => {
+  const pending = deferred<unknown>();
+  vi.mocked(api.mergeCatalogProducts).mockReturnValue(pending.promise);
+  renderWithClient(<Duplicates />);
+  await userEvent.click(await screen.findByRole("button", { name: "Revisar combinación" }));
+  const input = await screen.findByRole("textbox");
+  const submit = screen.getByRole("button", { name: "Combinar definitivamente" });
+  expect(submit).toHaveProperty("disabled", true);
+  await userEvent.type(input, right.name);
+  await userEvent.dblClick(submit);
+  expect(api.mergeCatalogProducts).toHaveBeenCalledExactlyOnceWith(preview, right.name, expect.any(String));
+  expect(screen.getByRole("combobox")).toHaveProperty("disabled", true);
+  await act(async () => pending.resolve({ merged: true }));
+  await screen.findByText("Productos combinados. Se ha conservado el producto elegido.");
+  expect(screen.queryByRole("textbox")).toBeNull();
+  await waitFor(() => expect(api.getDuplicateCandidates).toHaveBeenCalledTimes(2));
+});
+it("choosing the other product refreshes the audit and clears the previous confirmation", async () => {
+  vi.mocked(api.getMergePreview).mockImplementation(async (source, _target) => source === 1 ? preview : { ...preview, source: preview.target, target: preview.source });
+  renderWithClient(<Duplicates />);
+  await userEvent.click(await screen.findByRole("button", { name: "Revisar combinación" }));
+  await userEvent.type(await screen.findByRole("textbox"), right.name);
+  await userEvent.selectOptions(screen.getByRole("combobox"), "1");
+  expect(await screen.findByLabelText("Escribe «Leche entera» para conservarlo")).toHaveProperty("value", "");
+  expect(api.getMergePreview).toHaveBeenLastCalledWith(2, 1);
+  expect(api.mergeCatalogProducts).not.toHaveBeenCalled();
+});
+it("locks a lost merge response and never retries the write", async () => {
+  vi.mocked(api.mergeCatalogProducts).mockRejectedValue(new Error("Comprueba Grocy"));
+  renderWithClient(<Duplicates />);
+  await userEvent.click(await screen.findByRole("button", { name: "Revisar combinación" }));
+  await userEvent.type(await screen.findByRole("textbox"), right.name);
+  await userEvent.click(screen.getByRole("button", { name: "Combinar definitivamente" }));
+  await screen.findByRole("alert");
+  expect(screen.getByRole("button", { name: "Combinar definitivamente" })).toHaveProperty("disabled", true);
+  expect(api.mergeCatalogProducts).toHaveBeenCalledOnce();
+});
+it("loads the complete export audit only on request and recovers failed reads", async () => {
+  vi.mocked(api.getDuplicateCandidates).mockRejectedValueOnce(new Error("No disponible"));
+  vi.mocked(api.getCatalogAudit).mockResolvedValue({ schema_version: 1, source: "Grocy", products: [], barcode_conflicts: [], unlinked_shopping_entries: [] });
   renderWithClient(<Duplicates />);
   await screen.findByRole("alert");
-  expect(fetch).toHaveBeenCalledTimes(1);
-  await userEvent.click(
-    screen.getByRole("button", { name: "Volver a analizar" }),
-  );
-  await screen.findByText("No se han detectado posibles duplicados.");
-  expect(fetch).toHaveBeenCalledTimes(2);
-  await userEvent.click(
-    screen.getByRole("button", { name: "Analizar catálogo" }),
-  );
+  expect(api.getCatalogAudit).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Volver a analizar" }));
+  await screen.findByRole("button", { name: "Son diferentes" });
+  await userEvent.click(screen.getByRole("button", { name: "Analizar catálogo" }));
   await screen.findByRole("button", { name: "Exportar auditoría JSON" });
-  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(api.getCatalogAudit).toHaveBeenCalledOnce();
 });

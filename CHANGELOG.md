@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.0] — 2026-11-01
+
+### Added
+- Review duplicate pairs with “Son diferentes”, stored by canonical IDs in the existing persistent catalog database. Keep decisions across reloads and renames, list them for explicit undo, and suppress only that pair in three-way groups. Exclude archived products from active duplicate suggestions.
+- Choose which product to keep and explicitly combine compatible products through Grocy 4.7.1’s native transaction. Preserve lots, stock history, barcodes, shopping quantities/notes and recipe/meal-plan references; keep the chosen product’s metadata. Verify source absence, destination metadata and migrated data after one journaled dispatch. Rebuild-derived meal-plan recipes are verified by date/type/unit totals.
+- Require a fresh reference snapshot and the exact destination name. Block incompatible units/conversions, unknown amounts, hierarchies/tare/custom fields, default-list collisions and source local receipt/variant/Alexa bindings that cannot be migrated atomically. Show the reason and allow keeping the other product. Never replay uncertain merges.
+
+### Tests
+- Cover persistent differences/undo, independent pairs, rename/archive behavior, authentication, CSRF, stale state, transactional dispatch and uncertain outcomes; add component and real Grocy/browser flows for review, lot/history preservation and combining stocked products.
+
 ## [1.8.0] — 2026-11-01
 
 ### Added
