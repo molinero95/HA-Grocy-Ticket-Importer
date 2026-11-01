@@ -1022,3 +1022,10 @@ select:focus-visible {
 .inventory-filter:focus-within { outline: 3px solid #278359; outline-offset: 3px; }
 .inventory-filter-summary { display: inline-flex; align-items: center; gap: 8px; margin: -8px 0 16px; padding: 6px 10px; border: 1px solid #cfdfd1; border-radius: 999px; background: #eaf3e9; color: #24563d; font-size: 13px; font-weight: 650; }
 .inventory-filter-summary button { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 5px; border: 0; border-radius: 50%; color: inherit; background: transparent; }
+
+.product-discovery { padding-top: 12px; border-top: 1px solid #d6e0da; }
+.product-discovery > button { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.discovery-candidate { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 12px 0; padding: 14px; border: 1px solid #d2dfd5; border-radius: 12px; background: #f4f8f2; overflow-wrap: anywhere; }
+.discovery-candidate img { width: 110px; height: 110px; object-fit: contain; border-radius: 8px; }
+.discovery-candidate p { margin: 0; }
+.discovery-candidate a { display: inline-flex; align-items: center; min-height: 44px; color: #176d4b; }

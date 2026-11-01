@@ -101,3 +101,10 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 ## Mejora 1.15.0
 
 - [x] Icono de filtro en Mi despensa: todos, falta de stock y lista de compra; búsqueda combinada, umbrales/avisos y actualización de compra.
+
+
+## Mejora 1.16.0
+
+- [x] Buscar imagen y código por nombre con IA en el alta, con fuentes, comprobación GTIN/catálogo y selección explícita.
+- [x] Reconocer una foto sin código previo, aplicar el nombre y buscar; mantener alta manual/foto propia si no hay coincidencias.
+- [ ] Aceptación instalada de búsquedas reales con el modelo/clave del usuario; las pruebas automatizadas sustituyen proveedores y no consumen API.

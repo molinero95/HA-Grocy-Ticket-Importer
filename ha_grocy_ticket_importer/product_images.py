@@ -97,3 +97,43 @@ def lookup_image(barcode):
     if len(errors) == len(urls):
         raise ConnectionError("No se pudo consultar ninguna fuente de productos")
     return None
+
+
+def catalog_reference(url):
+    """Extract an exact public catalog product ID; never fetch a model-provided URL."""
+    import re
+
+    if not isinstance(url, str) or len(url) > 2048:
+        return None
+    try:
+        parts = urlparse(url)
+        if (parts.scheme != "https" or parts.username or parts.password
+                or parts.port not in (None, 443)):
+            return None
+        source = next((entry for entry in SOURCES
+                       if parts.hostname == urlparse(entry[1]).hostname.removeprefix("world.")
+                       or (parts.hostname or "").endswith("." + urlparse(entry[1]).hostname.removeprefix("world."))), None)
+        match = re.match(r"^/(?:product|producto|produit|produkt)/([0-9]{8,14})(?:/[^?#]*)?$", parts.path)
+        if not source or not match:
+            return None
+        code = match.group(1)
+        # AI discovery only accepts standard GTINs with a valid check digit.
+        if len(code) not in (8, 12, 13, 14) or sum(
+            int(digit) * (3 if index % 2 == 0 else 1)
+            for index, digit in enumerate(reversed(code[:-1]))
+        ) % 10 != (-int(code[-1])) % 10:
+            return None
+        return source, code
+    except ValueError:
+        return None
+
+
+def verify_discovered_product(url):
+    reference = catalog_reference(url)
+    if not reference:
+        return None
+    source, code = reference
+    found = _fetch_catalog(source[1] + code + "?fields=" + FIELDS, code)
+    if not found or not found["name"]:
+        return None
+    return {**found, "search_source_url": url}

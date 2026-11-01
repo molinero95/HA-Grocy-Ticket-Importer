@@ -100,7 +100,7 @@ class RecognitionTests(unittest.TestCase):
                 vision.identify(data, "8412345678901")
             remote.assert_not_called()
 
-    def test_explicit_consent_csrf_and_valid_code_are_required(self):
+    def test_explicit_consent_csrf_and_valid_code_when_present_are_required(self):
         with patch.object(vision, "identify") as identify:
             self.assertEqual(self.client.post("/api/v1/photos/identify").status_code, 403)
             for fields in ({"barcode": "8412345678901"}, {"barcode": "bad", "consent": "true"}):

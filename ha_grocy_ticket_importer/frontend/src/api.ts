@@ -463,3 +463,9 @@ export async function identifyProductPhoto(barcode: string, photo: Blob) {
   form.append("consent", "true");
   return request<{ suggestion: ProductSuggestion }>("photos/identify", "POST", form);
 }
+
+export type ProductDiscoveryCandidate = PhotoLookup & { search_source_url: string };
+export const discoverProduct = (name: string, barcode: string) =>
+  request<{ candidates: ProductDiscoveryCandidate[]; advisory: true }>(
+    "photos/discover", "POST", { name, barcode, consent: true },
+  );

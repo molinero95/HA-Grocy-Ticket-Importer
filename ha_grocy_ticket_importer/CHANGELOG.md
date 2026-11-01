@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.16.0] — 2026-11-01
+
+### Added
+- Explicit AI search for a product image and barcode during creation, starting from a name or a newly recognized photo even without a barcode. Show catalog candidates, cited sources and an explicit code/image choice before saving.
+- Confirm cited GTINs with checksum and exact-code public catalog checks; restrict images to trusted catalog hosts, keep scanned codes and existing duplicate photos, and discard stale search responses.
+
+### Tests
+- Read-only/auth/CSRF/consent/provider failure and source/GTIN regressions, optional-code photo recognition, form selection/photo-save tests and mobile browser coverage. Providers are mocked with no paid requests.
+
 ## [1.15.0] — 2026-11-01
 
 ### Added
