@@ -73,3 +73,8 @@ Conservar todos los datos persistentes y módulos Python espejo. Validación aut
 En 1.14.0 el usuario solicita una toma nueva del frontal/etiqueta mediante «Tomar otra foto para buscar con IA». El escáner solo devuelve el código y no captura fotos para el reconocimiento. La nueva foto se previsualiza antes del envío explícito.
 
 Por indicación del usuario, guardar la foto nueva analizada como imagen local al crear una ficha nueva. Sanear con el endpoint existente, preservar las fotos de duplicados y no repetir el alta si falla el guardado de imagen.
+
+
+## Filtros de despensa 1.15.0
+
+Icono junto a la cámara: Todos los productos / Falta de stock / En la lista de la compra. Falta de stock usa el mismo umbral inclusivo y opt-out del aviso visual; compra exige cantidad positiva. Combinar con nombre/código, actualizar tras controles de compra y quitar solo el estado mediante X. Sin escrituras al filtrar; archivados no muestran este control.

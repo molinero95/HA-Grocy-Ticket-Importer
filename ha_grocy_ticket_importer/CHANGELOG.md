@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.0] — 2026-11-01
+
+### Added
+- Pantry filter icon for all products, low stock and products in the shopping list. Low stock follows each product’s threshold and warning setting; status filters combine with name/barcode search and update after shopping changes.
+- Native accessible mobile selector, active-filter indicator, clear action and responsive browser regressions. Filtering does not write stock or shopping data.
+
 ## [1.14.0] — 2026-11-01
 
 ### Added

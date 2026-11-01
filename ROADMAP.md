@@ -96,3 +96,8 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 ## Corrección 1.14.0
 
 - [x] Tomar una foto nueva del frontal/etiqueta para IA, con botón específico, sin reutilizar la imagen del código de barras.
+
+
+## Mejora 1.15.0
+
+- [x] Icono de filtro en Mi despensa: todos, falta de stock y lista de compra; búsqueda combinada, umbrales/avisos y actualización de compra.

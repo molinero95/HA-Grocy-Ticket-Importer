@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.14.0 — actualización de la instalación existente
+## Despensa 1.15.0 — actualización de la instalación existente
 
-La versión 1.14.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.15.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.14.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.15.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -214,3 +214,6 @@ The voice endpoint verifies `Signature-256`, the certificate chain against syste
 The UI offers full-photo identification after barcode lookup has no product name or fails. Since 1.14.0, “Tomar otra foto para buscar con IA” requests a fresh rear-camera photo of the product front or label. Barcode-scanner frames are not captured or reused for recognition. The new photo stays local until the explicit OpenAI analysis button. The authenticated CSRF-protected photo API sanitizes and resizes the full frame, removes EXIF, requests structured suggestions with `store=false` and never writes stock/products/photos or auto-retries. A suggestion changes the name only after explicit acceptance. Existing duplicate/EAN checks remain on save; the image/model never replaces the scanned code or pack configuration. The existing OpenAI API key is reused and normal API usage applies. Public barcode lookup remains the first attempt.
 
 1.14.0 saves the newly analyzed front/label photo through the existing sanitized local-photo endpoint after a genuinely new product is created. Snapshot the file with creation variables and never send it inside the product JSON. Existing duplicates keep their images. Photo failures are advisory and must not replay catalog creation or stock. Raw recognition uploads are still not persisted by the analysis endpoint; saving the new product is the persistence action.
+
+
+En **Mi despensa**, el icono de filtro junto a la cámara permite elegir **Todos los productos**, **Falta de stock** o **En la lista de la compra**. Falta de stock respeta el umbral inclusivo y los avisos activados de cada producto; compra muestra cantidades pendientes mayores que cero. El filtro se combina con la búsqueda por nombre/código y se puede quitar con la X sin borrar la búsqueda. No modifica existencias ni compras.

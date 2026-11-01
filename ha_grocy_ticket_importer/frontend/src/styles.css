@@ -1015,3 +1015,10 @@ select:focus-visible {
 .recognition-preview { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin: 12px auto; border-radius: 9px; }
 
 .product-recognition > button { display: flex; margin: 10px 0; max-width: 100%; }
+
+.inventory-filter { position: relative; display: flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; color: #176d4b; background: #edf4ee; border: 0; box-shadow: inset 0 0 0 1px #d2dfd5; border-radius: 10px; }
+.inventory-filter select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.inventory-filter.active { background: #176d4b; color: white; box-shadow: inset 0 0 0 1px #176d4b; }
+.inventory-filter:focus-within { outline: 3px solid #278359; outline-offset: 3px; }
+.inventory-filter-summary { display: inline-flex; align-items: center; gap: 8px; margin: -8px 0 16px; padding: 6px 10px; border: 1px solid #cfdfd1; border-radius: 999px; background: #eaf3e9; color: #24563d; font-size: 13px; font-weight: 650; }
+.inventory-filter-summary button { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 5px; border: 0; border-radius: 50%; color: inherit; background: transparent; }

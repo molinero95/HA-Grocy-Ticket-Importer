@@ -1,7 +1,7 @@
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, ShoppingBasket } from "lucide-react";
+import { Minus, Plus, ShoppingBasket, ListFilter, X } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { ProductDetail } from "./ProductDetail";
 import { CreateProduct } from "./CreateProduct";
@@ -11,6 +11,7 @@ import {
   lookupBarcode,
   stepShopping,
 } from "./api";
+import type { InventoryItem } from "./types";
 import { isBarcode } from "./barcodes";
 
 const normalize = (value: string) =>
@@ -22,6 +23,15 @@ const normalize = (value: string) =>
 const hasLowStock = (amount: string, threshold = "0") =>
   amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) <= Number(threshold);
 
+type PantryFilter = "all" | "low-stock" | "shopping";
+const filterLabels: Record<PantryFilter, string> = {
+  all: "Todos los productos",
+  "low-stock": "Falta de stock",
+  shopping: "En la lista de la compra",
+};
+const isLowStock = (item: InventoryItem) =>
+  item.stock_warning_enabled !== false && hasLowStock(item.amount, item.stock_threshold);
+
 export function Inventory({ archived = false }: { archived?: boolean }) {
   const client = useQueryClient();
   const inventory = useQuery({
@@ -29,6 +39,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
     queryFn: archived ? getArchivedProducts : getInventory,
   });
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<PantryFilter>("all");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
   );
@@ -59,12 +70,16 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
   });
   const items = useMemo(
     () =>
-      (inventory.data?.items ?? []).filter((item) =>
-        isBarcode(code)
+      (inventory.data?.items ?? []).filter((item) => {
+        const matchesSearch = isBarcode(code)
           ? code === lookupCode && item.id === barcode.data
-          : normalize(item.name).includes(normalize(code)),
-      ),
-    [inventory.data, code, lookupCode, barcode.data],
+          : normalize(item.name).includes(normalize(code));
+        const matchesFilter = archived || filter === "all" ||
+          (filter === "low-stock" && isLowStock(item)) ||
+          (filter === "shopping" && Number.isFinite(Number(item.shopping_amount)) && Number(item.shopping_amount) > 0);
+        return matchesSearch && matchesFilter;
+      }),
+    [inventory.data, code, lookupCode, barcode.data, filter, archived],
   );
   return (
     <main>
@@ -100,7 +115,19 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
           onChange={(event) => setQuery(event.target.value)}
         />
         <BarcodeScanner onDetect={setQuery} />
+        {!archived && <div className={"inventory-filter" + (filter !== "all" ? " active" : "")} title={"Filtrar productos: " + filterLabels[filter]}>
+          <ListFilter size={21} aria-hidden="true" />
+          <select aria-label="Filtrar productos" value={filter} onChange={event => setFilter(event.target.value as PantryFilter)}>
+            <option value="all">Todos los productos</option>
+            <option value="low-stock">Falta de stock</option>
+            <option value="shopping">En la lista de la compra</option>
+          </select>
+        </div>}
       </div>
+      {!archived && filter !== "all" && <div className="inventory-filter-summary" role="status">
+        <span>{filterLabels[filter]}</span>
+        <button type="button" aria-label="Quitar filtro" title="Mostrar todos los productos" onClick={() => setFilter("all")}><X size={16} aria-hidden="true" /></button>
+      </div>}
       {inventory.isLoading && <p role="status">Cargando inventario…</p>}
       {inventory.isError && (
         <div role="alert" className="notice">
@@ -120,7 +147,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
       <div className="items">
         {items.map((item) => (
           <article
-            className={"item inventory-item" + (!archived && item.stock_warning_enabled !== false && hasLowStock(item.amount, item.stock_threshold) ? " out-of-stock" : "")}
+            className={"item inventory-item" + (!archived && isLowStock(item) ? " out-of-stock" : "")}
             key={item.id}
             aria-busy={step.isPending && step.variables?.id === item.id}
           >
@@ -148,7 +175,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
                 <small>
                   En casa: {item.amount} {item.unit}
                 </small>
-                {!archived && item.stock_warning_enabled !== false && hasLowStock(item.amount, item.stock_threshold) && (
+                {!archived && isLowStock(item) && (
                   <span className="stock-status">{Number(item.amount) <= 0 ? "Sin existencias" : "Stock bajo"}</span>
                 )}
               </div>
@@ -208,7 +235,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
         !items.length && (
           <div className="empty">
             <h3>Sin resultados</h3>
-            <p>Prueba con otro nombre o código de barras.</p>
+            <p>{!archived && filter !== "all" ? "No hay productos que coincidan con el filtro y la búsqueda." : "Prueba con otro nombre o código de barras."}</p>
           </div>
         )}
       {creating && (

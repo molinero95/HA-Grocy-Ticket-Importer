@@ -2,7 +2,7 @@
 
 ## Current handoff — 2026-11-01
 
-Main has 1.13.0 (PR #26, merge 76663cf). Current branch `feat/retake-product-ai-photo` prepares 1.14.0: the user wants a separate new photo of the product front/label for AI, rather than the barcode frame or a visible upload control. “Tomar otra foto para buscar con IA” opens a hidden file input with capture=environment; preview and explicit analysis remain separate. Remove the unused scanner-frame capture/prop plumbing. The latest user instruction authorizes saving the analyzed front/label photo as the new product image: use the existing sanitized upload after successful genuinely-new creation, snapshot code/file in mutation variables, protect existing duplicates and do not replay creation on photo failure. Keep code identity, CSRF/consent, manual entry and late-response protections. Cloudflare/Amazon configuration is still deferred; no installed options or private/paid provider requests are authorized for testing.
+Main has 1.14.0 (PR #27, merge 8a6de38). Current branch `feat/pantry-status-filters` prepares 1.15.0: native accessible filter icon beside the pantry camera, all / low-stock / shopping. Low stock reuses the same inclusive threshold and warning opt-out as amber badges; shopping requires finite positive shopping_amount. Combine with name/barcode search, refresh after shopping writes, and clear only status with X. Archives have no selector. Filtering never writes stock/shopping. Local validation: 105 Vitest tests with coverage, TypeScript/Vite build and both 360/768px Chromium filter scenarios passed; mobile screenshot reviewed. Observe final-head CI before merge and record results in the PR. Cloudflare/Amazon configuration remains deferred. Preserve all prior data and do not test against production or paid providers.
 
 Voice runs only when enabled, in its own process/listener on internal port 8100, with only POST /alexa/despensa; ordinary panel APIs stay on existing authenticated ingress. Verify SHA-256, system-trusted X.509 chain/SAN, timestamp, exact configured skill and user; never add an unsigned test mode to production. Read stock via GET and metadata through read-only SQLite. Recognition uses explicit CSRF-protected upload, full-frame resized/sanitized image, existing OpenAI credentials, store=false, no auto-retry or automatic catalog/stock/barcode/pack mutation. Ignore late UI responses and keep manual entry.
 
@@ -57,7 +57,7 @@ Frontend QA: 91 Vitest tests, 317 Python tests, 12 real Grocy contracts and 27 c
 
 ## Release maintenance
 
-A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Manifest, frontend package/lockfile and visible footer versions must match (1.14.0 for this minor release). Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
+A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Manifest, frontend package/lockfile and visible footer versions must match (1.15.0 for this minor release). Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
 
 Permanent deletion is enabled only for the audited Grocy 4.7.1 release; a different version stays archived until its cascades have been reviewed.
 
