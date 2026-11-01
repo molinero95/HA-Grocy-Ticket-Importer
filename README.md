@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.14.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.15.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.14.0
+## Despensa 1.15.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.14.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.15.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -175,7 +175,7 @@ El registro `stock-commands.sqlite3` reside junto al historial (configurable con
 `STOCK_COMMAND_DB`); nunca borrarlo para repetir un resultado incierto. Si el
 consumo se confirma y falla la reposición, añadir solo la compra pendiente.
 
-La búsqueda por nombre o código funciona al escribir; la barra solo tiene el campo de texto y la cámara. El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha permite **Archivar** productos sin existencias ni dependencias y
+La búsqueda por nombre o código funciona al escribir; la barra tiene el campo de texto, la cámara y el icono de filtro. El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha permite **Archivar** productos sin existencias ni dependencias y
 **Restaurar** desde Acciones → Productos archivados. Archivar/restaurar conserva historial e identidad. Duplicados permite marcar diferencias o revisar una combinación nativa.
 No hay migración automática de stock Pack antiguo ni combinación automática de productos.
 Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).
@@ -254,3 +254,6 @@ Si un código no está asociado a tu catálogo, **Dar de alta este código** abr
 La foto permanece en memoria del navegador hasta el envío explícito. Se sanea sin EXIF, se limita a 8 MiB/25 megapíxeles y se redimensiona manteniendo el encuadre. Se usa la clave OpenAI existente; la solicitud de análisis puede generar consumo en esa cuenta. No se trata de una búsqueda web ni de una verificación del EAN: el modelo interpreta lo visible y puede equivocarse. El código y los factores de compra se conservan. Puedes seguir introduciendo el nombre manualmente.
 
 En 1.14.0, la foto nueva analizada con IA se guarda como imagen local al crear el producto, saneada y sin EXIF. Se prioriza esa toma del frontal o etiqueta. Si el alta detecta un producto existente, conserva su imagen. Un fallo al guardar la foto no repite el alta ni las existencias y se informa para añadirla desde la ficha.
+
+
+En **Mi despensa**, el icono de filtro junto a la cámara permite elegir **Todos los productos**, **Falta de stock** o **En la lista de la compra**. Falta de stock respeta el umbral inclusivo y los avisos activados de cada producto; compra muestra cantidades pendientes mayores que cero. El filtro se combina con la búsqueda por nombre/código y se puede quitar con la X sin borrar la búsqueda. No modifica existencias ni compras.

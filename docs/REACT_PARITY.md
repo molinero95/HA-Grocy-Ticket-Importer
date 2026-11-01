@@ -41,3 +41,6 @@ Desde 1.11.0 la revisión de compra/Alexa ofrece creación contextual sin stock 
 Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al confirmar; cantidad final calculada de solo lectura y asociaciones por supermercado en el ledger existente. Simulación y preflight bloquean líneas pendientes; original monetario/hash y protección contra duplicados se conservan.
 
 1.13.0: reconocimiento opcional de foto completa tras búsqueda pública sin nombre; vista previa local, envío explícito, nombre aplicado manualmente y código/stock conservados. Endpoint Alexa en proceso independiente sin rutas del frontend.
+
+
+1.15.0 añade selector nativo accesible mediante icono en Mi despensa: todos, falta de stock o compra; respeta umbrales/avisos, búsqueda por nombre/código y cambios de cantidad. No cambia datos al filtrar.

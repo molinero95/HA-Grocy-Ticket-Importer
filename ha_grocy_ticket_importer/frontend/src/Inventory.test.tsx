@@ -166,6 +166,7 @@ it("keeps archived rows neutral and does not label them as missing stock", async
   const row = (await screen.findByText(rows[0].name)).closest("article")!;
   expect(row.classList.contains("out-of-stock")).toBe(false);
   expect(screen.queryByText("Sin existencias")).toBeNull();
+  expect(screen.queryByRole("combobox", { name: "Filtrar productos" })).toBeNull();
 });
 it("does not turn unknown stock into a zero-stock warning", async () => {
   vi.mocked(api.getInventory).mockResolvedValue({ items: [{ ...rows[0], amount: "?" }] });
@@ -191,4 +192,65 @@ it("keeps a product with warnings disabled neutral even at zero stock", async ()
   expect(row.classList.contains("out-of-stock")).toBe(false);
   expect(screen.queryByText("Sin existencias")).toBeNull();
   expect(screen.queryByText("Stock bajo")).toBeNull();
+});
+
+it("filters low stock using thresholds, excluding disabled warnings and unknown quantities", async () => {
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [
+    { ...rows[0], amount: "2", stock_threshold: "2" },
+    { ...rows[1], amount: "0" },
+    { ...rows[0], id: 3, name: "Sin avisos", amount: "0", stock_warning_enabled: false },
+    { ...rows[0], id: 4, name: "Desconocido", amount: "?" },
+    { ...rows[0], id: 5, name: "Suficiente", amount: "3", stock_threshold: "2" },
+  ] });
+  mount();
+  await screen.findByText("Suficiente");
+  const user = userEvent.setup();
+  await user.selectOptions(screen.getByRole("combobox", { name: "Filtrar productos" }), "low-stock");
+  expect(screen.getByText("2 artículos")).toBeTruthy();
+  expect(screen.getByText(rows[0].name)).toBeTruthy();
+  expect(screen.getByText("Leche")).toBeTruthy();
+  for (const name of ["Sin avisos", "Desconocido", "Suficiente"]) expect(screen.queryByText(name)).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Quitar filtro" }));
+  expect(screen.getByText("5 artículos")).toBeTruthy();
+  expect(api.getInventory).toHaveBeenCalledTimes(1);
+  expect(api.stepShopping).not.toHaveBeenCalled();
+});
+
+it("combines shopping status with name and barcode search and clears only the status", async () => {
+  vi.mocked(api.lookupBarcode).mockResolvedValue(1);
+  mount();
+  await screen.findByText("Leche");
+  const user = userEvent.setup();
+  const filter = screen.getByRole("combobox", { name: "Filtrar productos" });
+  const search = screen.getByRole("textbox", { name: "Buscar por nombre o código de barras" });
+  await user.selectOptions(filter, "shopping");
+  expect(screen.queryByText(rows[0].name)).toBeNull();
+  expect(screen.getByText("1 artículos")).toBeTruthy();
+  await user.type(search, "tomate");
+  expect(screen.getByText("Sin resultados")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Quitar filtro" }));
+  expect(search).toHaveProperty("value", "tomate");
+  expect(screen.getByText(rows[0].name)).toBeTruthy();
+  await user.clear(search);
+  await user.type(search, "8412345678901");
+  await screen.findByText(rows[0].name);
+  await user.selectOptions(filter, "shopping");
+  expect(screen.getByText("Sin resultados")).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("refreshes the active shopping filter after removing the last shopping quantity", async () => {
+  let removed = false;
+  vi.mocked(api.getInventory).mockImplementation(async () => ({ items: [
+    { ...rows[1], shopping_amount: removed ? "0" : "1" },
+  ] }));
+  vi.mocked(api.stepShopping).mockImplementation(async () => { removed = true; });
+  mount();
+  await screen.findByText("Leche");
+  const user = userEvent.setup();
+  await user.selectOptions(screen.getByRole("combobox", { name: "Filtrar productos" }), "shopping");
+  await user.click(screen.getByRole("button", { name: "Quitar de compra: Leche" }));
+  expect(await screen.findByText("Sin resultados")).toBeTruthy();
+  expect(screen.getByRole("combobox", { name: "Filtrar productos" })).toHaveProperty("value", "shopping");
+  expect(api.stepShopping).toHaveBeenCalledExactlyOnceWith(2, "minus");
 });
