@@ -344,3 +344,30 @@ test("purchase configuration, inline shopping and reversible archive preserve hi
     page.getByRole("button", { name: "Producto sin uso", exact: true }),
   ).toBeVisible();
 });
+
+test("a newly created product becomes an Alexa suggestion without another worker cycle", async ({ page }) => {
+  const name = "Jabon recien creado";
+  await page.goto(base + "react/");
+  const added = await page.request.post(base + "api/services/todo/add_item", {
+    headers: { Authorization: "Bearer disposable" },
+    data: { entity_id: "todo.disposable", item: name },
+  });
+  expect(added.ok()).toBe(true);
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await page.getByRole("button", { name: "Actualizar", exact: true }).click();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  await pantry(page);
+  await page.getByRole("button", { name: "Nuevo producto", exact: true }).click();
+  await page.getByLabel("Nombre", { exact: true }).fill(name);
+  await page.getByLabel("Unidad", { exact: true }).selectOption({ label: "Piece" });
+  await page.getByRole("button", { name: "Guardar producto", exact: true }).click();
+  await expect(page.getByText("Producto creado correctamente", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await page.getByRole("button", { name: "Lista de la compra", exact: true }).click();
+  await page.getByText(`Elegir producto para «${name}»`, { exact: true }).click();
+  await expect(page.getByRole("option", { name, exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Guardar elección", exact: true }).click();
+  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  const row = page.locator("article").filter({ has: page.getByRole("button", { name, exact: true }) });
+  await expect(row).toContainText("1 Piece");
+});

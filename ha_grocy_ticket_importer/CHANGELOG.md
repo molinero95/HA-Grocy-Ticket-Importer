@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0] — 2026-11-01
+
+### Added
+- Refresh Alexa review candidates from the current active catalog when reading the shopping list, including additions, renames and archives. Discover newly matching free-text notes without waiting for a worker cycle. Revalidate candidates again when saving a choice.
+- Wake the background worker after successful local shopping, catalog, alias and receipt-commit changes, using an entity-scoped local marker observed every 250 ms. Keep Home Assistant events and periodic checks as fallbacks. Disabled synchronization remains read-only.
+- Refresh the shopping view every five seconds to show incoming changes sooner; product creation invalidates suggestions before optional photo lookup finishes.
+
+### Fixed
+- Preserve explicit choices, dismissals, removal intents, source generations and checkpoints while refreshing candidates. Keep stale selections visible for review rather than silently replacing them; do not create a second row when an already associated item is pointed at a different product.
+- Serialize quick shopping controls and the basic fallback with the worker. Failed/rejected operations and receipt previews do not trigger synchronization; marker failures never replay a saved mutation.
+
+### Tests
+- Cover live catalog ranking, new/renamed/archived products, stale choices and failed catalog reads, immediate local wake-up, API mutation boundaries and foreground cache invalidation. Add real Grocy API/browser coverage for a newly created product becoming selectable without another worker cycle.
+
 ## [1.6.0] — 2026-11-01
 
 ### Added

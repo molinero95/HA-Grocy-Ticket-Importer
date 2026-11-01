@@ -301,3 +301,24 @@ it("explains a blocked Alexa cycle and offers explicit exact-note association", 
   await userEvent.click(screen.getByRole("button", { name: "Guardar elección" }));
   expect(api.chooseAlexaMatch).toHaveBeenCalledExactlyOnceWith("leche entera", 7, expect.any(String));
 });
+
+it("updates candidate names and clears unavailable selections when catalog data changes", async () => {
+  const initial: ShoppingResponse = {
+    ...shopping,
+    pending_matches: [{ key: "leche", name: "Leche", candidates: [{ id: 7, name: "Leche entera" }] }],
+  };
+  vi.mocked(api.getShopping).mockResolvedValue(initial);
+  const { client } = renderWithClient(<App />);
+  await userEvent.click(await screen.findByText("Elegir producto para «Leche»"));
+  await userEvent.selectOptions(screen.getByLabelText("Producto sugerido"), "7");
+  act(() => client.setQueryData(["shopping"], {
+    ...initial,
+    pending_matches: [{ key: "leche", name: "Leche", requires_product: true, selection_stale: true,
+      candidates: [{ id: 8, name: "Leche semi" }] }],
+  }));
+  await screen.findByRole("option", { name: "Leche semi" });
+  expect(screen.queryByRole("option", { name: "Leche entera" })).toBeNull();
+  await waitFor(() => expect(screen.getByLabelText("Producto sugerido")).toHaveProperty("value", ""));
+  expect(screen.getByRole("button", { name: "Guardar elección" })).toHaveProperty("disabled", true);
+  expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
+});

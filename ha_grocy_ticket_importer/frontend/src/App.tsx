@@ -50,10 +50,15 @@ function Suggestions({
       ]);
     },
   });
+  useEffect(() => {
+    if (selected && !match.candidates.some((candidate) => String(candidate.id) === selected))
+      setSelected("");
+  }, [match.candidates, selected]);
   return (
     <details className="suggestions">
       <summary>Elegir producto para «{match.name}»</summary>
       <div className="suggestion-options">
+        {match.selection_stale && <p>El producto elegido ha cambiado o ya no está disponible. Revisa las opciones antes de guardar.</p>}
         {match.requires_product && <p>Este artículo está guardado como texto. Puedes asociarlo al producto conservando su cantidad, o quitarlo de la lista.</p>}
         <label htmlFor={"choice-" + match.key}>Producto sugerido</label>
         <select
@@ -62,7 +67,9 @@ function Suggestions({
           disabled={mutation.isPending || mutation.isSuccess}
           onChange={(event) => setSelected(event.target.value)}
         >
-          {!match.requires_product && <option value="">Mantener artículo original</option>}
+          {match.requires_product
+            ? <option value="" disabled>Selecciona un producto</option>
+            : <option value="">Mantener artículo original</option>}
           {match.candidates.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {candidate.name}
@@ -70,10 +77,10 @@ function Suggestions({
           ))}
         </select>
         <button
-          disabled={mutation.isPending || mutation.isSuccess}
+          disabled={mutation.isPending || mutation.isSuccess || (match.requires_product && !selected)}
           onClick={() => mutation.mutate(selected ? Number(selected) : 0)}
         >
-          {selected ? "Guardar elección" : "Mantener original"}
+          {selected || match.requires_product ? "Guardar elección" : "Mantener original"}
         </button>
         {mutation.isError && <p role="alert">{mutation.error.message}</p>}
       </div>
@@ -129,7 +136,7 @@ function AuthenticatedApp() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["shopping"],
     queryFn: getShopping,
-    refetchInterval: 30_000,
+    refetchInterval: 5_000,
   });
   const matches = new Map(
     (data?.pending_matches ?? []).map((match) => [match.key, match]),
@@ -461,7 +468,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.6.0</footer>
+      <footer>Despensa 1.7.0</footer>
     </div>
   );
 }

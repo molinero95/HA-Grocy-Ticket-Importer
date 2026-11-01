@@ -37,6 +37,7 @@ export function CreateProduct({
   const save = useMutation({
     mutationFn: createCatalogProduct,
     onSuccess: async (response, submitted) => {
+      await client.invalidateQueries({ queryKey: ["shopping"] });
       // Never attach metadata to an existing duplicate as a side effect of creation.
       if (response.created && submitted.barcode) {
         try {

@@ -31,6 +31,9 @@
 
 ## Alexa
 
+- Desde 1.7.0 las sugerencias usan el catálogo activo actual al leer la lista y al guardar la elección. Altas, renombrados y archivados actualizan opciones; conservar decisiones, descartes, retiradas y generaciones. No reasignar una fila ya asociada ni crear otra para cambiar su producto.
+- Los cambios guardados en Despensa despiertan el worker mediante marcador local (250 ms), manteniendo eventos HA e intervalo configurado como respaldo. La vista refresca cada 5 s; la latencia de Alexa depende de cuándo su integración notifique a HA. Con sync desactivado no hay escrituras remotas.
+
 - Solo entidad `todo.*` configurada y lista predeterminada de Grocy; pendientes de Alexa, sin históricos/completados. Desactivado por defecto.
 - Entidad configurada con sync desactivado permite actualizar la cola local en modo lectura. El worker no escribe remotamente con sync desactivado. Una acción manual explícita sí actualiza Grocy de inmediato; nunca requiere habilitar sync ni escribe en Alexa por sí sola.
 - Primer ciclo v2 une sin borrar; siguientes propagan altas/bajas por ID canónico y checkpoint confirmado. No sincronizar cantidades, unidades, completados ni renombrar Alexa.

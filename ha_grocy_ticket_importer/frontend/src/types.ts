@@ -14,6 +14,7 @@ export type AlexaMatch = {
   candidates: MatchCandidate[];
   selected_product_id?: number | null;
   requires_product?: boolean;
+  selection_stale?: boolean;
 };
 export type ShoppingResponse = {
   items: ShoppingItem[];
