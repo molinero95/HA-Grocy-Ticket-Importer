@@ -8,7 +8,7 @@ La versión 1.0.0 sirve React en `/`, alias `/react/`, con compras sin JavaScrip
 | Despensa y carrito/cantidad | Búsqueda nombre/EAN, pasos kg/pieza, sin recarga ni salto | Vitest; Chromium móvil; Grocy real |
 | Crear producto / duplicados | Alta con stock cero, enlace al existente, conversión Pack verificada | Python; navegador real con alta y Pack |
 | Editar nombre / stock / unidades | Conserva descripción/foto/compra; estado esperado; compra futura independiente | Python; contratos reales; compra de 2 packs = 8 piezas |
-| Consumir y reponer | ID canónico, precisión, operación persistente, resultado parcial seguro | Python de fallos/repetición; consumo real e idempotencia |
+| Existencias / consumo | Ficha 1.0.1: un único ajuste de cantidad total restante; formulario separado retirado. API de consumo conservada | Vitest de ajuste descendente; Grocy real, Python de consumo/repetición |
 | Códigos y variantes | Propiedad auditada; ficha y escáner; edición de variante conserva EAN | Python; navegador y persistencia real |
 | Fotos | Búsqueda exacta validada y subida saneada, URL compartida/versionada | Python; navegador; archivo servido tras reinicio real |
 | Tickets | Subir/revisar/simular/confirmar; ledger y marcadores contra duplicados | Python; importador real en subprocess; segundo ticket no duplica stock |
@@ -19,7 +19,7 @@ La versión 1.0.0 sirve React en `/`, alias `/react/`, con compras sin JavaScrip
 | Acceso sin JavaScript | Página básica autenticada con controles de compra y CSRF | Python y Chromium con JavaScript desactivado |
 | Empaquetado | React compilado, runtime completo, espejos Python | CI AMD64/ARM64: build y arranque de contenedor |
 
-Refuerzo del frontend: 67 pruebas Vitest y 13 escenarios Chromium configurados. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
+Frontend 1.0.1: 62 pruebas Vitest y 14 escenarios Chromium configurados. Alta solo en Mi despensa; archivados en Acciones, sin acceso de alta duplicado. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
 
 La antigua eliminación permanente podía borrar historia mediante cascadas de Grocy: se sustituye por archivado reversible. La consolidación sigue en auditoría, igual que la función estable protegida; no existe autorización para fusionar productos de usuario.
 

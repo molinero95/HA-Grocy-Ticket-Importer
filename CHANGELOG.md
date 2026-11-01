@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1] — 2026-11-01
+
+### Changed
+- Simplify the product sheet to one stock control: set the total remaining quantity under Existencias. Remove the separate Consumir producto form and its unused frontend component.
+- Clarify the remaining-total hint, move Products archived to Actions, remove the duplicate creation shortcut from Actions, and style New product as the pantry primary button. Refresh action cards and restore buttons with consistent accessible styles. Consumption API safeguards and persistent command history remain unchanged.
+- Add a regression for reducing the final stock from 3 to 2 and adapt the real Grocy receipt/browser flow to adjust remaining stock before checking duplicate-import protection.
+
 ## [1.0.0] — 2026-11-01
 
 ### Changed

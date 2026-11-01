@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.0.0:** migración React integrada desde PR #10. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.0.1:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía.
 
@@ -19,7 +19,7 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 - **Ficha de producto:** editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.
 - **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
 - **Alta de productos nuevos:** desde Acciones → Añadir producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
-- **Acciones separadas:** añadir un producto nuevo, consumir una cantidad elegida (con opción de añadir la misma cantidad a la lista de la compra) e importar un ticket. La asociación de códigos se realiza desde cada ficha de producto.
+- **Gestión de productos:** añadir un producto nuevo, ajustar la cantidad total que queda desde Existencias e importar un ticket. La ficha ya no muestra «Consumir producto». La asociación de códigos se realiza desde cada ficha de producto.
 - **Escáner de cámara:** lectura EAN/UPC desde un móvil compatible, con entrada manual alternativa.
 - **Tickets:** subir PDF/JPG/PNG, extraer líneas con OpenAI, revisar, simular y confirmar la importación.
 - **Historial de importaciones:** SQLite persistente para evitar registrar de nuevo líneas de tickets ya importadas.
@@ -159,13 +159,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.0.0
+## Despensa 1.0.1
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.0.0; Home Assistant ofrece actualizar desde 0.16.4 al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.0.1; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -177,8 +177,8 @@ El registro `stock-commands.sqlite3` reside junto al historial (configurable con
 `STOCK_COMMAND_DB`); nunca borrarlo para repetir un resultado incierto. Si el
 consumo se confirma y falla la reposición, añadir solo la compra pendiente.
 
-La ficha permite **Archivar** productos sin existencias ni dependencias y
-**Restaurar** desde Ver archivados. Conserva historial e identidad; no borra ni
+El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha permite **Archivar** productos sin existencias ni dependencias y
+**Restaurar** desde Acciones → Productos archivados. Conserva historial e identidad; no borra ni
 consume stock. Detectar duplicados sigue siendo una auditoría de solo lectura.
 No hay migración automática de stock Pack antiguo ni consolidación de productos.
 Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).

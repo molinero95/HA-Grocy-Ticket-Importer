@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isBarcode } from "./barcodes";
 import { useState } from "react";
 import { BarcodeScanner } from "./BarcodeScanner";
-import { ProductConsumption } from "./ProductConsumption";
 import { PhotoPreview } from "./ProductPhotos";
 import { X } from "lucide-react";
 import {
@@ -430,7 +429,8 @@ export function ProductDetail({
             )}
             <p>
               Stock actual: {currentStock} {currentUnit}. Ajusta el número de
-              piezas o kilogramos disponibles, no los envases completos.
+              piezas o kilogramos disponibles, no los envases completos. Indica
+              la cantidad total que queda.
             </p>
             <form
               className="variant-form"
@@ -470,15 +470,6 @@ export function ProductDetail({
               )}
               {stockMessage && <p role="status">{stockMessage}</p>}
             </form>
-            <>
-              {product.data && (
-                <ProductConsumption
-                  id={id}
-                  amount={currentStock}
-                  unit={currentUnit}
-                />
-              )}
-            </>
             <h3>
               {product.data?.active === false
                 ? "Producto archivado"

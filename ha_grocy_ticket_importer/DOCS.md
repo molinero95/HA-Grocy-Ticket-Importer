@@ -92,12 +92,18 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.0.0 — actualización desde 0.16.4
+## Despensa 1.0.1 — actualización desde 0.16.4 / 1.0.0
 
-La versión 1.0.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.0.1 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.0.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.0.1. Publicar el manifiesto no instala automáticamente la actualización.
+
+**Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
+
+La ficha usa un único ajuste de **Existencias**: escribe la cantidad total que queda.
+Se ha retirado el formulario «Consumir producto». Por ejemplo, si tienes 3 y queda 1,
+indica 1 en Cantidad final. Ajustar existencias no añade artículos a la compra.
 
 No se requieren opciones nuevas ni reinicializar bases de datos. Conservar
 `/config` y `/data`: ledger de tickets, fotos, variantes, colas, checkpoints y

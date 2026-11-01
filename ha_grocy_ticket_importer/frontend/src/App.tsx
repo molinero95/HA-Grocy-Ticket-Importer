@@ -4,7 +4,14 @@ import { ProductDetail } from "./ProductDetail";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
 import { Duplicates } from "./Duplicates";
-import { ShoppingBasket, Package, ScanBarcode, RefreshCw } from "lucide-react";
+import {
+  ShoppingBasket,
+  Package,
+  ScanBarcode,
+  RefreshCw,
+  Archive,
+  Copy,
+} from "lucide-react";
 import {
   chooseAlexaMatch,
   clearCompletedShopping,
@@ -57,7 +64,12 @@ function Suggestions({ match }: { match: AlexaMatch }) {
 function AuthenticatedApp() {
   const client = useQueryClient();
   const [view, setView] = useState<
-    "shopping" | "inventory" | "actions" | "receipts" | "duplicates"
+    | "shopping"
+    | "inventory"
+    | "actions"
+    | "receipts"
+    | "duplicates"
+    | "archived"
   >("shopping");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
@@ -128,7 +140,9 @@ function AuthenticatedApp() {
         </button>
         <button
           className={
-            ["actions", "receipts", "duplicates"].includes(view) ? "active" : ""
+            ["actions", "receipts", "duplicates", "archived"].includes(view)
+              ? "active"
+              : ""
           }
           onClick={() => setView("actions")}
         >
@@ -139,17 +153,49 @@ function AuthenticatedApp() {
         <main>
           <h2>Acciones</h2>
           <div className="action-grid">
-            <button onClick={() => setView("receipts")}>Escanear ticket</button>
-            <button onClick={() => setView("inventory")}>
-              Añadir o consumir producto
+            <button
+              aria-label="Escanear ticket"
+              aria-describedby="receipt-action-description"
+              onClick={() => setView("receipts")}
+            >
+              <ScanBarcode size={24} aria-hidden="true" />
+              <span>
+                Escanear ticket
+                <small id="receipt-action-description">
+                  Revisar e importar una compra
+                </small>
+              </span>
             </button>
-            <button onClick={() => setView("duplicates")}>
-              Revisar duplicados y auditoría
+            <button
+              aria-label="Revisar duplicados y auditoría"
+              aria-describedby="audit-action-description"
+              onClick={() => setView("duplicates")}
+            >
+              <Copy size={24} aria-hidden="true" />
+              <span>
+                Revisar duplicados y auditoría
+                <small id="audit-action-description">
+                  Consultar coincidencias del catálogo
+                </small>
+              </span>
+            </button>
+            <button
+              aria-label="Productos archivados"
+              aria-describedby="archive-action-description"
+              onClick={() => setView("archived")}
+            >
+              <Archive size={24} aria-hidden="true" />
+              <span>
+                Productos archivados
+                <small id="archive-action-description">
+                  Consultar y restaurar productos
+                </small>
+              </span>
             </button>
           </div>
         </main>
-      ) : view === "inventory" ? (
-        <Inventory />
+      ) : view === "inventory" || view === "archived" ? (
+        <Inventory key={view} archived={view === "archived"} />
       ) : view === "receipts" ? (
         <Receipts />
       ) : view === "duplicates" ? (
@@ -331,7 +377,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.0.0</footer>
+      <footer>Despensa 1.0.1</footer>
     </div>
   );
 }
