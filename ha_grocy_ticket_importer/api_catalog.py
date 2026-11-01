@@ -78,6 +78,10 @@ def register_catalog_routes(app, barcode_stock, lock):
             from api_photos import local_image_url
             product = barcode_stock.product_detail(product_id)
             product["image_url"] = local_image_url(product_id) or product.get("image_url")
+            from stock_thresholds import settings
+            warning = settings().get(product_id, {"amount": "0", "warning_enabled": True})
+            product["stock_threshold"] = warning["amount"]
+            product["stock_warning_enabled"] = warning["warning_enabled"]
             return jsonify(product)
         except barcode_stock.BarcodeError as exc:
             return jsonify({"error": str(exc)}), 404
@@ -123,6 +127,23 @@ def register_catalog_routes(app, barcode_stock, lock):
         finally:
             lock.release()
         return jsonify(result)
+
+    @app.put('/api/v1/catalog/products/<int:product_id>/stock-threshold')
+    def api_v1_stock_threshold(product_id):
+        from stock_thresholds import save_threshold
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or any(not isinstance(payload.get(key), str) for key in ('amount', 'expected'))
+                or any(type(payload.get(key, True)) is not bool for key in ('warning_enabled', 'expected_warning_enabled'))):
+            return jsonify({"error": "Indica un umbral válido y actualiza la ficha."}), 400
+        if not lock.acquire(blocking=False): return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            product = barcode_stock.grocy('GET', f'objects/products/{product_id}')
+            if not isinstance(product, dict) or int(product.get('id', 0)) != product_id:
+                return jsonify({"error": "El producto ya no está disponible."}), 409
+            return jsonify({"stock_threshold": save_threshold(product_id, payload['amount'], payload['expected'], payload.get('warning_enabled', True), payload.get('expected_warning_enabled', True)), 'stock_warning_enabled': payload.get('warning_enabled', True)})
+        except ValueError as exc: return jsonify({"error": str(exc)}), 409
+        except Exception: return jsonify({"error": "No se pudo guardar el umbral. Vuelve a consultar la ficha."}), 503
+        finally: lock.release()
 
     @app.post("/api/v1/catalog/products/<int:product_id>/stock")
     def api_v1_adjust_catalog_stock(product_id):
@@ -265,6 +286,7 @@ def register_catalog_routes(app, barcode_stock, lock):
         payload = request.get_json(silent=True)
         if (not isinstance(payload, dict) or not isinstance(payload.get('expected_name'), str)
                 or payload.get('confirmation') != payload['expected_name'] or not payload['expected_name']
+                or type(payload.get('delete_history', False)) is not bool
                 or not isinstance(payload.get('token'), str) or not re.fullmatch(r'[a-f0-9]{64}', payload['token'])):
             return jsonify({"error": "Escribe el nombre exacto del producto y revisa su borrado antes de confirmar."}), 400
         if not lock.acquire(blocking=False):
@@ -273,7 +295,7 @@ def register_catalog_routes(app, barcode_stock, lock):
             with mutation_lock(DEFAULT_PATH, blocking=False):
                 def change():
                     try:
-                        return {"status": 200, "body": delete_archived(product_id, payload['expected_name'], payload['token'])}
+                        return {"status": 200, "body": delete_archived(product_id, payload['expected_name'], payload['token'], payload.get('delete_history', False))}
                     except barcode_stock.BarcodeError as exc:
                         return {"status": 409, "body": {"error": str(exc)}}
                 result = execute_once(payload.get('operation_id'), {**payload, 'product_id': product_id, 'command': 'delete_archived'}, change)

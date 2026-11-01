@@ -47,6 +47,7 @@ class DeletionFixture:
         if method == 'DELETE':
             self.assertEqual(path, 'objects/products/7')
             self.deleted = True
+            self.rows['stock_log'] = [row for row in self.rows['stock_log'] if row['product_id'] != 7]
             if self.uncertain: raise ConnectionError('private endpoint')
             return {}
         self.assertEqual(method, 'GET')
@@ -74,7 +75,7 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         self.assertEqual([call.args for call in self.mock_grocy.call_args_list if call.args[0] != 'GET'], [('DELETE', 'objects/products/7')])
 
     def test_every_grocy_history_and_dependency_blocks_deletion(self):
-        for collection in ('stock', 'stock_log', 'shopping_list', 'recipes_pos', 'recipes', 'meal_plan', 'products'):
+        for collection in ('stock', 'shopping_list', 'recipes_pos', 'recipes', 'meal_plan', 'products'):
             with self.subTest(collection=collection):
                 field = 'parent_product_id' if collection == 'products' else 'product_id'
                 self.rows[collection] = [{'id': 50, field: 7, **({'amount': 0} if collection == 'stock' else {})}]
@@ -125,16 +126,38 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
             register_variant(db, gid, '8412345678901', 'Variante', grocy_barcode_owners={7})
         set_alias(self.root / 'queue-other.sqlite3', 'Alias', 7)
         with sqlite3.connect(self.root / 'imports.sqlite3') as db:
-            db.execute('CREATE TABLE receipt_items(product_id INTEGER)')
-            db.execute('INSERT INTO receipt_items VALUES(7)')
+            db.execute('CREATE TABLE receipt_items(product_id INTEGER, state TEXT)')
+            db.execute("INSERT INTO receipt_items VALUES(7,'pending')")
         save_identity_state(self.root / 'shopping-sync-other-identity-v2.json', ['p:7'], {'alias': 7})
         before = {path: path.read_bytes() for path in self.root.iterdir() if path.is_file()}
         preview = lifecycle.deletion_preview(7)
         self.assertFalse(preview['allowed'])
-        for reason in ('variantes asociadas', 'alias de Alexa', 'historial de tickets', 'sincronización de Alexa aún vinculada'):
+        for reason in ('variantes asociadas', 'alias de Alexa', 'una importación de ticket pendiente de comprobar', 'sincronización de Alexa aún vinculada'):
             self.assertIn(reason, preview['blockers'])
         for path, original in before.items(): self.assertEqual(path.read_bytes(), original)
         self.assert_no_write()
+
+    def test_movement_history_requires_explicit_acknowledgement_and_is_then_deleted(self):
+        self.rows['stock_log'] = [{'id': 1, 'product_id': 7, 'amount': 2}]
+        preview = lifecycle.deletion_preview(7)
+        self.assertTrue(preview['allowed'])
+        self.assertEqual(preview['history_count'], 1)
+        with self.assertRaisesRegex(barcode_stock.BarcodeError, 'Confirma expresamente'):
+            lifecycle.delete_archived(7, 'Sin uso', preview['token'])
+        self.assert_no_write()
+        lifecycle.delete_archived(7, 'Sin uso', preview['token'], delete_history=True)
+        self.assertEqual(self.rows['stock_log'], [])
+
+    def test_completed_receipt_ledger_is_retained_without_blocking_confirmed_deletion(self):
+        path = self.root / 'imports.sqlite3'
+        with sqlite3.connect(path) as db:
+            db.execute('CREATE TABLE receipt_items(product_id INTEGER, state TEXT)')
+            db.execute("INSERT INTO receipt_items VALUES(7,'imported')")
+        before = path.read_bytes()
+        preview = lifecycle.deletion_preview(7)
+        self.assertTrue(preview['allowed'])
+        lifecycle.delete_archived(7, 'Sin uso', preview['token'])
+        self.assertEqual(path.read_bytes(), before)
 
     def test_pending_alexa_choices_and_removals_block_without_deleting_queue(self):
         with queue.connect(queue.DEFAULT_PATH) as db:

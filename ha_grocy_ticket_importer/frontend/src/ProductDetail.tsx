@@ -1,3 +1,4 @@
+import { ProductThreshold } from "./ProductThreshold";
 import { ProductPurchase } from "./ProductPurchase";
 import { DeleteArchivedProduct } from "./DeleteArchivedProduct";
 import { useModal } from "./useModal";
@@ -468,6 +469,7 @@ export function ProductDetail({
               )}
               {stockMessage && <p role="status">{stockMessage}</p>}
             </form>
+            {product.data && <ProductThreshold id={id} threshold={product.data.stock_threshold ?? "0"} unit={currentUnit} warningEnabled={product.data.stock_warning_enabled !== false} />}
             <h3>
               {product.data?.active === false
                 ? "Producto archivado"

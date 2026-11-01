@@ -55,6 +55,7 @@ it("keeps creation only in the pantry and loads archives only through Actions", 
   expect(screen.queryByRole("button", { name: "Ver archivados" })).toBeNull();
   expect(api.getArchivedProducts).not.toHaveBeenCalled();
   await userEvent.click(screen.getByRole("button", { name: "Acciones" }));
+  expect(screen.queryByRole("button", { name: "Pantalla completa" })).toBeNull();
   expect(
     screen.queryByRole("button", {
       name: /Nuevo producto|Añadir.*producto|Gestionar productos/,

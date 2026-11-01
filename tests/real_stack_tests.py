@@ -211,7 +211,7 @@ class RealStackTests(unittest.TestCase):
             self.assertFalse(any(str(row[field]) == str(pid) for row in self.instance.http('GET', 'objects/' + entity)))
         for entity, original in before.items():
             self.assertEqual(self.instance.http('GET', 'objects/' + entity), original)
-        # Even a zero-stock archived product with one old movement must survive.
+        # Movement history can be deleted only after explicit acknowledgement.
         pid = barcode_stock.create_catalog_product('Historical archive', unit_id=units['Piece'], initial_stock='1')['product_id']
         barcode_stock.consume_product_quantity(pid, '1', '1', False)
         url = f'/api/v1/catalog/products/{pid}'
@@ -221,13 +221,18 @@ class RealStackTests(unittest.TestCase):
         history = self.instance.http('GET', 'objects/stock_log')
         preview = self.client.get(url + '/deletion')
         self.assertEqual(preview.status_code, 200, preview.json)
-        self.assertFalse(preview.json['allowed'])
-        self.assertIn('historial de movimientos', preview.json['blockers'])
-        response = self.client.delete(url, json={'expected_name': 'Historical archive', 'confirmation': 'Historical archive',
-                        'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertTrue(preview.json['allowed'], preview.json)
+        self.assertGreater(preview.json['history_count'], 0)
+        payload = {'expected_name': 'Historical archive', 'confirmation': 'Historical archive',
+                   'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
+        response = self.client.delete(url, json=payload, headers=self.headers)
         self.assertEqual(response.status_code, 409, response.json)
         self.assertEqual(self.instance.http('GET', 'objects/stock_log'), history)
-        self.assertEqual(self.client.get(url).status_code, 200)
+        payload.update(delete_history=True, operation_id=str(uuid.uuid4()))
+        response = self.client.delete(url, json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual(self.instance.http('GET', 'objects/stock_log'), [row for row in history if row['product_id'] != pid])
+        self.assertFalse(any(row['id'] == pid for row in self.instance.http('GET', 'objects/products')))
 
     def test_native_merge_preserves_real_lots_history_codes_and_reference_rows(self):
         import barcode_stock
@@ -260,3 +265,21 @@ class RealStackTests(unittest.TestCase):
                 for field in ('amount', 'price', 'stock_id', 'note', 'barcode', 'product_amount'):
                     if field in row: self.assertEqual(actual[field], row[field], (entity, field))
         self.instance.http('DELETE', f'objects/shopping_list/{shopping_id}')
+
+    def test_stock_threshold_and_opt_out_never_write_grocy_stock_or_shopping(self):
+        import barcode_stock
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        pid = barcode_stock.create_catalog_product('Threshold contract', unit_id=units['Piece'], initial_stock='2')['product_id']
+        before = {entity: self.instance.http('GET', 'objects/' + entity) for entity in ('products', 'stock', 'stock_log', 'shopping_list')}
+        url = f'/api/v1/catalog/products/{pid}/stock-threshold'
+        for enabled, expected_enabled, value, expected in [(True, True, '2', '0'), (False, True, '2', '2')]:
+            result = self.client.put(url, json={'amount': value, 'expected': expected, 'warning_enabled': enabled, 'expected_warning_enabled': expected_enabled}, headers=self.headers)
+            self.assertEqual(result.status_code, 200, result.json)
+        product = self.client.get(f'/api/v1/catalog/products/{pid}').json
+        self.assertEqual(product['stock_threshold'], '2')
+        self.assertFalse(product['stock_warning_enabled'])
+        self.instance.stop(); self.instance.start()
+        product = self.client.get(f'/api/v1/catalog/products/{pid}').json
+        self.assertEqual(product['stock_threshold'], '2')
+        self.assertFalse(product['stock_warning_enabled'])
+        for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)

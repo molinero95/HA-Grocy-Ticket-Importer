@@ -173,3 +173,22 @@ it("does not turn unknown stock into a zero-stock warning", async () => {
   await screen.findByText(rows[0].name);
   expect(screen.queryByText("Sin existencias")).toBeNull();
 });
+
+it("marks a positive amount at its per-product threshold as low stock", async () => {
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [{ ...rows[0], amount: "2", stock_threshold: "2" }, { ...rows[1], amount: "3", stock_threshold: "2" }] });
+  mount();
+  const low = (await screen.findByText(rows[0].name)).closest("article")!;
+  expect(low.classList.contains("out-of-stock")).toBe(true);
+  expect(low.textContent).toContain("Stock bajo");
+  expect(screen.queryByText("Sin existencias")).toBeNull();
+  expect(screen.getByText("Leche").closest("article")!.classList.contains("out-of-stock")).toBe(false);
+});
+
+it("keeps a product with warnings disabled neutral even at zero stock", async () => {
+  vi.mocked(api.getInventory).mockResolvedValue({items: [{...rows[0], amount: "0", stock_threshold: "3", stock_warning_enabled: false}]});
+  mount();
+  const row = (await screen.findByText(rows[0].name)).closest("article")!;
+  expect(row.classList.contains("out-of-stock")).toBe(false);
+  expect(screen.queryByText("Sin existencias")).toBeNull();
+  expect(screen.queryByText("Stock bajo")).toBeNull();
+});

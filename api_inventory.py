@@ -46,7 +46,12 @@ def register_inventory_routes(app, barcode_stock, lock):
         try:
             items = barcode_stock.inventory_with_shopping()
             from api_photos import local_image_url
+            from stock_thresholds import settings
+            limits = settings()
             for item in items:
+                warning = limits.get(item['id'], {'amount': '0', 'warning_enabled': True})
+                item['stock_threshold'] = warning['amount']
+                item['stock_warning_enabled'] = warning['warning_enabled']
                 item["image_url"] = local_image_url(item["id"]) or item.get("image_url")
             return jsonify({"items": items})
         except Exception:

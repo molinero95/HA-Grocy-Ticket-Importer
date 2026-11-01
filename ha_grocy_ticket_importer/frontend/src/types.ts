@@ -24,6 +24,8 @@ export type ShoppingResponse = {
   sync?: { state: "unconfigured" | "disabled" | "unknown" | "stale" | "error" | "ok"; reason?: string | null };
 };
 export type InventoryItem = {
+  stock_threshold?: string;
+  stock_warning_enabled?: boolean;
   id: number;
   name: string;
   amount: string;

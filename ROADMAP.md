@@ -16,7 +16,7 @@ Estado de código: migración de PR #10 integrada en `main` (`a6cc354`). Publica
 - [x] React como entrada de la candidata; retirar PAGE, scripts y formularios obsoletos; alternativa básica sin JavaScript.
 - [x] Fuentes Python duplicadas sincronizadas y manifiesto Docker completo.
 - [x] CI configurado para frontend, integración real aislada y contenedores AMD64/ARM64 con arranque.
-- [x] Frontend 1.9.0: 83 tests Vitest y 25 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
+- [x] Frontend 1.10.0: 87 tests Vitest y 25 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
 
 La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATION_V1.md); el resultado CI debe observarse para el SHA final, nunca inferirse de esta lista.
 
@@ -52,7 +52,7 @@ La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATI
 
 ## Fuera del alcance de la migración
 
-Combinación automática o con dependencias no migrables, eliminación con pérdida de historial, migración automática de stock Pack antiguo y sincronización de cantidades o estados de compra con Alexa. Se mantienen auditoría y protecciones; no son funciones destructivas pendientes de activar.
+Combinación automática o con dependencias no migrables, eliminación de historial sin confirmación explícita, migración automática de stock Pack antiguo y sincronización de cantidades o estados de compra con Alexa. Se mantienen auditoría y protecciones; no son funciones destructivas pendientes de activar.
 
 
 ## Mejoras 1.8.0
@@ -68,3 +68,12 @@ Combinación automática o con dependencias no migrables, eliminación con pérd
 - [x] Diferencias persistentes por pareja de productos, con deshacer y sin ocultar otras parejas de un grupo.
 - [x] Combinación nativa de Grocy bajo revisión, destino elegido, stock/historia/referencias verificadas y comandos sin repetición.
 - [ ] Alta de producto desde una sugerencia de compra y asociación automática: siguiente release independiente solicitada.
+
+
+## Mejoras 1.10.0
+
+- [x] Confirmaciones correctas en verde y retirada del botón pantalla completa.
+- [x] Borrado de movimientos de archivados autorizado expresamente; aviso y confirmación, con stock/dependencias/importaciones pendientes protegidas.
+- [ ] Siguientes releases: alta desde compras/Alexa y revisión completa de tickets con asociaciones por supermercado.
+
+- [x] Umbral de aviso visual por producto (0 por defecto), comparación inclusiva y desactivación individual, sin cambios de compra/stock.

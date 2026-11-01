@@ -92,6 +92,7 @@ test("different duplicate pairs stay hidden after reload and can be restored", a
   await open();
   await page.getByRole("button", {name: "Son diferentes", exact: true}).click();
   await expect(page.getByText("No se han detectado posibles duplicados.")).toBeVisible();
+  await expect(page.locator('.notice[role="status"]')).toHaveCSS("color", "rgb(22, 109, 74)");
   await page.reload(); await open();
   await expect(page.getByText("No se han detectado posibles duplicados.")).toBeVisible();
   await page.getByText("Productos marcados como diferentes (1)").click();

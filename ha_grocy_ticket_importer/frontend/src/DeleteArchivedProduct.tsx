@@ -8,9 +8,10 @@ export function DeleteArchivedProduct({ id, onDeleted }: { id: number; onDeleted
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [deleteHistory, setDeleteHistory] = useState(false);
   const preview = useQuery({ queryKey: ["product-deletion", id], queryFn: () => getProductDeletion(id), enabled: open, retry: false, staleTime: 0 });
   const remove = useMutation({
-    mutationFn: () => deleteArchivedProduct(id, preview.data!.name, name, preview.data!.token, crypto.randomUUID()),
+    mutationFn: () => deleteArchivedProduct(id, preview.data!.name, name, preview.data!.token, crypto.randomUUID(), deleteHistory),
     retry: false,
     onMutate: () => setSubmitted(true),
     onSuccess: async () => {
@@ -23,7 +24,7 @@ export function DeleteArchivedProduct({ id, onDeleted }: { id: number; onDeleted
   return (
     <section className="product-deletion" aria-label="Eliminar producto archivado">
       <h3>Eliminar definitivamente</h3>
-      <p>Para productos archivados sin existencias, historial ni dependencias. Esta acción no se puede deshacer.</p>
+      <p>Para productos archivados sin existencias ni dependencias activas. Esta acción no se puede deshacer.</p>
       {!open ? (
         <button className="secondary-button danger-outline" type="button" disabled={submitted} onClick={() => setOpen(true)}>
           <Trash2 size={17} aria-hidden="true" /> Revisar eliminación
@@ -34,13 +35,14 @@ export function DeleteArchivedProduct({ id, onDeleted }: { id: number; onDeleted
           {preview.isError && <p role="alert">{preview.error.message} <button className="secondary-button" type="button" onClick={() => void preview.refetch()}>Reintentar revisión</button></p>}
           {preview.data && !preview.isFetching && !preview.isError && (
             preview.data.allowed ? (
-              <form className="variant-form" onSubmit={(event) => { event.preventDefault(); if (!submitted && name === preview.data!.name) remove.mutate(); }}>
+              <form className="variant-form" onSubmit={(event) => { event.preventDefault(); if (!submitted && name === preview.data!.name && (!preview.data!.history_count || deleteHistory)) remove.mutate(); }}>
                 <p>Se borrarán la ficha, sus códigos de barras y su configuración de unidades.</p>
+                {preview.data.history_count > 0 && <label className="history-confirmation"><input type="checkbox" disabled={submitted} checked={deleteHistory} onChange={event => setDeleteHistory(event.target.checked)} />Entiendo que se eliminarán también {preview.data.history_count} movimientos de Grocy y no se podrán recuperar desde Despensa.</label>}
                 <label className="variant-field">
                   Escribe «{preview.data.name}» para confirmar
                   <input autoComplete="off" value={name} disabled={submitted} onChange={(event) => setName(event.target.value)} />
                 </label>
-                <button className="primary-button danger-button" type="submit" disabled={submitted || name !== preview.data.name}>
+                <button className="primary-button danger-button" type="submit" disabled={submitted || name !== preview.data.name || (preview.data.history_count > 0 && !deleteHistory)}>
                   {remove.isPending ? "Eliminando…" : "Eliminar producto definitivamente"}
                 </button>
               </form>

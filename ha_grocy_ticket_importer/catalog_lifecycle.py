@@ -1,4 +1,4 @@
-"""Archive/restore and guarded deletion of unused archived products; retain history."""
+"""Archive/restore and reviewed archived deletion, including explicitly confirmed movement history."""
 from decimal import Decimal
 import barcode_stock
 
@@ -44,7 +44,7 @@ def archived_inventory():
             if row["id"] in ids]
 
 
-def _local_deletion_blockers(pid):
+def _local_deletion_blockers(pid, *, allow_completed_receipts=False):
     """Inspect owned local state read-only; retain all journals and metadata."""
     import json
     import os
@@ -71,8 +71,12 @@ def _local_deletion_blockers(pid):
     read(variant_catalog.CATALOG_DB, variants)
 
     def receipts(db, tables):
-        if 'receipt_items' in tables and db.execute('SELECT 1 FROM receipt_items WHERE product_id=? LIMIT 1', (pid,)).fetchone():
-            blockers.append('historial de tickets')
+        if 'receipt_items' in tables:
+            if allow_completed_receipts:
+                if db.execute("SELECT 1 FROM receipt_items WHERE product_id=? AND state IS NOT 'imported' LIMIT 1", (pid,)).fetchone():
+                    blockers.append('una importación de ticket pendiente de comprobar')
+            elif db.execute('SELECT 1 FROM receipt_items WHERE product_id=? LIMIT 1', (pid,)).fetchone():
+                blockers.append('historial de tickets')
     read(os.environ.get('GROCY_IMPORT_DB', importer.DB_PATH), receipts)
 
     def alexa(db, tables):
@@ -121,7 +125,7 @@ def deletion_preview(product_id):
     # the complete authoritative stock rows instead; an empty set proves zero.
     snapshot = {'product': product, 'grocy_version': version}
     checks = [('stock', 'product_id', 'lotes de existencias'),
-              ('stock_log', 'product_id', 'historial de movimientos'),
+              ('stock_log', 'product_id', None),
               ('shopping_list', 'product_id', 'referencias en listas de compra'),
               ('recipes_pos', 'product_id', 'ingredientes de recetas'),
               ('recipes', 'product_id', 'recetas vinculadas'),
@@ -140,21 +144,24 @@ def deletion_preview(product_id):
     amounts = [Decimal(str(row['amount'])) for row in snapshot['stock']]
     if any(not amount.is_finite() or amount != 0 for amount in amounts):
         blockers.append('existencias distintas de cero o desconocidas')
-    blockers.extend(_local_deletion_blockers(pid))
+    blockers.extend(_local_deletion_blockers(pid, allow_completed_receipts=True))
     snapshot['local_blockers'] = blockers
     token = hashlib.sha256(json.dumps(snapshot, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return {'product_id': pid, 'name': product['name'], 'allowed': not blockers,
             'blockers': blockers, 'token': token,
+            'history_count': len(snapshot['stock_log']),
             'barcode_count': len(snapshot['product_barcodes']),
             'conversion_count': len(snapshot['quantity_unit_conversions'])}
 
 
-def delete_archived(product_id, expected_name, token):
+def delete_archived(product_id, expected_name, token, delete_history=False):
     """Reaudit at dispatch. Caller holds app/worker locks and at-most-once journal."""
     import hmac
     preview = deletion_preview(product_id)
     if preview['name'] != expected_name or not hmac.compare_digest(preview['token'], token):
         raise barcode_stock.BarcodeError('El producto o sus referencias han cambiado. Vuelve a revisar el borrado')
+    if preview['history_count'] and delete_history is not True:
+        raise barcode_stock.BarcodeError('Confirma expresamente que también quieres borrar el historial de movimientos')
     if not preview['allowed']:
         raise barcode_stock.BarcodeError('No se puede eliminar: ' + ', '.join(preview['blockers']))
     pid = int(product_id)
@@ -162,4 +169,7 @@ def delete_archived(product_id, expected_name, token):
     products = barcode_stock.grocy('GET', 'objects/products')
     if not isinstance(products, list) or any(int(row['id']) == pid for row in products):
         raise RuntimeError('No se pudo verificar la eliminación')
+    history = barcode_stock.grocy('GET', 'objects/stock_log')
+    if not isinstance(history, list) or any(int(row['product_id']) == pid for row in history):
+        raise RuntimeError('No se pudo verificar el borrado del historial')
     return {'deleted': True, 'product_id': pid}
