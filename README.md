@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.11.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.12.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.11.0
+## Despensa 1.12.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.11.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.12.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -234,3 +234,12 @@ Cada artículo de texto ofrece **Crear producto para «…»**, aunque no haya n
 Si el nombre/código ya pertenece a un producto, no se duplica ni cambia su stock: revisa el producto existente y pulsa **Asociar este producto**. Si el producto se creó pero no se pudo confirmar la asociación, se conserva y el formulario permite **Revisar estado** antes de completarla; no vuelve a crear el producto ni reescribe una fila ya asociada.
 
 El vínculo usa el ID del producto para esa aparición del artículo de Alexa, incluso con nombre canónico distinto, sin renombrar Alexa. Una nueva aparición tras desaparecer inicia otra revisión. Para nombres alternativos permanentes sigue disponible Acciones → Alias de Alexa.
+
+
+## Revisión completa de tickets (1.12.0)
+
+Tras escanear, corrige **Cantidad del ticket**, **Unidad de stock** y **Piezas por envase**, o selecciona un **Producto de Despensa** existente. Su configuración de compra se muestra en la revisión. Para un artículo nuevo, elige **Crear producto nuevo al importar** y escribe su nombre. El alta ocurre al confirmar, nunca al simular.
+
+**Cantidad final calculada** es de solo lectura y cambia al editar: 2 envases de 6 añaden 12 piezas. Se conserva el coste original de cada línea y el total del ticket; corregir unidades no cambia el importe pagado. Las cantidades pesadas admiten tres decimales.
+
+**Recordar este artículo para este supermercado** guarda el vínculo después de importar correctamente. Un texto distinto puede apuntar al mismo producto, sin renombrarlo; cada supermercado tiene sus propias asociaciones. En el siguiente ticket se selecciona el producto recordado. Si falta, está archivado o cambia su configuración, debes revisarlo. Cambiar una línea invalida la simulación; las líneas pendientes de revisión bloquean la confirmación. El historial de importaciones sigue impidiendo duplicar existencias.

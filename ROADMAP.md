@@ -67,14 +67,14 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 
 - [x] Diferencias persistentes por pareja de productos, con deshacer y sin ocultar otras parejas de un grupo.
 - [x] Combinación nativa de Grocy bajo revisión, destino elegido, stock/historia/referencias verificadas y comandos sin repetición.
-- [ ] Alta de producto desde una sugerencia de compra y asociación automática: siguiente release independiente solicitada.
+- [x] Alta de producto desde compra/Alexa publicada en 1.11.0 (PR #24).
 
 
 ## Mejoras 1.10.0
 
 - [x] Confirmaciones correctas en verde y retirada del botón pantalla completa.
 - [x] Borrado de movimientos de archivados autorizado expresamente; aviso y confirmación, con stock/dependencias/importaciones pendientes protegidas.
-- [ ] Siguientes releases: alta desde compras/Alexa y revisión completa de tickets con asociaciones por supermercado.
+- [x] Alta desde compras/Alexa en 1.11.0; revisión de tickets preparada en 1.12.0.
 
 - [x] Umbral de aviso visual por producto (0 por defecto), comparación inclusiva y desactivación individual, sin cambios de compra/stock.
 
@@ -83,4 +83,4 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 
 - [x] Alta contextual desde compra/Alexa sin candidatos, nombre editable, cero stock y asociación automática con cantidad/nota conservadas.
 - [x] Vínculo por ID limitado a episodio, confirmación de producto existente y recuperación de asociación sin duplicar alta ni fila.
-- [ ] Siguiente release: selección/alta/unidades de cada línea de ticket, asociaciones por supermercado y cantidad final calculada de solo lectura.
+- [x] 1.12.0: selección/alta/unidades de cada línea de ticket, asociaciones por supermercado y cantidad final calculada de solo lectura.

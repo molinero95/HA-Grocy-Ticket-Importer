@@ -120,7 +120,7 @@ test("catalog, variants, barcode ownership, stock and photos survive a Grocy res
 
 test("receipt preview/commit converts packs and re-upload cannot duplicate adjusted stock", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto(base + "react/");
   await tickets(page);
   const file = {
@@ -129,10 +129,22 @@ test("receipt preview/commit converts packs and re-upload cannot duplicate adjus
     buffer: Buffer.from("isolated-browser-ticket"),
   };
   await page.getByLabel("Foto o PDF del ticket").setInputFiles(file);
+  await expect(page.getByLabel("Cantidad final calculada")).toHaveValue("10");
+  await expect(page.getByLabel("Cantidad final calculada")).toHaveAttribute("readonly", "");
   await page.getByRole("button", { name: "Simular importación" }).click();
   await expect(
     page.getByRole("heading", { name: "Resultado de la simulación" }),
   ).toBeVisible();
+  await expect(page.locator("pre")).toContainText("10 Piece");
+  await page.getByLabel("Cantidad del ticket").fill("3");
+  await expect(page.getByLabel("Cantidad final calculada")).toHaveValue("15");
+  await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toHaveCount(0);
+  await page.getByLabel("Cantidad del ticket").fill("2");
+  await page.getByLabel("Producto de Despensa").selectOption("new");
+  await expect(page.getByLabel("Recordar este artículo para este supermercado")).toBeChecked();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("receipt-review-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Simular importación" }).click();
   await expect(page.locator("pre")).toContainText("10 Piece");
   page.once("dialog", (dialog) => dialog.accept());
   await page

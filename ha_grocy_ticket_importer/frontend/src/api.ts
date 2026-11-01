@@ -143,7 +143,7 @@ export async function uploadReceipt(file: File): Promise<ReceiptUpload> {
 }
 export const previewReceipt = (
   id: string,
-  items: { name: string; purchase_units: string; pieces_per_pack: number }[],
+  items: ReceiptReviewItem[],
 ) =>
   request<{ preview: string; ready_to_commit: boolean }>(
     "receipts/" + encodeURIComponent(id) + "/preview",
@@ -282,8 +282,37 @@ export type VariantInput = {
   brand: string;
   units_per_purchase: string;
 };
+export type ReceiptReviewItem = {
+  name: string;
+  purchase_units: string;
+  pieces_per_pack: number;
+  stock_unit?: "piece" | "kg";
+  product_mode?: "auto" | "existing" | "new";
+  product_id?: number | null;
+  remember_product?: boolean;
+  unit_confirmed?: boolean;
+};
+export type ReceiptReviewProduct = {
+  id: number;
+  name: string;
+  stock_unit: "piece" | "kg";
+  pieces_per_pack: number;
+};
+export type ReceiptReviewContext = {
+  products: ReceiptReviewProduct[];
+  line_mappings?: ({ stale?: boolean; product_id: number; stock_unit: "piece" | "kg"; pieces_per_pack: number } | null)[];
+  mappings: Record<
+    string,
+    { stale?: boolean; product_id: number; stock_unit: "piece" | "kg"; pieces_per_pack: number }
+  >;
+};
+export const getReceiptReviewContext = (id: string) =>
+  request<ReceiptReviewContext>(
+    "receipts/" + encodeURIComponent(id) + "/review-context",
+  );
 export type ReceiptItem = {
   name: string;
+  original_name?: string;
   quantity: number | string;
   pieces_per_pack?: number;
   purchase_units?: string;

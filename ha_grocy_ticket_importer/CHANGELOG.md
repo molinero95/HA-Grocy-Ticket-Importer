@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.12.0] — 2026-11-01
+
+### Added
+- Review each receipt line with editable purchased quantity, stock unit and pack contents; select an existing canonical product by ID or create a new product on confirmed import. Show the live calculated stock amount as read-only, computed again by the importer.
+- Remember merchant + original receipt text -> product ID in an additive table in the existing receipt ledger, only after confirmed stock import. Apply valid mappings during future reviews; require explicit selection if the product disappears, is archived or its stock/purchase units change. Keep receipt text, monetary quantities/prices, hashes and imported/pending ledger entries intact.
+
+### Fixed
+- Keep original line costs and total reconciliation when correcting stock quantities. Re-simulate every edit, reject unresolved lines before confirmation and recheck the catalog before commit under the shared worker lock. Preserve one-shot and pending/uncertain recovery protections.
+- Keep three-decimal weighed receipt quantities (for example 1.095 kg) while requiring whole pieces. Explicit product selection never falls back to creating a replacement.
+
+### Tests
+- Cover corrected amounts/costs, canonical ID selection, merchant isolation, restart persistence, stale mappings, invalid units, pending results and repeated uploads. Extend the real Grocy contract and mobile receipt flow.
+
 ## [1.11.0] — 2026-11-01
 
 ### Added

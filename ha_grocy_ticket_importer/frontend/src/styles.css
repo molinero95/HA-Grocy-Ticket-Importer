@@ -1007,3 +1007,6 @@ select:focus-visible {
 
 .shopping-create-button { margin-top: 12px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .shopping-creation-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+.receipt-line select { width: 100%; min-width: 0; }
+.receipt-line input[readonly] { background: #eef4ef; color: #315a45; font-weight: 700; }

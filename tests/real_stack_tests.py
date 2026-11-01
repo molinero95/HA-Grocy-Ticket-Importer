@@ -319,3 +319,45 @@ class RealStackTests(unittest.TestCase):
             for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
             self.assertEqual(queue.resolved_choices(queue.DEFAULT_PATH, [name], self.instance.http('GET', 'objects/products'))[name.lower()]['product_id'], pid)
             self.instance.http('DELETE', f"objects/shopping_list/{saved['id']}")
+
+    def test_receipt_review_maps_merchant_text_to_existing_id_without_duplicate_creation(self):
+        import barcode_stock
+        import hashlib
+        import sqlite3
+        import importer
+        from pathlib import Path
+        from unittest.mock import patch
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        pid = barcode_stock.create_catalog_product('Mapped receipt pack', unit_id=units['Pack'], initial_stock='0', pack_size='6')['product_id']
+        before = self.instance.http('GET', 'objects/products')
+        def extract(path):
+            return {'merchant': 'New test supermarket', 'receipt_date': '2026-10-01', 'total': 6,
+                    'source_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+                    'items': [{'name': 'YOG NAT 6UD', 'quantity': 2, 'unit_price': 3, 'ambiguous': True}]}
+        with patch.object(self.web.extract, 'extract', side_effect=extract):
+            upload = self.client.post('/api/v1/receipts', data={'ticket': (io.BytesIO(b'review-mapping-contract'), 'test.pdf')}, headers=self.headers).json
+            base = '/api/v1/receipts/' + upload['receipt_id']
+            item = {'name': 'Different merchant display name', 'purchase_units': '3', 'pieces_per_pack': 6, 'stock_unit': 'piece', 'product_mode': 'existing', 'product_id': pid, 'remember_product': True}
+            preview = self.client.post(base + '/preview', json={'items': [item]}, headers=self.headers)
+            self.assertEqual(preview.status_code, 200, preview.json)
+            self.assertTrue(preview.json['ready_to_commit'])
+            self.assertIn('18 Piece', preview.json['preview'])
+            self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 0)
+            result = self.client.post(base + '/commit', headers=self.headers)
+            self.assertEqual(result.status_code, 200, result.json)
+            self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 18)
+            lots = [row for row in self.instance.http('GET', 'objects/stock') if int(row['product_id']) == pid]
+            self.assertAlmostEqual(sum(float(row['amount']) * float(row['price']) for row in lots), 6, places=6)
+            self.assertEqual(self.instance.http('GET', 'objects/products'), before)
+            self.instance.stop(); self.instance.start()
+            second = self.client.post('/api/v1/receipts', data={'ticket': (io.BytesIO(b'review-mapping-contract'), 'test.pdf')}, headers=self.headers).json
+            base = '/api/v1/receipts/' + second['receipt_id']
+            context = self.client.get(base + '/review-context')
+            self.assertEqual(context.status_code, 200, context.json)
+            self.assertEqual(context.json['mappings']['yog nat 6ud']['product_id'], pid)
+            self.assertEqual(next(p for p in context.json['products'] if p['id'] == pid)['pieces_per_pack'], 6)
+            self.assertTrue(self.client.post(base + '/preview', json={'items': [item]}, headers=self.headers).json['ready_to_commit'])
+            self.assertEqual(self.client.post(base + '/commit', headers=self.headers).status_code, 200)
+            self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 18)
+            from receipt_review import mappings
+            self.assertEqual(mappings(importer.DB_PATH, 'Unrelated supermarket'), {})

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from flask import Flask
 from api_receipts import register_receipt_routes
@@ -50,23 +50,79 @@ class ReceiptSafetyTests(unittest.TestCase):
         second = self.client.post("/api/v1/receipts/" + self.rid + "/commit")
         self.assertEqual(second.status_code, 409)
         self.assertEqual(second.json["error"], "receipt_already_submitted")
-        self.importer.assert_called_once_with(self.rid, "--commit")
+        self.assertEqual([call.args for call in self.importer.call_args_list], [(self.rid, "--dry-run"), (self.rid, "--commit")])
 
     def test_failed_import_remains_blocked_until_manual_reconciliation(self):
-        self.importer.return_value = SimpleNamespace(returncode=1, stdout="", stderr="failure")
+        self.importer.side_effect = [SimpleNamespace(returncode=0, stdout="OK", stderr=""), SimpleNamespace(returncode=1, stdout="", stderr="failure")]
         self.authorize()
         first = self.client.post("/api/v1/receipts/" + self.rid + "/commit")
         self.assertEqual(first.status_code, 502)
         self.authorize()
         second = self.client.post("/api/v1/receipts/" + self.rid + "/commit")
         self.assertEqual(second.status_code, 409)
-        self.importer.assert_called_once()
+        self.assertEqual(self.importer.call_count, 2)
 
-    def test_preview_rejects_changed_ticket_quantity(self):
+    def test_preview_accepts_corrected_stock_quantity_and_preserves_receipt_cost(self):
         self.authorize()
         response = self.client.post("/api/v1/receipts/" + self.rid + "/preview", json={"items": [{"name": "Arroz", "purchase_units": "2", "pieces_per_pack": 1}]})
+        self.assertEqual(response.status_code, 200)
+        saved = json.loads(self.path.read_text())["items"][0]
+        self.assertEqual(saved["quantity"], 1)
+        self.assertEqual(saved["purchase_units"], "2")
+        self.importer.assert_called_once_with(self.rid, "--dry-run")
+
+    def test_review_lines_never_authorize_partial_commit(self):
+        self.authorize()
+        self.importer.return_value = SimpleNamespace(returncode=0, stdout="[1] REVIEW Arroz: ambiguous", stderr="")
+        preview = self.client.post('/api/v1/receipts/' + self.rid + '/preview', json={'items': [{'name': 'Arroz'}]})
+        self.assertEqual(preview.status_code, 200)
+        self.assertFalse(preview.json['ready_to_commit'])
+        self.assertEqual(self.client.post('/api/v1/receipts/' + self.rid + '/commit').status_code, 403)
+
+    def test_catalog_change_before_commit_requires_new_simulation(self):
+        self.authorize()
+        self.importer.return_value = SimpleNamespace(returncode=0, stdout="[1] REVIEW Arroz: archived", stderr="")
+        result = self.client.post('/api/v1/receipts/' + self.rid + '/commit')
+        self.assertEqual(result.status_code, 409)
+        self.assertFalse((self.data / (self.rid + '.commit-started')).exists())
+        self.importer.assert_called_once_with(self.rid, '--dry-run')
+
+    def test_rejected_preview_preserves_original_text_and_invalidates_old_preview(self):
+        self.authorize()
+        response = self.client.post('/api/v1/receipts/' + self.rid + '/preview', json={'items': [{'name': 'Canonical', 'purchase_units': 'NaN'}]})
         self.assertEqual(response.status_code, 400)
-        self.importer.assert_not_called()
+        self.assertEqual(json.loads(self.path.read_text())['items'][0]['name'], 'Arroz')
+        self.assertEqual(self.client.post('/api/v1/receipts/' + self.rid + '/commit').status_code, 403)
+
+    def test_original_name_cannot_be_replaced_by_client_or_later_edits(self):
+        self.authorize()
+        for name in ('Arroz largo', 'Arroz basmati'):
+            response = self.client.post('/api/v1/receipts/' + self.rid + '/preview', json={'items': [{'name': name, 'original_name': 'forged'}]})
+            self.assertEqual(response.status_code, 200)
+        item = json.loads(self.path.read_text())['items'][0]
+        self.assertEqual(item['original_name'], 'Arroz')
+        self.assertEqual(item['name'], 'Arroz basmati')
+
+    def test_preview_plan_identity_changes_require_resimulation(self):
+        self.authorize()
+        self.importer.return_value = SimpleNamespace(returncode=0, stdout='[1] WOULD IMPORT Arroz (existing id=1)', stderr='')
+        self.assertEqual(self.client.post('/api/v1/receipts/' + self.rid + '/preview', json={'items': [{'name': 'Arroz'}]}).status_code, 200)
+        self.importer.return_value = SimpleNamespace(returncode=0, stdout='[1] WOULD IMPORT Arroz (existing id=2)', stderr='')
+        self.assertEqual(self.client.post('/api/v1/receipts/' + self.rid + '/commit').status_code, 409)
+        self.assertFalse((self.data / (self.rid + '.commit-started')).exists())
+
+    def test_review_context_requires_session_and_marks_changed_mappings_stale(self):
+        url = '/api/v1/receipts/' + self.rid + '/review-context'
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.authorize()
+        reads = {'objects/products': [{'id': 17, 'name': 'Arroz largo', 'qu_id_stock': 2}],
+                 'objects/quantity_units': [{'id': 2, 'name': 'Piece'}], 'objects/quantity_unit_conversions': []}
+        with patch('api_receipts.importer.grocy', side_effect=lambda method, route: reads[route]) as remote, patch('api_receipts.mappings', return_value={'arroz': {'product_id': 17, 'stock_unit': 'kg', 'pieces_per_pack': 1}}):
+            result = self.client.get(url)
+        self.assertEqual(result.status_code, 200, result.json)
+        self.assertTrue(result.json['mappings']['arroz']['stale'])
+        self.assertTrue(result.json['line_mappings'][0]['stale'])
+        self.assertTrue(all(call.args[0] == 'GET' for call in remote.call_args_list))
 
 
 if __name__ == "__main__":

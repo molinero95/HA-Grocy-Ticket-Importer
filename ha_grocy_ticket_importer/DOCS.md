@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.11.0 — actualización de la instalación existente
+## Despensa 1.12.0 — actualización de la instalación existente
 
-La versión 1.11.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.12.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.11.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.12.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -194,3 +194,12 @@ Unknown arrivals remain reviewable with no candidates. Contextual creation prefi
 A server-prepared created_product_id is scoped to the active source generation; it validates the edited canonical product name by ID and survives advisory reranking without weakening ordinary candidate guards. New source episodes clear the proof; inactive/missing products cannot be chosen. Existing attached rows cannot be rebound. Active prepared products block deletion/native merge. Names containing slashes use path-safe routes.
 
 Creation is journaled once. Known partial outcomes retain the product ID; a fresh context read and explicit choose finish the association, detecting a row already converted without rewriting it. Uncertain creation cannot be resent with the same command. Native product creation still checks duplicate names/barcodes and never adds stock to existing products.
+
+
+## Receipt line review (1.12.0)
+
+Receipt review edits purchased quantity, stock unit and pack contents, selects an existing product by canonical ID or explicitly creates a new one during confirmed import. Existing selection uses its audited current purchase conversion; stock unit and pack controls remain locked to that configuration. Live calculated stock is read-only and recomputed server-side. Monetary receipt quantities/prices and line costs remain unchanged, so stock corrections preserve total reconciliation. Weighed quantities retain three-decimal precision; pieces stay integral.
+
+An optional merchant/original-text mapping is stored only after a successful line import in the additive `receipt_product_mappings` table of the existing receipt ledger. It does not replace or reset `receipt_items`. Keys normalize case/whitespace without fuzzy matching or crossing merchants. New reviews preselect a valid canonical ID; missing/archived targets or changed units/conversions require explicit review. No mappings or remote stock/products are written during simulation. Preserve the existing ledger in upgrades and backups.
+
+Every edit invalidates confirmation. Unresolved REVIEW/pending lines cannot authorize partial import; a catalog preflight under the shared worker lock must still pass at commit. One-shot receipt markers and source-hash deduplication remain. Uncertain outcomes are never retried automatically.
