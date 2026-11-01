@@ -4,7 +4,7 @@
 
 Work only in PR #10, `feature/despensa-v1-react`. The user explicitly asks to finish the migration autonomously and permits commits, pushes and CI fixes. Never modify `main`, merge, bump `config.yaml` or publish in this task. Stable main/installed add-on remain 0.16.4; this branch is an unpublished candidate.
 
-Read `DECISIONS.md`, `ROADMAP.md`, `docs/REACT_PARITY.md`, `README.md` and the add-on `DOCS.md`. Verify actual GitHub branch/checks before work. Never describe a deployment or CI success without observing it. The production Grocy HTTP probe returned 403; do not change security/options to bypass it or use production stock for tests.
+Read `DECISIONS.md`, `ROADMAP.md`, `docs/REACT_PARITY.md`, `README.md` and the add-on `DOCS.md`. Verify actual GitHub branch/checks before work. Never describe a deployment or CI success without observing it. Installed Grocy read-only checks now pass using its existing internal service port 80 and existing API key; ingress proxy alone returned 403. Grocy 4.7.1 / PHP 8.5.12 matches isolated validation. Do not change security/options or use production stock for exploratory tests. The configured HA todo entity also returned valid pending uid/summary/status records.
 
 ## Implementation
 

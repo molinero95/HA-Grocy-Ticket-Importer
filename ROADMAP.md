@@ -21,9 +21,9 @@ La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATI
 
 ## Aceptación de un despliegue futuro
 
-- [ ] Acceso de prueba a la instalación propia HA/Grocy: la consulta de solo lectura ha devuelto HTTP 403. No modificar credenciales/puertos/autenticación para sortearlo.
+- [x] Lecturas de Grocy instalado 4.7.1 y esquema de unidades/conversiones/lista/referencias, usando su acceso interno y clave existentes. Entidad HA/Alexa: pendientes con uid/summary/status válidos; sin escrituras ni cambios de seguridad.
 - [ ] Copia HA y actualización de prueba conservando ledger, fotos, variantes, comandos, colas y checkpoints de esa instalación. Reiniciar Grocy aislado ya está probado; no equivale a actualizar Supervisor.
-- [ ] Cámara física y permisos de Android/HA; servicio Alexa real de la entidad elegida. El navegador automatizado simula el dispositivo de cámara y la respuesta HA.
+- [ ] Cámara física y permisos de Android/HA; escrituras Alexa reales de la entidad elegida. El navegador automatizado simula el dispositivo de cámara y la respuesta HA.
 - [ ] Solo tras esas comprobaciones: decisión separada sobre fusión, versión y publicación. No autorizadas durante esta ejecución.
 
 ## Fuera del alcance de la migración

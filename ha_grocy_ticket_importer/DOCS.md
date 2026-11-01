@@ -113,7 +113,9 @@ ID, historial, códigos y fotos. No hay borrado permanente ni consolidación.
 
 La suite prueba Grocy oficial 4.7.1 con datos temporales, importador real,
 worker Alexa, navegador móvil/ingress y reinicio. OpenAI, proveedor público de
-fotos y HA todo se sustituyen. La consulta a la instalación real devolvió 403;
-no se han debilitado protecciones ni modificado datos. Cámara física, entidad
-Alexa real y actualización Supervisor requieren aceptación antes de publicar.
+fotos y HA todo se sustituyen. Las lecturas adicionales de Grocy instalado
+confirman 4.7.1 y el esquema; la entidad HA/Alexa devuelve pendientes válidos.
+Se utiliza su servicio y clave existentes, sin cambiar seguridad ni datos.
+Cámara física, escrituras Alexa y actualización Supervisor requieren aceptación
+antes de publicar.
 Véanse `docs/VALIDATION_V1.md` y `docs/REACT_PARITY.md` en el repositorio.

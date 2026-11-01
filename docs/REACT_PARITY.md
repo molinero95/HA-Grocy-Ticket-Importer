@@ -27,4 +27,4 @@ Retirados `PAGE`, scripts incrustados y rutas antiguas de formularios de aplicac
 
 ## Límites de la evidencia
 
-Véase [VALIDATION_V1.md](VALIDATION_V1.md). Grocy es el release oficial 4.7.1 sin modificar, con datos temporales. Solo OpenAI, búsqueda pública de fotos y HA todo se sustituyen en esas pruebas. No prueba cámara física, la infraestructura Supervisor ni la cuenta Alexa real. La consulta a Grocy instalado devuelve 403. No publicar ni afirmar aceptación de despliegue hasta resolver esas comprobaciones externas.
+Véase [VALIDATION_V1.md](VALIDATION_V1.md). Grocy es el release oficial 4.7.1 sin modificar, con datos temporales. Solo OpenAI, búsqueda pública de fotos y HA todo se sustituyen en esas pruebas. Las lecturas adicionales del Grocy instalado confirman 4.7.1 y el esquema utilizado, y la entidad HA/Alexa devuelve pendientes válidos. No se prueba cámara física, actualización Supervisor ni escrituras sobre la cuenta Alexa real. No publicar ni afirmar aceptación de despliegue hasta resolver esas comprobaciones externas.

@@ -43,4 +43,4 @@ React 19, TypeScript 7, Vite 7 y Vitest 4 en el mismo origen que Flask. Credenci
 
 La candidata de la rama sirve React en `/` y conserva `/react/` como alias; `/basic` mantiene compras sin JavaScript. Se ha eliminado el frontend completo duplicado después de comprobar paridad contra Grocy 4.7.1 aislado. Esto NO despliega nada en Home Assistant.
 
-Conservar todos los datos persistentes y módulos Python espejo. Validación automatizada y límites constan en `docs/VALIDATION_V1.md`. La prueba de la instalación HA real devuelve 403; aceptación de despliegue, cámara física y servicio Alexa real siguen siendo comprobaciones externas. No afirmar que se han realizado ni publicar antes de completarlas.
+Conservar todos los datos persistentes y módulos Python espejo. Validación automatizada y límites constan en `docs/VALIDATION_V1.md`. Las lecturas de Grocy instalado y la entidad HA/Alexa real ya responden correctamente sin cambios de seguridad. Actualización Supervisor, cámara física y escrituras Alexa reales siguen siendo aceptación de despliegue externa. No afirmar que se han realizado ni publicar antes de completarlas.

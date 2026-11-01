@@ -134,8 +134,9 @@ manuales de la cola antigua deberán revisarse de nuevo, evitando asignarlas
 accidentalmente a otra lista Alexa. Incluye ambos directorios en la copia de
 seguridad de Home Assistant.
 
-**Antes del despliegue:** comprobar la entidad Home Assistant/Alexa real y la
-actualización con copia de seguridad. Grocy 4.7.1, reinicio y flujos de extremo
+**Antes del despliegue:** comprobar las escrituras de la entidad Home Assistant/Alexa
+y la actualización con copia de seguridad. Sus lecturas y el esquema de Grocy
+instalado ya responden correctamente. Grocy 4.7.1, reinicio y flujos de extremo
 a extremo ya se validan con datos desechables; no equivalen a esa instalación.
 
 ## Productos genéricos y variantes

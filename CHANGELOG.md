@@ -9,7 +9,7 @@
 - Explicit Alexa note association preserves row/amount/text; keep-original dismissal persists. Conflict checks and verified checkpoints remain mandatory; sync stays disabled by default.
 - Reversible archive/restore preserves history and metadata; permanent deletion and automatic consolidation remain unavailable.
 - Real unmodified Grocy 4.7.1 contracts and full mobile browser workflows with disposable data; CI builds/starts AMD64 and ARM64 containers. Python mirrors remain synchronized.
-- No manifest bump, release, merge or production deployment. Installed HA/Grocy access returned 403; physical camera, actual Alexa service and Supervisor upgrade acceptance remain external deployment checks.
+- No manifest bump, release, merge or production deployment. Read-only installed Grocy 4.7.1/schema and configured HA/Alexa entity checks succeeded with existing credentials/listeners. Physical camera, real Alexa writes and Supervisor upgrade acceptance remain external deployment checks.
 
 ## [0.16.4] — 2026-10-31
 
