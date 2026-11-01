@@ -1,15 +1,18 @@
 import { useEffect, useRef } from "react";
+import { useModalNavigation } from "./navigation";
 
 let openModals = 0;
 let originalOverflow = "";
 /** Trap keyboard focus in the active dialog, restore focus and release scroll. */
 export function useModal(onClose: () => void, enabled = true) {
+  const navigation = useModalNavigation();
   const ref = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
     const element = ref.current;
     if (!enabled || !element) return;
+    const unregister = navigation?.register(() => close.current());
     const previousFocus = document.activeElement as HTMLElement | null;
     if (openModals++ === 0) {
       originalOverflow = document.body.style.overflow;
@@ -47,10 +50,11 @@ export function useModal(onClose: () => void, enabled = true) {
     };
     document.addEventListener("keydown", keydown);
     return () => {
+      unregister?.();
       document.removeEventListener("keydown", keydown);
       if (--openModals === 0) document.body.style.overflow = originalOverflow;
       if (previousFocus?.isConnected) previousFocus.focus();
     };
-  }, [enabled]);
+  }, [enabled, navigation]);
   return ref;
 }

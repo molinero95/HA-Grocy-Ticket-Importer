@@ -278,7 +278,7 @@ test("archives live in Actions without a duplicate product-creation shortcut", a
     page.getByRole("heading", { name: "Productos archivados" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Ver y restaurar" }),
+    page.getByRole("button", { name: "Ver producto" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Nuevo producto" }),

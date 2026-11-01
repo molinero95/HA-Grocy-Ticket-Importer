@@ -4,11 +4,11 @@ Fecha: 2026-11-01. Migración de PR #10 integrada en `main`; publicación 1.0.0 
 
 ## Evidencia local
 
-- Python: 284 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
-- Vitest 4: 70 pruebas de interacciones React y cliente API en 1.7.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
+- Python: 297 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
+- Vitest 4: 79 pruebas de interacciones React y cliente API en 1.8.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
 - TypeScript 7: aplicación y e2e; Vite 7: compilación de producción.
-- Grocy real: 8 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
-- Chromium: 19 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
+- Grocy real: 9 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
+- Chromium: 23 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
 
 ## Refuerzo de QA del frontend
 
@@ -16,7 +16,7 @@ Las pruebas de componentes cubren ajuste del total restante sin formulario de co
 
 Estas regresiones detectaron y corrigieron tres defectos: borrar una consulta de autenticación observada podía dejar la vista anterior y recrear caché privada; el frontend ignoraba `ready_to_commit: false`; el botón de alta no aplicaba el máximo de 1000 piezas por pack (el campo HTML y el servidor ya lo limitaban).
 
-`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,26 % líneas, 75,96 % sentencias, 79,60 % ramas y 65,46 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
+`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,33 % líneas, 75,27 % sentencias, 79,67 % ramas y 66,45 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
 
 La ejecución local de navegador sin PHP/Grocy ejecuta 14 escenarios disponibles y omitió explícitamente los 5 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 19; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
 
@@ -89,3 +89,12 @@ Las nuevas regresiones reproducen el bloqueo, exigen resolución explícita y ve
 Las pruebas cambian productos después de crear la propuesta: altas, renombrados y archivados deben actualizar las opciones en la siguiente lectura, con estado previo conservado si falla el catálogo. Elegir un candidato nuevo revalida el catálogo sin esperar al worker; una fila ya asociada no puede producir una segunda fila al cambiar su elección. Un contrato y escenario de navegador con Grocy real crean primero una nota sin coincidencia, dan de alta su producto y guardan la asociación con la misma fila/cantidad, sin ejecutar otro ciclo del worker.
 
 Un test de hilo/archivo verifica que un marcador de otra entidad no despierta el listener y que el marcador correcto sí lo hace sin esperar el intervalo de 120 s. Las pruebas API comprueban que solo mutaciones confirmadas solicitan sincronización; lecturas, previews, errores y rechazos no lo hacen. La notificación no ejecuta llamadas remotas en la petición HTTP. La entrega de eventos de Alexa y su latencia real siguen requiriendo observación de la instalación actualizada.
+
+
+## Archivados y navegación 1.8.0
+
+Trece regresiones Python nuevas cubren las referencias de cada cascada, stock desconocido/NaN, archivos locales corruptos, variantes, tickets, colas/alias/checkpoints de otras entidades, CSRF, nombre y snapshot obsoletos, respuesta perdida y repetición del mismo comando. No borran datos de usuario. El nuevo contrato Grocy elimina un archivado desechable con código/conversión y comprueba que stock, historia y listas ajenos son idénticos; bloquea otro archivado con movimientos históricos.
+
+Componentes: confirmación exacta, auditoría fallida y recuperación de lectura, bloqueo tras escritura incierta, caché de archivados, estado sin stock independiente de compra y soporte de fullscreen. Chromium añade Atrás por secciones/cámara/diálogos, sustitución alta→ficha, cierre manual sin paso vacío y captura ámbar móvil sin desbordamiento; un flujo Grocy usa la ficha real para eliminar y verifica ausencia tras recargar. Sin Grocy local se ejecutan 17 escenarios y se omiten explícitamente 6; CI ejecuta los 23.
+
+El historial es del mismo documento y conserva URL/prefijo ingress, sin acceder al documento padre. Android físico y permisos fullscreen del iframe de HA requieren aceptación externa. La API genérica de Grocy no dispone de DELETE condicional atómico: los bloqueos protegen escritores de Despensa/worker, no ediciones simultáneas desde Grocy u otras aplicaciones.

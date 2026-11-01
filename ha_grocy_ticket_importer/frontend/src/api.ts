@@ -397,3 +397,11 @@ export const savePurchaseConfiguration = (
     expected,
     operation_id: operationId,
   });
+
+export type ProductDeletion = {
+  product_id: number; name: string; allowed: boolean; blockers: string[];
+  token: string; barcode_count: number; conversion_count: number;
+};
+export const getProductDeletion = (id: number) => request<ProductDeletion>("catalog/products/" + id + "/deletion");
+export const deleteArchivedProduct = (id: number, expectedName: string, confirmation: string, token: string, operationId: string) =>
+  request("catalog/products/" + id, "DELETE", { expected_name: expectedName, confirmation, token, operation_id: operationId });

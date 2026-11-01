@@ -244,9 +244,48 @@ def register_catalog_routes(app, barcode_stock, lock):
             app.logger.exception("api_v1_catalog_duplicates_failed")
             return jsonify({"error": "duplicates_unavailable"}), 503
 
+    @app.get("/api/v1/catalog/products/<int:product_id>/deletion")
+    def api_v1_product_deletion_preview(product_id):
+        from catalog_lifecycle import deletion_preview
+        from shopping_match_queue import mutation_lock, DEFAULT_PATH
+        try:
+            with mutation_lock(DEFAULT_PATH, blocking=False):
+                return jsonify(deletion_preview(product_id))
+        except BlockingIOError:
+            return jsonify({"error": "operation_in_progress"}), 409
+        except Exception:
+            return jsonify({"error": "No se pudo verificar si el producto puede eliminarse. Conserva el archivado y vuelve a consultar."}), 503
+
     @app.delete("/api/v1/catalog/products/<int:product_id>")
     def api_v1_delete_catalog_product(product_id):
-        return jsonify({"error": "Usa Archivar producto para conservar las existencias e historial de Grocy"}), 409
+        from catalog_lifecycle import delete_archived
+        from shopping_match_queue import mutation_lock, DEFAULT_PATH
+        from stock_commands import execute_once, CommandConflict
+        import re
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or not isinstance(payload.get('expected_name'), str)
+                or payload.get('confirmation') != payload['expected_name'] or not payload['expected_name']
+                or not isinstance(payload.get('token'), str) or not re.fullmatch(r'[a-f0-9]{64}', payload['token'])):
+            return jsonify({"error": "Escribe el nombre exacto del producto y revisa su borrado antes de confirmar."}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            with mutation_lock(DEFAULT_PATH, blocking=False):
+                def change():
+                    try:
+                        return {"status": 200, "body": delete_archived(product_id, payload['expected_name'], payload['token'])}
+                    except barcode_stock.BarcodeError as exc:
+                        return {"status": 409, "body": {"error": str(exc)}}
+                result = execute_once(payload.get('operation_id'), {**payload, 'product_id': product_id, 'command': 'delete_archived'}, change)
+            return jsonify(result['body']), result['status']
+        except BlockingIOError:
+            return jsonify({"error": "operation_in_progress"}), 409
+        except CommandConflict:
+            return jsonify({"error": "No se ha reenviado el borrado. Comprueba el producto en Grocy antes de otra operación."}), 409
+        except Exception:
+            return jsonify({"error": "No se pudo confirmar el borrado. Comprueba Grocy y vuelve a abrir la ficha; no se ha repetido la operación."}), 502
+        finally:
+            lock.release()
 
     @app.get("/api/v1/catalog/audit")
     def api_v1_catalog_audit():

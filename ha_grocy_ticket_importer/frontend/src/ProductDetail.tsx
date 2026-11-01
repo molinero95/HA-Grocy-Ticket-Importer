@@ -1,4 +1,5 @@
 import { ProductPurchase } from "./ProductPurchase";
+import { DeleteArchivedProduct } from "./DeleteArchivedProduct";
 import { useModal } from "./useModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isBarcode } from "./barcodes";
@@ -500,6 +501,7 @@ export function ProductDetail({
                 : "Archivar producto"}
             </button>
             {lifecycle.isError && <p role="alert">{lifecycle.error.message}</p>}
+            {product.data?.active === false && <DeleteArchivedProduct id={id} onDeleted={onClose} />}
             <h3>Variantes por supermercado</h3>
             {data.variants.length === 0 ? (
               <p>Este producto aún no tiene variantes asociadas.</p>

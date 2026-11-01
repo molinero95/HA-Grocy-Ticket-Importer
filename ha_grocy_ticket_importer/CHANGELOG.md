@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0] — 2026-11-01
+
+### Added
+- Highlight active pantry products without stock in amber, with an explicit “Sin existencias” label independent of shopping quantities. Keep archived rows neutral.
+- Offer permanent deletion from an archived product sheet after a fresh reference audit and exact typed-name confirmation. Require zero stock, no Grocy movement history, shopping/recipe/meal-plan/child references, local receipt history, variants, Alexa aliases, pending choices/removals or identity checkpoints. Show blockers and fail closed on incomplete reads.
+- Recheck the reviewed product and owned barcode/conversion metadata before dispatch, serialize with app/worker mutations, journal the operation and verify absence. Repeated commands return their recorded result; uncertain writes are never replayed. Preserve local journals, photos and metadata.
+- Use same-document browser history for sections and nested dialogs, including Android Back where the host delegates navigation. Closing a dialog removes its history entry; replacing the create dialog with a product sheet preserves one step. Preserve the ingress URL and allow normal root exit.
+- Add an explicit fullscreen action, with an explanatory status when Home Assistant/WebView denies the browser API.
+
+### Tests
+- Add guarded deletion/API regressions, real Grocy cascade/history contracts, reviewed browser deletion, mobile Back/nested camera/dialog replacement and zero-stock styling checks. Cover typed confirmation, failed audits, lost responses and fullscreen support.
+
 ## [1.7.0] — 2026-11-01
 
 ### Added

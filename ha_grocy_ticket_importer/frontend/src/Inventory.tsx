@@ -19,6 +19,9 @@ const normalize = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("es")
     .trim();
+const hasNoStock = (amount: string) =>
+  amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) <= 0;
+
 export function Inventory({ archived = false }: { archived?: boolean }) {
   const client = useQueryClient();
   const inventory = useQuery({
@@ -72,7 +75,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
           <h2>{archived ? "Productos archivados" : "Mi despensa"}</h2>
           <p>
             {archived
-              ? "Consulta o restaura los productos que has archivado."
+              ? "Consulta, restaura o elimina productos archivados sin uso."
               : "Stock de Grocy y cantidades pendientes de compra."}
           </p>
         </div>
@@ -116,7 +119,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
       <div className="items">
         {items.map((item) => (
           <article
-            className="item inventory-item"
+            className={"item inventory-item" + (!archived && hasNoStock(item.amount) ? " out-of-stock" : "")}
             key={item.id}
             aria-busy={step.isPending && step.variables?.id === item.id}
           >
@@ -144,6 +147,9 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
                 <small>
                   En casa: {item.amount} {item.unit}
                 </small>
+                {!archived && hasNoStock(item.amount) && (
+                  <span className="stock-status">Sin existencias</span>
+                )}
               </div>
             </div>
             {archived ? (
@@ -151,7 +157,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
                 className="secondary-button"
                 onClick={() => setSelectedProductId(item.id)}
               >
-                Ver y restaurar
+                Ver producto
               </button>
             ) : Number(item.shopping_amount) === 0 ? (
               <button
