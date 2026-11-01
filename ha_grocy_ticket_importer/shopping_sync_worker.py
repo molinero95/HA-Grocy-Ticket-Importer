@@ -6,6 +6,8 @@ import fcntl
 import os
 import time
 import threading
+import json
+import tempfile
 from shopping_sync_events import listen
 from pathlib import Path
 
@@ -124,6 +126,20 @@ def _run_once(*, dry_run=True):
         acknowledge_choices(MATCH_QUEUE, choices)
     return result
 
+def publish_status(state, error=None):
+    """Publish only sanitized state; never include remote exception details."""
+    path = Path("/data/shopping-sync-status.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".shopping-status-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump({"timestamp": time.time(), "state": state, "error": error}, stream)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def main():
     STATE.parent.mkdir(parents=True, exist_ok=True)
     with open(str(STATE) + ".lock", "a+") as lock:
@@ -134,6 +150,7 @@ def main():
         while True:
             try:
                 result = run_once(dry_run=os.environ.get("SHOPPING_SYNC_ENABLED") != "1")
+                publish_status("ok" if os.environ.get("SHOPPING_SYNC_ENABLED") == "1" else "disabled")
                 print("Shopping sync checked (" + trigger + "): " +
                       ", ".join(key + "=" + str(len(result[key])) for key in (
                           "add_alexa", "add_grocy", "remove_alexa", "remove_grocy")),
@@ -142,6 +159,7 @@ def main():
                 # Only our own fixed conflict messages are safe to print.
                 # Remote exception strings can contain tokens or private data.
                 reason = str(exc) if isinstance(exc, IdentityConflict) else type(exc).__name__
+                publish_status("failed", reason if isinstance(exc, IdentityConflict) else type(exc).__name__)
                 print("Shopping sync failed: " + reason, flush=True)
             triggered = wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
             wake.clear()
