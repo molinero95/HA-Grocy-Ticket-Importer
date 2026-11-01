@@ -1013,3 +1013,5 @@ select:focus-visible {
 
 .product-recognition { margin: 14px 0; padding: 14px; border: 1px solid #d2dfd5; border-radius: 12px; background: #f5f8f3; }
 .recognition-preview { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin: 12px auto; border-radius: 9px; }
+
+.product-recognition > button { display: flex; margin: 10px 0; max-width: 100%; }

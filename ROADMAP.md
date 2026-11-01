@@ -92,3 +92,7 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [x] Reconocimiento de foto completa tras código sin resultados, acción explícita y sugerencia editable; conservar alta manual.
 - [ ] Configurar con el usuario Amazon Developer, skill/usuario autorizados y ruta Cloudflare del listener 8100; validar voz en Echo físico.
 - [ ] Validar una fotografía real del usuario contra su cuenta OpenAI tras la actualización. Las pruebas sustituyen el proveedor y no consumen su API.
+
+## Corrección 1.14.0
+
+- [x] Tomar una foto nueva del frontal/etiqueta para IA, con botón específico, sin reutilizar la imagen del código de barras.

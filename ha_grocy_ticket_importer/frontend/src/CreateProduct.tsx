@@ -6,20 +6,26 @@ import {
   createCatalogProduct,
   getCatalogUnits,
   saveDiscoveredPhoto,
+  uploadCatalogPhoto,
 } from "./api";
+import type { CatalogProductInput } from "./api";
 import { isBarcode } from "./barcodes";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { PhotoPreview } from "./ProductPhotos";
 
 export function CreateProduct({
   onClose,
-  onOpenProduct, initialName = "", submitProduct = createCatalogProduct, zeroStockOnly = false, oneAttempt = false, initialBarcode = "", initialFrame,
+  onOpenProduct,
+  initialName = "",
+  submitProduct = createCatalogProduct,
+  zeroStockOnly = false,
+  oneAttempt = false,
+  initialBarcode = "",
 }: {
   onClose: () => void;
   onOpenProduct?: (id: number) => void;
   initialName?: string;
   initialBarcode?: string;
-  initialFrame?: Blob;
   submitProduct?: typeof createCatalogProduct;
   zeroStockOnly?: boolean;
   oneAttempt?: boolean;
@@ -33,23 +39,39 @@ export function CreateProduct({
   const [name, setName] = useState(initialName);
   const [attempted, setAttempted] = useState(false);
   const [barcode, setBarcode] = useState(initialBarcode);
-  const [captured, setCaptured] = useState<{ code: string; frame: Blob } | null>(initialFrame ? { code: initialBarcode, frame: initialFrame } : null);
   const [unit, setUnit] = useState("");
   const [initialStock, setInitialStock] = useState("0");
   const [packSize, setPackSize] = useState("1");
+  const [recognitionPhoto, setRecognitionPhoto] = useState<{
+    code: string;
+    file: File;
+  } | null>(null);
   const [photoMessage, setPhotoMessage] = useState("");
   const isPack = units.data?.some(
     (value) =>
       value.id === Number(unit) && value.name.toLowerCase().includes("pack"),
   );
   const save = useMutation({
-    mutationFn: submitProduct,
+    mutationFn: ({
+      recognition_photo: _photo,
+      ...product
+    }: CatalogProductInput & { recognition_photo?: File | null }) =>
+      submitProduct(product),
     onSuccess: async (response, submitted) => {
       await client.invalidateQueries({ queryKey: ["shopping"] });
       // Never attach metadata to an existing duplicate as a side effect of creation.
-      if (response.created && submitted.barcode) {
+      if (
+        response.created &&
+        (submitted.recognition_photo || submitted.barcode)
+      ) {
         try {
-          await saveDiscoveredPhoto(response.product_id, submitted.barcode);
+          if (submitted.recognition_photo)
+            await uploadCatalogPhoto(
+              response.product_id,
+              submitted.recognition_photo,
+            );
+          else
+            await saveDiscoveredPhoto(response.product_id, submitted.barcode);
         } catch {
           setPhotoMessage(
             "El producto está creado. No se pudo guardar su foto; puedes añadirla desde la ficha.",
@@ -120,6 +142,10 @@ export function CreateProduct({
               if (save.isPending || (oneAttempt && attempted)) return;
               if (oneAttempt) setAttempted(true);
               save.mutate({
+                recognition_photo:
+                  recognitionPhoto?.code === barcode.trim()
+                    ? recognitionPhoto.file
+                    : null,
                 name: name.trim(),
                 barcode: barcode.trim(),
                 unit_id: Number(unit),
@@ -145,8 +171,16 @@ export function CreateProduct({
                 onChange={(event) => setBarcode(event.target.value)}
               />
             </label>
-            <BarcodeScanner onDetect={setBarcode} onCapture={(code, frame) => setCaptured({ code, frame })} label="Escanear código" />
-            <PhotoPreview barcode={barcode} onUseName={setName} capturedFrame={captured?.code === barcode ? captured.frame : undefined} />
+            <BarcodeScanner onDetect={setBarcode} label="Escanear código" />
+            <PhotoPreview
+              barcode={barcode}
+              onUseName={setName}
+              onRecognitionPhoto={(photo) =>
+                setRecognitionPhoto(
+                  photo ? { code: barcode.trim(), file: photo } : null,
+                )
+              }
+            />
             <label className="variant-field">
               Unidad
               <select
@@ -163,16 +197,23 @@ export function CreateProduct({
                 ))}
               </select>
             </label>
-            {zeroStockOnly ? <p>Se crea sin existencias. La cantidad y nota de la compra se conservan.</p> : <label className="variant-field">
-              Stock inicial
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={initialStock}
-                onChange={(event) => setInitialStock(event.target.value)}
-              />
-            </label>}
+            {zeroStockOnly ? (
+              <p>
+                Se crea sin existencias. La cantidad y nota de la compra se
+                conservan.
+              </p>
+            ) : (
+              <label className="variant-field">
+                Stock inicial
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={initialStock}
+                  onChange={(event) => setInitialStock(event.target.value)}
+                />
+              </label>
+            )}
             {isPack && (
               <>
                 <label className="variant-field">
@@ -195,14 +236,16 @@ export function CreateProduct({
             {save.isError && (
               <p role="alert" className="notice">
                 {save.error.message}
-                {oneAttempt && " Cierra el formulario y comprueba el catálogo y la lista antes de otra operación."}
+                {oneAttempt &&
+                  " Cierra el formulario y comprueba el catálogo y la lista antes de otra operación."}
               </p>
             )}
             <button
               className="primary-button create-product-submit"
               type="submit"
               disabled={
-                save.isPending || (oneAttempt && attempted) ||
+                save.isPending ||
+                (oneAttempt && attempted) ||
                 !unit ||
                 !name.trim() ||
                 Boolean(barcode && !isBarcode(barcode)) ||

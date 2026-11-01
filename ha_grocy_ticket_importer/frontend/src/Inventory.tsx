@@ -34,7 +34,6 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
   );
   const [creating, setCreating] = useState(false);
   const [creationCode, setCreationCode] = useState("");
-  const [captured, setCaptured] = useState<{ code: string; frame: Blob } | null>(null);
   const code = query.trim();
   const lookupCode = useDebouncedValue(code);
   // Query identity isolates late responses: a previous scan cannot change a newer search.
@@ -100,7 +99,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <BarcodeScanner onDetect={setQuery} onCapture={archived ? undefined : (code, frame) => setCaptured({ code, frame })} />
+        <BarcodeScanner onDetect={setQuery} />
       </div>
       {inventory.isLoading && <p role="status">Cargando inventario…</p>}
       {inventory.isError && (
@@ -215,7 +214,6 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
       {creating && (
         <CreateProduct
           initialBarcode={creationCode}
-          initialFrame={captured?.code === creationCode ? captured.frame : undefined}
           onClose={() => setCreating(false)}
           onOpenProduct={(id) => {
             setCreating(false);
