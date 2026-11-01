@@ -993,3 +993,10 @@ select:focus-visible {
 .fullscreen-action > button { width: 100%; }
 .fullscreen-action > p { margin: 10px 0 0; font-size: .85rem; color: #60756a; }
 :fullscreen { overflow: auto; background: #f5f7fa; }
+
+.difference-history { margin-bottom: 16px; }
+.difference-history summary { cursor: pointer; color: #166d4a; font-weight: 700; }
+.difference-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 12px; }
+.duplicate-group button { margin: 5px 8px 0 0; }
+.merge-review { margin-bottom: 16px; }
+.merge-review select { width: 100%; }

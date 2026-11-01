@@ -74,3 +74,28 @@ test("manual close removes its Back entry; empty stock has an accessible amber s
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Lista de la compra", exact: true })).toBeVisible();
 });
+
+test("different duplicate pairs stay hidden after reload and can be restored", async ({ page }, testInfo) => {
+  let different = false;
+  const items = [{id: 1, name: "Leche entera", barcodes: []}, {id: 2, name: "Leche enteras", barcodes: []}];
+  await page.route("**/api/v1/catalog/duplicates", route => route.fulfill({ json: { groups: different ? [] : [{reason: "Nombres parecidos", items}] } }));
+  await page.route("**/api/v1/catalog/duplicates/differences", async route => {
+    if (route.request().method() === "PUT") { different = true; await route.fulfill({ json: {saved: true} }); }
+    else await route.fulfill({ json: {differences: different ? [{left_id: 1, right_id: 2, left_name: items[0].name, right_name: items[1].name}] : []} });
+  });
+  await page.route("**/api/v1/catalog/duplicates/differences/1/2", async route => { different = false; await route.fulfill({ json: {removed: true} }); });
+  const open = async () => {
+    await page.getByRole("button", {name: "Acciones", exact: true}).click();
+    await page.getByRole("button", {name: "Revisar duplicados y auditoría", exact: true}).click();
+  };
+  await page.goto(ingress);
+  await open();
+  await page.getByRole("button", {name: "Son diferentes", exact: true}).click();
+  await expect(page.getByText("No se han detectado posibles duplicados.")).toBeVisible();
+  await page.reload(); await open();
+  await expect(page.getByText("No se han detectado posibles duplicados.")).toBeVisible();
+  await page.getByText("Productos marcados como diferentes (1)").click();
+  await page.screenshot({path: testInfo.outputPath("duplicate-difference-mobile.png"), fullPage: true});
+  await page.getByRole("button", {name: "Deshacer diferencia", exact: true}).click();
+  await expect(page.getByRole("button", {name: "Revisar combinación", exact: true})).toBeVisible();
+});

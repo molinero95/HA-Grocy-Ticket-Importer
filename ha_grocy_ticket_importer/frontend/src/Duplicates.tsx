@@ -1,12 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   getCatalogAudit,
   getDuplicateCandidates,
   getMergePreview,
+  getDuplicateDifferences, markProductsDifferent, undoProductDifference, mergeCatalogProducts,
+  type DuplicateCandidate,
 } from "./api";
 
 export function Duplicates() {
+  const client = useQueryClient();
+  const [message, setMessage] = useState("");
+  const differences = useQuery({ queryKey: ["duplicate-differences"], queryFn: getDuplicateDifferences });
+  const refresh = () => Promise.all(["duplicates", "duplicate-differences", "inventory", "archived", "shopping", "catalog-audit", "alexa-aliases", "product", "variants", "catalog-barcodes"].map(key => client.invalidateQueries({ queryKey: [key] })));
+  const different = useMutation({ mutationFn: ([left, right]: DuplicateCandidate[]) => markProductsDifferent(left, right), retry: false, onSuccess: async () => { setMessage("Marcados como diferentes. Esta pareja no volverá a sugerirse hasta que deshagas la decisión."); setPair(null); await refresh(); } });
+  const undo = useMutation({ mutationFn: ({left_id, right_id}: {left_id: number; right_id: number}) => undoProductDifference(left_id, right_id), retry: false, onSuccess: async () => { setMessage("Diferencia deshecha. Se volverán a comprobar las coincidencias."); await refresh(); } });
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["duplicates"],
     queryFn: getDuplicateCandidates,
@@ -17,11 +25,6 @@ export function Duplicates() {
     enabled: false,
   });
   const [pair, setPair] = useState<[number, number] | null>(null);
-  const preview = useQuery({
-    queryKey: ["merge-preview", pair],
-    queryFn: () => getMergePreview(pair![0], pair![1]),
-    enabled: pair !== null,
-  });
   return (
     <main>
       <div className="heading">
@@ -37,6 +40,14 @@ export function Duplicates() {
           Volver a analizar
         </button>
       </div>
+      {message && <p role="status" className="notice">{message}</p>}
+      {(different.isError || undo.isError) && <p role="alert">{different.error?.message || undo.error?.message}</p>}
+      <details className="item difference-history">
+        <summary>Productos marcados como diferentes ({differences.data?.differences?.length ?? 0})</summary>
+        <p>Se guardan por pareja e ID de producto, también después de renombrar. Puedes deshacer cualquier decisión.</p>
+        {differences.isError && <p role="alert">No se pudieron cargar las decisiones. <button className="secondary-button" onClick={() => void differences.refetch()}>Reintentar decisiones</button></p>}
+        {differences.data?.differences?.map(row => <div className="difference-row" key={row.left_id + ":" + row.right_id}><span>{row.left_name} (ID {row.left_id}) · {row.right_name} (ID {row.right_id})</span><button className="secondary-button" disabled={undo.isPending} onClick={() => undo.mutate(row)}>Deshacer diferencia</button></div>)}
+      </details>
       <section className="item audit-panel">
         <h3>Auditoría completa (solo lectura)</h3>
         <p>
@@ -90,72 +101,7 @@ export function Duplicates() {
         </p>
       )}
       {data?.length === 0 && <p>No se han detectado posibles duplicados.</p>}
-      {pair && (
-        <section className="item audit-panel">
-          <h3>Vista previa de fusión (solo lectura)</h3>
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => setPair(null)}
-          >
-            Cerrar
-          </button>
-          {preview.isLoading && <p>Comprobando productos…</p>}
-          {preview.isError && <p role="alert">{preview.error.message}</p>}
-          {preview.data && (
-            <>
-              <p>
-                <strong>Origen:</strong> {preview.data.source.name} ·{" "}
-                {preview.data.source.stock_amount} unidades (unidad Grocy{" "}
-                {preview.data.source.unit_id}) · códigos:{" "}
-                {preview.data.source.barcodes.join(", ") || "ninguno"}
-              </p>
-              <p>
-                <strong>Destino:</strong> {preview.data.target.name} ·{" "}
-                {preview.data.target.stock_amount} unidades (unidad Grocy{" "}
-                {preview.data.target.unit_id}) · códigos:{" "}
-                {preview.data.target.barcodes.join(", ") || "ninguno"}
-              </p>
-              <p>
-                Variantes: {preview.data.source_variants.length} en origen y{" "}
-                {preview.data.target_variants.length} en destino.
-              </p>
-              {preview.data.audit && (
-                <>
-                  <strong>Referencias detectadas:</strong>
-                  <ul>
-                    {preview.data.audit.collections.map((collection) => (
-                      <li key={collection.collection}>
-                        {collection.label}:{" "}
-                        {collection.status === "ok"
-                          ? `${collection.count} referencia(s)`
-                          : "No disponible"}
-                        {collection.references.length > 0 && (
-                          <ul>
-                            {collection.references.map((ref, index) => (
-                              <li key={index}>
-                                Registro {ref.id ?? "sin ID"} · {ref.field} →
-                                producto {ref.product_id}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              <strong>Bloqueos de seguridad:</strong>
-              <ul>
-                {preview.data.blockers.map((blocker) => (
-                  <li key={blocker}>{blocker}</li>
-                ))}
-              </ul>
-              <p>No se ha modificado ningún dato.</p>
-            </>
-          )}
-        </section>
-      )}
+      {pair && <MergeReview key={pair.join(":")} pair={pair} onSwap={() => setPair([pair[1], pair[0]])} onClose={() => setPair(null)} onMerged={() => { setPair(null); setMessage("Productos combinados. Se ha conservado el producto elegido."); void refresh(); }} />}
       <div className="items">
         {data?.map((group, index) => (
           <article className="item duplicate-group" key={index}>
@@ -178,17 +124,45 @@ export function Duplicates() {
                     setPair([group.items[0].id, group.items[1].id])
                   }
                 >
-                  Comparar los dos primeros
+                  Revisar combinación
                 </button>
               )}
-              <small>
-                Revisa los productos antes de decidir si deben combinarse. La
-                fusión está deshabilitada por seguridad.
-              </small>
+              <button className="secondary-button" disabled={different.isPending || undo.isPending} onClick={() => different.mutate(group.items.slice(0, 2))}>Son diferentes</button>
             </div>
           </article>
         ))}
       </div>
     </main>
   );
+}
+
+
+function MergeReview({ pair, onSwap, onClose, onMerged }: { pair: [number, number]; onSwap: () => void; onClose: () => void; onMerged: () => void }) {
+  const preview = useQuery({ queryKey: ["merge-preview", pair], queryFn: () => getMergePreview(...pair), retry: false, staleTime: 0 });
+  const [confirmation, setConfirmation] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const merge = useMutation({ mutationFn: () => mergeCatalogProducts(preview.data!, confirmation, crypto.randomUUID()), retry: false, onMutate: () => setAttempted(true), onSuccess: onMerged });
+  return <section className="item audit-panel merge-review" aria-label="Revisar combinación">
+    <h3>Combinar productos</h3>
+    <button className="secondary-button" disabled={merge.isPending} onClick={onClose}>Cerrar revisión</button>
+    {preview.isFetching && <p role="status">Comprobando productos y referencias…</p>}
+    {preview.isError && <p role="alert">{preview.error.message} <button className="secondary-button" onClick={() => void preview.refetch()}>Reintentar revisión</button></p>}
+    {preview.data && !preview.isFetching && !preview.isError && <>
+      <label className="variant-field">Producto que conservarás
+        <select value={preview.data.target.id} disabled={attempted} onChange={() => onSwap()}>
+          {[preview.data.target, preview.data.source].map(product => <option key={product.id} value={product.id}>{product.name} (ID {product.id})</option>)}
+        </select>
+      </label>
+      <p><strong>Se conserva:</strong> {preview.data.target.name} (ID {preview.data.target.id}) · {preview.data.target.stock_amount} unidades.</p>
+      <p><strong>Se integra y desaparece:</strong> {preview.data.source.name} (ID {preview.data.source.id}) · {preview.data.source.stock_amount} unidades.</p>
+      <p>Se conservan el nombre, descripción, foto y configuración del producto elegido. Sus lotes, movimientos, códigos y referencias de Grocy se reúnen sin consumir stock. Esta combinación no se puede deshacer.</p>
+      {preview.data.audit && <ul>{preview.data.audit.collections.map(row => <li key={row.collection}>{row.label}: {row.status === "ok" ? row.count + " registro(s)" : "No disponible"}</li>)}</ul>}
+      {preview.data.blockers.length > 0 && <div role="alert"><strong>No se pueden combinar:</strong><ul>{preview.data.blockers.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Puedes cambiar el producto que conservarás o marcar esta pareja como diferente.</p></div>}
+      {preview.data.can_merge && <form className="variant-form" onSubmit={event => { event.preventDefault(); if (!attempted && confirmation === preview.data!.target.name) merge.mutate(); }}>
+        <label className="variant-field">Escribe «{preview.data.target.name}» para conservarlo<input autoComplete="off" disabled={attempted} value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>
+        <button className="primary-button danger-button" disabled={attempted || confirmation !== preview.data.target.name}>{merge.isPending ? "Combinando…" : "Combinar definitivamente"}</button>
+      </form>}
+    </>}
+    {merge.isError && <p role="alert">{merge.error.message} Cierra la revisión y comprueba Grocy antes de intentarlo de nuevo.</p>}
+  </section>;
 }

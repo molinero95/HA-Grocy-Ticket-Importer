@@ -228,3 +228,35 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409, response.json)
         self.assertEqual(self.instance.http('GET', 'objects/stock_log'), history)
         self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_native_merge_preserves_real_lots_history_codes_and_reference_rows(self):
+        import barcode_stock
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        source = barcode_stock.create_catalog_product('Merge source contract', barcode='8411231231231', unit_id=units['Piece'], initial_stock='2')['product_id']
+        target = barcode_stock.create_catalog_product('Merge target contract', barcode='8411231231232', unit_id=units['Piece'], initial_stock='3')['product_id']
+        shopping_id = int(self.instance.http('POST', 'objects/shopping_list', {'shopping_list_id': 1, 'product_id': source, 'amount': 2.5, 'note': 'Preserve this note'})['created_object_id'])
+        recipe = int(self.instance.http('POST', 'objects/recipes', {'name': 'Merge recipe contract'})['created_object_id'])
+        self.instance.http('POST', 'objects/recipes_pos', {'recipe_id': recipe, 'product_id': source, 'amount': 1, 'qu_id': units['Piece']})
+        self.instance.http('POST', 'objects/meal_plan', {'day': '2026-11-01', 'type': 'product', 'product_id': source, 'product_amount': 1})
+        before = {entity: [row for row in self.instance.http('GET', 'objects/' + entity) if row.get('product_id') in (source, target)]
+                  for entity in ('stock', 'stock_log', 'product_barcodes', 'shopping_list', 'recipes_pos', 'meal_plan')}
+        self.assertGreater(len(before['stock_log']), 0)
+        response = self.client.get(f'/api/v1/catalog/merge-preview?source_id={source}&target_id={target}')
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertTrue(response.json['can_merge'], response.json)
+        payload = {'source_id': source, 'target_id': target, 'expected_source': 'Merge source contract', 'expected_target': 'Merge target contract', 'confirmation': 'Merge target contract', 'token': response.json['token'], 'operation_id': str(uuid.uuid4())}
+        for _ in range(2):
+            response = self.client.post('/api/v1/catalog/products/merge', json=payload, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+        self.assertFalse(any(p['id'] == source for p in self.instance.http('GET', 'objects/products')))
+        self.assertEqual(float(self.instance.http('GET', f'stock/products/{target}')['stock_amount']), 5)
+        for entity, rows in before.items():
+            after = {row['id']: row for row in self.instance.http('GET', 'objects/' + entity)}
+            for row in rows:
+                if entity == 'recipes_pos' and int(row.get('recipe_id') or 0) < 0:
+                    continue  # Grocy rebuilds derived day/week recipes; server verifies totals.
+                actual = after[row['id']]
+                self.assertEqual(actual['product_id'], target)
+                for field in ('amount', 'price', 'stock_id', 'note', 'barcode', 'product_amount'):
+                    if field in row: self.assertEqual(actual[field], row[field], (entity, field))
+        self.instance.http('DELETE', f'objects/shopping_list/{shopping_id}')

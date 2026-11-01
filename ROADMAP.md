@@ -16,7 +16,7 @@ Estado de código: migración de PR #10 integrada en `main` (`a6cc354`). Publica
 - [x] React como entrada de la candidata; retirar PAGE, scripts y formularios obsoletos; alternativa básica sin JavaScript.
 - [x] Fuentes Python duplicadas sincronizadas y manifiesto Docker completo.
 - [x] CI configurado para frontend, integración real aislada y contenedores AMD64/ARM64 con arranque.
-- [x] Frontend 1.8.0: 79 tests Vitest y 23 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
+- [x] Frontend 1.9.0: 83 tests Vitest y 25 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
 
 La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATION_V1.md); el resultado CI debe observarse para el SHA final, nunca inferirse de esta lista.
 
@@ -52,7 +52,7 @@ La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATI
 
 ## Fuera del alcance de la migración
 
-Consolidación de productos, eliminación con pérdida de historial, migración automática de stock Pack antiguo y sincronización de cantidades o estados de compra con Alexa. Se mantienen auditoría y protecciones; no son funciones destructivas pendientes de activar.
+Combinación automática o con dependencias no migrables, eliminación con pérdida de historial, migración automática de stock Pack antiguo y sincronización de cantidades o estados de compra con Alexa. Se mantienen auditoría y protecciones; no son funciones destructivas pendientes de activar.
 
 
 ## Mejoras 1.8.0
@@ -61,3 +61,10 @@ Consolidación de productos, eliminación con pérdida de historial, migración 
 - [x] Eliminación irreversible solo para archivados sin historial ni dependencias; revisar, escribir nombre y revalidar, con journal contra repetición.
 - [x] Historial interno para Atrás en secciones/diálogos anidados y solicitud explícita de pantalla completa cuando el host lo permite.
 - [ ] Aceptación física Android/HA tras la actualización del usuario.
+
+
+## Mejoras 1.9.0
+
+- [x] Diferencias persistentes por pareja de productos, con deshacer y sin ocultar otras parejas de un grupo.
+- [x] Combinación nativa de Grocy bajo revisión, destino elegido, stock/historia/referencias verificadas y comandos sin repetición.
+- [ ] Alta de producto desde una sugerencia de compra y asociación automática: siguiente release independiente solicitada.

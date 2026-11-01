@@ -300,35 +300,76 @@ def register_catalog_routes(app, barcode_stock, lock):
 
     @app.get("/api/v1/catalog/merge-preview")
     def api_v1_catalog_merge_preview():
+        from merge_audit import merge_preview
         try:
-            source_id = int(request.args.get("source_id", "0"))
-            target_id = int(request.args.get("target_id", "0"))
-            if source_id <= 0 or target_id <= 0 or source_id == target_id:
-                return jsonify({"error": "Selecciona dos productos distintos"}), 400
-            from variant_catalog import variants_for_product
-            source = barcode_stock.product_detail(source_id)
-            target = barcode_stock.product_detail(target_id)
-            source_variants = variants_for_product(source_id)
-            target_variants = variants_for_product(target_id)
-            blockers = []
-            if source["unit_id"] != target["unit_id"]:
-                blockers.append("Las unidades de stock son diferentes: no se pueden sumar directamente")
-            if source["pack_size"] != target["pack_size"] or source.get("purchase_unit_id") != target.get("purchase_unit_id"):
-                blockers.append("Configuración de envases o unidades de compra diferente")
-            if source_variants or target_variants:
-                blockers.append("Hay variantes de supermercado que requieren migración de referencias")
-            if source["stock_amount"] != "0" or target["stock_amount"] != "0":
-                blockers.append("Las existencias requieren conciliación y verificación de movimientos")
-            from merge_audit import audit_merge
-            audit = audit_merge(barcode_stock.grocy, source, target)
-            blockers.extend(audit["blockers"])
-            if source_variants or target_variants:
-                blockers.append("No existe todavía una migración transaccional de variantes")
-            return jsonify({"source": source, "target": target,
-                            "source_variants": source_variants, "target_variants": target_variants,
-                            "audit": audit, "blockers": blockers, "warnings": blockers, "can_merge": False, "merge_allowed": False})
-        except (ValueError, TypeError, barcode_stock.BarcodeError) as exc:
-            return jsonify({"error": str(exc)}), 400
+            return jsonify(merge_preview(int(request.args.get('source_id', '0')), int(request.args.get('target_id', '0'))))
+        except (ValueError, TypeError, barcode_stock.BarcodeError):
+            return jsonify({"error": "No se pudo revisar la combinación. Selecciona dos productos y vuelve a consultar."}), 400
         except Exception:
-            app.logger.exception("api_v1_catalog_merge_preview_failed")
-            return jsonify({"error": "merge_preview_unavailable"}), 503
+            return jsonify({"error": "No se pudieron verificar todos los datos de Grocy para combinar."}), 503
+
+    @app.post('/api/v1/catalog/products/merge')
+    def api_v1_catalog_merge():
+        import re
+        from merge_audit import merge_products
+        from shopping_match_queue import mutation_lock, DEFAULT_PATH
+        from stock_commands import execute_once, CommandConflict
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or any(type(payload.get(key)) is not int or payload[key] <= 0 for key in ('source_id', 'target_id'))
+                or payload['source_id'] == payload['target_id']
+                or any(not isinstance(payload.get(key), str) or not payload[key] for key in ('expected_source', 'expected_target'))
+                or payload.get('confirmation') != payload['expected_target']
+                or not isinstance(payload.get('token'), str) or not re.fullmatch('[a-f0-9]{64}', payload['token'])):
+            return jsonify({"error": "Revisa los productos y escribe el nombre exacto del que conservarás."}), 400
+        if not lock.acquire(blocking=False): return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            with mutation_lock(DEFAULT_PATH, blocking=False):
+                def change():
+                    try:
+                        result = merge_products(payload['source_id'], payload['target_id'], payload['expected_source'], payload['expected_target'], payload['token'])
+                        return {"status": 200, "body": result}
+                    except barcode_stock.BarcodeError as exc:
+                        return {"status": 409, "body": {"error": str(exc)}}
+                result = execute_once(payload.get('operation_id'), {**payload, 'command': 'merge_products'}, change)
+            return jsonify(result['body']), result['status']
+        except BlockingIOError:
+            return jsonify({"error": "operation_in_progress"}), 409
+        except CommandConflict:
+            return jsonify({"error": "No se ha reenviado la combinación. Comprueba Grocy antes de otra operación."}), 409
+        except Exception:
+            return jsonify({"error": "No se pudo confirmar la combinación. Comprueba ambos productos en Grocy antes de volver a intentarlo."}), 502
+        finally: lock.release()
+
+    @app.get('/api/v1/catalog/duplicates/differences')
+    def api_v1_catalog_differences():
+        from duplicate_review import differences
+        try: return jsonify({"differences": differences()})
+        except Exception: return jsonify({"error": "No se pudieron cargar las diferencias guardadas."}), 503
+
+    @app.put('/api/v1/catalog/duplicates/differences')
+    def api_v1_catalog_set_different():
+        from duplicate_review import set_different
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or any(type(payload.get(key)) is not int or payload[key] <= 0 for key in ('left_id', 'right_id'))
+                or payload['left_id'] == payload['right_id'] or any(not isinstance(payload.get(key), str) for key in ('left_name', 'right_name'))):
+            return jsonify({"error": "Selecciona dos productos distintos y actualiza el análisis."}), 400
+        if not lock.acquire(blocking=False): return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            products = [barcode_stock.grocy('GET', f"objects/products/{payload[key + '_id']}") for key in ('left', 'right')]
+            if any(int(product['id']) != payload[key + '_id'] or product['name'] != payload[key + '_name'] for key, product in zip(('left', 'right'), products)):
+                return jsonify({"error": "Los productos han cambiado. Vuelve a analizar antes de decidir."}), 409
+            set_different(*products)
+            return jsonify({"saved": True})
+        except Exception:
+            return jsonify({"error": "No se pudo guardar la diferencia. Vuelve a consultar el análisis."}), 503
+        finally: lock.release()
+
+    @app.delete('/api/v1/catalog/duplicates/differences/<int:left_id>/<int:right_id>')
+    def api_v1_catalog_undo_difference(left_id, right_id):
+        from duplicate_review import undo_difference
+        if not lock.acquire(blocking=False): return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            undo_difference(left_id, right_id)
+            return jsonify({"removed": True})
+        except Exception: return jsonify({"error": "No se pudo deshacer la diferencia."}), 503
+        finally: lock.release()

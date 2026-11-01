@@ -40,12 +40,12 @@ test("duplicate-review buttons and native file selection use consistent touch-fr
     })
     .click();
   await expect(
-    page.getByRole("button", { name: "Comparar los dos primeros" }),
+    page.getByRole("button", { name: "Revisar combinación" }),
   ).toBeVisible();
   for (const name of [
     "Volver a analizar",
     "Analizar catálogo",
-    "Comparar los dos primeros",
+    "Revisar combinación",
   ]) {
     const button = page.getByRole("button", { name, exact: true });
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);

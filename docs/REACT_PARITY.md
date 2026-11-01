@@ -14,15 +14,15 @@ La versión 1.0.0 sirve React en `/`, alias `/react/`, con compras sin JavaScrip
 | Tickets | Subir/revisar/simular/confirmar; ledger y marcadores contra duplicados | Python; importador real en subprocess; segundo ticket no duplica stock |
 | Alias y salud Alexa | Candidatos recalculados con el catálogo activo, aviso local al worker; gestión por producto, varios alias, borrado por estado esperado, notas exactas revisables y estado sanitizado | Python, API, Vitest, Chromium y conservación de fila/cantidad/stock en Grocy real |
 | Alexa | Elección/mantener original materializan fila inmediata; Quitar siempre visible, incluso en sugerencias; retirada persistente y checkpoint verificado | Python de duplicados/conflictos/fallos, contrato Grocy real y navegador con worker/HA desechable |
-| Auditoría / duplicados | Exportación y vista de solo lectura | Python; conserva protección de consolidación |
+| Auditoría / duplicados | Auditoría exportable, diferencias persistentes/deshacer y combinación nativa revisada | Python; preserva lotes/historia/referencias y bloquea dependencias no migrables |
 | Ciclo de producto | Archivado/restauración reversibles; borrado 1.8.0 solo de archivados sin stock, historial ni dependencias, con revisión y nombre exacto | Python y Grocy real: historial idéntico antes/después |
 | Autenticación standalone / ingress | Login/logout, CSRF, caducidad y caché limpia; prefijos de assets/API | Python, Vitest y Chromium ingress |
 | Acceso sin JavaScript | Página básica autenticada con controles de compra y CSRF | Python y Chromium con JavaScript desactivado |
 | Empaquetado | React compilado, runtime completo, espejos Python | CI AMD64/ARM64: build y arranque de contenedor |
 
-Frontend 1.8.0: 79 pruebas Vitest y 23 escenarios Chromium configurados. Alta solo en Mi despensa; archivados en Acciones, sin acceso de alta duplicado. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
+Frontend 1.9.0: 83 pruebas Vitest y 25 escenarios Chromium configurados. Alta solo en Mi despensa; archivados en Acciones, sin acceso de alta duplicado. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
 
-La antigua eliminación permanente podía borrar historia mediante cascadas de Grocy. El archivado reversible sigue siendo la opción para productos con historial; desde 1.8.0 solo se permite eliminar una ficha archivada sin stock, historia ni dependencias tras auditar las cascadas. La consolidación sigue en auditoría, igual que la función estable protegida; no existe autorización para fusionar productos de usuario.
+La antigua eliminación permanente podía borrar historia mediante cascadas de Grocy. El archivado reversible sigue siendo la opción para productos con historial; desde 1.8.0 solo se permite eliminar una ficha archivada sin stock, historia ni dependencias tras auditar las cascadas. Desde 1.9.0 el usuario autoriza implementar combinación explícita compatible mediante la transacción nativa de Grocy; no se autoriza al agente a combinar datos de producción.
 
 ## Retirada del código anterior
 
