@@ -445,6 +445,7 @@ export function ProductDetail({
                   min="0"
                   step="0.01"
                   value={targetStock}
+                  disabled={!product.data || product.isError || adjustStock.isPending}
                   onChange={(event) => {
                     setExpectedStock((previous) => previous ?? currentStock);
                     setDesiredStock(event.target.value);

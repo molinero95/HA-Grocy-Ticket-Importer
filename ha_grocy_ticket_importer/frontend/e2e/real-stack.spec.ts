@@ -382,6 +382,7 @@ test("archived movement history requires explicit confirmation before permanent 
   await page.getByLabel("Stock inicial").fill("1");
   await page.getByRole("button", { name: "Guardar producto", exact: true }).click();
   await page.getByRole("button", { name: "Abrir ficha del producto" }).click();
+  await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("1");
   await page.getByLabel("Cantidad final", {exact: true}).fill("0");
   await page.getByRole("button", {name: "Actualizar stock", exact: true}).click();
   await expect(page.getByText("Stock actualizado correctamente")).toBeVisible();
