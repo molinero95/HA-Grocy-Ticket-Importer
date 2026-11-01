@@ -17,7 +17,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         payload = request.get_json(silent=True)
         password = payload.get("password") if isinstance(payload, dict) else None
         expected = os.environ.get("WEB_PASSWORD")
-        if not isinstance(password, str) or not expected or not hmac.compare_digest(password, expected):
+        if not isinstance(password, str) or not expected or not hmac.compare_digest(password.encode("utf-8"), expected.encode("utf-8")):
             return jsonify({"error": "invalid_credentials"}), 401
         session.clear()
         session["auth"] = True
@@ -99,7 +99,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         try:
             completed = [row["id"] for row in barcode_stock.shopping_list_snapshot() if row["done"]]
             for item_id in completed:
-                barcode_stock.remove_shopping_list_item(item_id)
+                barcode_stock.remove_shopping_list_item(item_id, expected_done=True)
                 removed += 1
         except Exception:
             app.logger.exception("api_v1_shopping_clear_completed_failed")
@@ -126,7 +126,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
             return jsonify({"items": [], "pending_matches": [], "shopping_error": True,
                             "pending_matches_error": False}), 503
         try:
-            matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH) if not row.get("dismissed")]
+            matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH) if not row.get("dismissed") or row.get("selection_stale")]
             matches_error = False
         except Exception:
             app.logger.exception("api_v1_alexa_matches_failed")

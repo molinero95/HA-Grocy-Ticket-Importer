@@ -1,61 +1,27 @@
-# Despensa 1.0 — architecture and migration
+# Despensa 1.0 — arquitectura
 
-## Invariants
-- Grocy remains the source of truth for catalog, stock, quantities and shopping list.
-- Never merge catalog entries, mutate stock, or resolve ambiguous Alexa identities without explicit authorized action.
-- Preserve existing Home Assistant add-on settings, data paths, ingress and synchronization.
-- Release 0.16.4 remains the production implementation until feature parity and e2e tests pass.
+## Límites
 
-## Target boundaries
-- `frontend/`: React + TypeScript, Vite, TanStack Query, mobile-first components; **no Grocy credentials** in browser.
-- `/api/v1/`: Flask JSON adapter, authenticated via existing ingress/session boundaries; explicit validation and consistent errors.
-- Python domain services: Grocy catalog, stock, barcode identity, Alexa synchronization, receipt import.
-- Home Assistant packaging: build static frontend in CI/Docker; serve it under ingress prefix with Flask API on the same origin.
+- `ha_grocy_ticket_importer/frontend/`: React/TypeScript, TanStack Query, cámara, formularios y vistas. `frontend` es un enlace. Sin claves Grocy/OpenAI.
+- `web.py`: un solo origen, ingress, sesión/CSRF, estáticos compilados, API y fallback HTML mínimo. React en `/`, alias `/react/`, fallback `/basic`.
+- `api_*.py`: validación de entrada y respuestas JSON; lock de mutaciones y errores.
+- Dominio Python: catálogo/compra/stock, conversión de unidades, importación y ledger, fotos, variantes, identidad Alexa y checkpoints.
+- Docker: Node 22 + npm 11 compila frontend; runtime Python/Gunicorn detrás de nginx de ingress. CI construye y arranca ambas arquitecturas soportadas.
 
-## Rollout
-1. Read-only shopping JSON endpoint and preview React UI (current branch).
-2. CSRF-protected shopping commands, per-item Alexa candidate selection and optimistic UI with rollback.
-3. Inventory, product details, barcode camera and supermarket variants.
-4. Ticket upload, review, simulation, stock mutations and all remaining screens.
-5. Playwright ingress/mobile e2e, data-preservation regression tests, accessibility and API contract tests.
-6. Remove inline Flask templates only after parity; publish 1.0.0 with migration notes.
+Grocy controla el catálogo, stock y lista. Las SQLite locales contienen metadatos, registros de importación/comandos y revisión, nunca un inventario alternativo. Se conservan las rutas de almacenamiento HA.
 
-## Safety
-Do not switch the ingress entrypoint to the React app before authentication, write actions, error handling and feature parity are complete. Preview must not change existing add-on behavior.
+## Escrituras y recuperación
 
-## Cleanup and removal ledger
+Stock y unidades se validan contra estado fresco. Compra por ID de fila verificado mantiene notas y no afecta otras listas/completados. Pack se convierte a stock una sola vez con `quantity_unit_conversions`; no se escriben campos de factor calculados de Grocy. Cambiar compra solo afecta al futuro.
 
-| Legacy component | Replacement | Removal gate |
-| --- | --- | --- |
-| Inline `PAGE` HTML/CSS/JS in `web.py` | React components and styles | Every screen has passing parity/e2e tests |
-| Flask form POST + redirects | Typed `/api/v1` commands | All clients use JSON commands with CSRF |
-| Duplicated root/add-on Python modules | Single Python source package | Docker and local tests import same package |
-| Legacy browser-JavaScript syntax check | Vite TypeScript build and frontend tests | Inline scripts removed |
-| Unused dependencies and transitional adapters | Audited runtime dependencies | No remaining imports and clean container build |
+`stock_commands.py` reserva el UUID en SQLite antes de la llamada remota, guarda respuesta confirmada y rechaza repetición incierta. No promete transacción distribuida. Tickets combinan hash del archivo simulado, marcador de envío y ledger de líneas. Conservar todos los marcadores pendientes tras cortes.
 
-**Do not remove** SQLite data, Home Assistant options, Grocy product/stock data, or Alexa sync checkpoints as part of source cleanup. Deletions must be independently reviewed and tested; the first 1.0 preview does not change production entrypoints.
+`catalog_lifecycle.py` cambia `active` sin DELETE ni consumo: cero stock y ausencia de dependencias para archivar, restauración reversible. Consolidación es solo auditoría.
 
-## Implementation update — 2026-11-01
+El worker Alexa valida identidades, proyecta elecciones explícitas, preflight, asocia notas por ID conservando cantidad/texto, relee ambos sistemas y confirma checkpoint solo tras converger. No toca stock ni activa sincronización por defecto.
 
-The canonical frontend now lives inside the add-on build context at
-`ha_grocy_ticket_importer/frontend/`; `/frontend` is a development symlink.
-Docker builds it with Node 22 and the npm lockfile, copies the resulting static
-assets, and includes every extracted API module. Flask exposes an opt-in
-`/react/` preview with an ingress-root base URL; stable `/` is unchanged.
+## Persistencia y pruebas
 
-`api_photos.py` centralizes photo discovery/upload and local image URLs.
-`stock_commands.py` isolates the durable consumption-command journal from the
-receipt ledger. SQLite write-ahead records reject uncertain repeats; they do not
-pretend to make the remote Grocy write transactional. Product metadata edits
-preserve purchase setup and descriptions, with fail-closed unit changes.
+No borrar ledger, fotos, catálogo de variantes, colas por entidad, checkpoints v1/v2 ni comandos al actualizar. Espejos raíz/add-on continúan sincronizados; eliminarlos exigiría cambiar el empaquetado de forma independiente.
 
-CI uses network-free Python/React regressions and Chromium mobile/ingress tests
-against disposable Flask fixtures. Pack conversion, destructive catalog lifecycle
-and real Grocy/HA upgrade verification still gate default rollout and legacy removal.
-
-Pack conversion uses Grocy 4's `objects/quantity_unit_conversions` contract,
-verified before initial stock; stock writes are already in Piece units. Receipt
-imports read the same conversion table and preserve pending/imported markers.
-No `qu_factor_purchase_to_stock` field is written to product objects. Reference:
-https://github.com/grocy/grocy/blob/master/services/StockService.php
-(`ExternalBarcodeLookup` and `GetProductDetails`). Live schema validation is still required.
+`tests/grocy_instance.py` arranca release oficial verificado en directorio temporal; `real_stack_server.py` conecta los módulos de producción y el importador subprocess, sustituyendo únicamente OpenAI, proveedor de fotos y HA. Sus rutas auxiliares no se incluyen en Docker. Contratos y Playwright ejecutan flujos y reinicio con Grocy real. Véase `VALIDATION_V1.md`.

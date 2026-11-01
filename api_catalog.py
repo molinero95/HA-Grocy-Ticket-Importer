@@ -4,6 +4,66 @@ from flask import jsonify, request
 
 
 def register_catalog_routes(app, barcode_stock, lock):
+    @app.get("/api/v1/catalog/archived")
+    def api_v1_archived_products():
+        from catalog_lifecycle import archived_inventory
+        try:
+            return jsonify({"items": archived_inventory()})
+        except Exception:
+            app.logger.exception("api_v1_archived_unavailable")
+            return jsonify({"error": "No se pudieron cargar los productos archivados"}), 503
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/active")
+    def api_v1_set_product_active(product_id):
+        from catalog_lifecycle import set_active
+        from stock_commands import execute_once, CommandConflict
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or type(payload.get("active")) is not bool or not isinstance(payload.get("expected_name"), str):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            def change():
+                try:
+                    return {"status": 200, "body": set_active(product_id, payload["expected_name"], payload["active"])}
+                except barcode_stock.BarcodeError as exc:
+                    return {"status": 409, "body": {"error": str(exc)}}
+            result = execute_once(payload.get("operation_id"), {**payload, "product_id": product_id, "command": "active"}, change)
+            return jsonify(result["body"]), result["status"]
+        except CommandConflict as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_product_active_uncertain")
+            return jsonify({"error": "Actualiza el catálogo para comprobar el estado del producto antes de reintentar"}), 502
+        finally:
+            lock.release()
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/purchase")
+    def api_v1_purchase_configuration(product_id):
+        from purchase_units import update_purchase_configuration
+        from stock_commands import execute_once, CommandConflict
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("expected"), dict):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            def change():
+                try:
+                    body = update_purchase_configuration(barcode_stock.grocy, product_id, payload.get("purchase_unit_id"), payload.get("factor"), payload["expected"])
+                    return {"status": 200, "body": body}
+                except (ValueError, TypeError, ArithmeticError) as exc:
+                    return {"status": 409, "body": {"error": str(exc)}}
+            result = execute_once(payload.get("operation_id"), {**payload, "product_id": product_id, "command": "purchase"}, change)
+            return jsonify(result["body"]), result["status"]
+        except CommandConflict as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            app.logger.exception("api_v1_purchase_uncertain")
+            return jsonify({"error": "Actualiza la ficha y comprueba la configuración en Grocy antes de reintentar"}), 502
+        finally:
+            lock.release()
+
     @app.get("/api/v1/catalog/units")
     def api_v1_catalog_units():
         try:
@@ -184,55 +244,9 @@ def register_catalog_routes(app, barcode_stock, lock):
             app.logger.exception("api_v1_catalog_duplicates_failed")
             return jsonify({"error": "duplicates_unavailable"}), 503
 
-    @app.get("/api/v1/catalog/products/<int:product_id>/deletion-check")
-    def api_v1_check_catalog_deletion(product_id):
-        """Read-only deletion eligibility report; never consume stock or delete."""
-        payload = {"expected_name": request.args.get("expected_name")}
-        if not isinstance(payload, dict) or not isinstance(payload.get("expected_name"), str):
-            return jsonify({"error": "expected_name_required"}), 400
-        return deletion_report(product_id, payload["expected_name"])
-
-    def deletion_report(product_id, expected_name):
-        if not lock.acquire(blocking=False):
-            return jsonify({"error": "operation_in_progress"}), 409
-        try:
-            from decimal import Decimal
-            from variant_catalog import variants_for_product
-            from merge_audit import COLLECTIONS, REFERENCES
-            product = barcode_stock.grocy("GET", f"objects/products/{product_id}")
-            if not isinstance(product, dict) or int(product.get("id", 0)) != product_id:
-                return jsonify({"error": "product_not_found"}), 404
-            if product.get("name") != expected_name:
-                return jsonify({"error": "stale_product_name"}), 409
-            stock = barcode_stock.grocy("GET", f"stock/products/{product_id}")
-            amount = Decimal(str(stock["stock_amount"]))
-            if not amount.is_finite() or amount != 0:
-                return jsonify({"error": "nonzero_or_invalid_stock"}), 409
-            if variants_for_product(product_id):
-                return jsonify({"error": "product_has_variants"}), 409
-            for collection, _ in COLLECTIONS:
-                rows = barcode_stock.grocy("GET", "objects/" + collection)
-                if not isinstance(rows, list):
-                    return jsonify({"error": "reference_audit_unavailable"}), 409
-                if any(isinstance(row, dict) and any(str(row.get(field)) == str(product_id) for field in REFERENCES) for row in rows):
-                    return jsonify({"error": "product_has_references", "collection": collection}), 409
-            # Historical and external references cannot be audited exhaustively.
-            return jsonify({"error": "historical_references_not_audited",
-                            "details": "No se elimina el producto hasta verificar historial y referencias externas."}), 409
-        except Exception:
-            app.logger.exception("api_v1_catalog_delete_audit_failed")
-            return jsonify({"error": "product_delete_audit_unavailable"}), 503
-        finally:
-            lock.release()
-
-
     @app.delete("/api/v1/catalog/products/<int:product_id>")
     def api_v1_delete_catalog_product(product_id):
-        """Fail-closed deletion: never consume stock or discard linked records."""
-        payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not isinstance(payload.get("expected_name"), str):
-            return jsonify({"error": "expected_name_required"}), 400
-        return deletion_report(product_id, payload["expected_name"])
+        return jsonify({"error": "Usa Archivar producto para conservar las existencias e historial de Grocy"}), 409
 
     @app.get("/api/v1/catalog/audit")
     def api_v1_catalog_audit():

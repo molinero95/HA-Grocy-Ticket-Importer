@@ -3,6 +3,39 @@ from flask import jsonify, request
 
 
 def register_inventory_routes(app, barcode_stock, lock):
+    @app.get("/api/v1/shopping/products/<int:product_id>/options")
+    def api_v1_shopping_options(product_id):
+        try:
+            return jsonify(barcode_stock.shopping_product_options(product_id))
+        except (barcode_stock.BarcodeError, ValueError) as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            return jsonify({"error": "No se pudieron consultar las unidades de compra"}), 503
+
+    @app.post("/api/v1/shopping/products/<int:product_id>/add")
+    def api_v1_shopping_add_amount(product_id):
+        from stock_commands import execute_once, CommandConflict
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            def add():
+                try:
+                    name = barcode_stock.add_to_shopping_list(product_id, payload.get("amount"), payload.get("unit_id"))
+                    return {"status": 200, "body": {"name": name}}
+                except (barcode_stock.BarcodeError, ValueError) as exc:
+                    return {"status": 409, "body": {"error": str(exc)}}
+            result = execute_once(payload.get("operation_id"), {**payload, "product_id": product_id, "command": "shopping_add"}, add)
+            return jsonify(result["body"]), result["status"]
+        except CommandConflict as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception:
+            return jsonify({"error": "Comprueba la lista antes de añadir otra vez este producto"}), 502
+        finally:
+            lock.release()
+
     @app.get("/api/v1/inventory")
     def api_v1_inventory():
         """Single read-only inventory response; no per-product Grocy requests."""

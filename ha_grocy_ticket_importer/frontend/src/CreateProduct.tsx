@@ -119,6 +119,7 @@ export function CreateProduct({
             <label className="variant-field">
               Unidad
               <select
+                aria-label="Unidad"
                 required
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
@@ -155,7 +156,8 @@ export function CreateProduct({
                   />
                 </label>
                 <p>
-                  El stock se guarda en piezas. Por ejemplo, 2 packs de 5 suman 10 piezas.
+                  El stock se guarda en piezas. Por ejemplo, 2 packs de 5 suman
+                  10 piezas.
                 </p>
               </>
             )}

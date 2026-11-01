@@ -12,7 +12,10 @@ test("standalone session, mobile alignment, stock controls and camera fallback",
   await expect(
     page.getByRole("heading", { name: "Lista de la compra" }),
   ).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("mobile-shopping.png"), fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath("mobile-shopping.png"),
+    fullPage: true,
+  });
   const actions = page.locator(".item-actions");
   await expect(actions).toHaveCount(2);
   const left = await actions.nth(0).boundingBox();
@@ -84,4 +87,26 @@ test("bundled assets and API requests keep the ingress prefix", async ({
   await expect(
     page.getByRole("heading", { name: "Mi despensa" }),
   ).toBeVisible();
+});
+
+test("shopping remains usable with JavaScript disabled", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto("http://127.0.0.1:8765/");
+  await page.getByRole("link", { name: "abre la vista básica" }).click();
+  await page.getByLabel("Contraseña").fill("browser-test");
+  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Mi despensa" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: /^Añadir / })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Mi despensa" }),
+  ).toBeVisible();
+  await context.close();
 });

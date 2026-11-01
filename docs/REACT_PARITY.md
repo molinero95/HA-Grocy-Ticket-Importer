@@ -1,37 +1,30 @@
-# Despensa 1.0 — Legacy/React parity gate
+# Despensa 1.0 — matriz de paridad
 
-Current implementation status: 2026-11-01. PR #10 is an unreleased migration branch.
-Stable `main` and the default ingress UI remain at 0.16.4. Historical roadmap notes
-are not evidence of validation on the current head.
+La candidata sirve React en `/`, alias `/react/`, con compras sin JavaScript en `/basic`. La versión instalada y `main` no se modifican. Esta matriz describe código probado, no un despliegue.
 
-Canonical frontend: `ha_grocy_ticket_importer/frontend/`; root `frontend` is a
-symlink. The add-on Dockerfile builds static assets and serves `/react/` as an
-opt-in preview. Python adapters and their root/package mirrors remain identical.
-
-| Workflow | React implementation | Remaining migration gate |
+| Flujo anterior | React y API | Evidencia |
 | --- | --- | --- |
-| Shopping read, complete, remove, clear completed | v1 API, pending states, aligned mobile actions, product-sheet links | Full failure recovery and live Grocy semantics |
-| Alexa ambiguous product selection | Inline suggestions, selection, durable keep-original dismissal | Isolated live list/checkpoint restart test; no automatic conversion |
-| Inventory, name/barcode search, shopping +/- | Automatic exact-code filtering, race isolation, cart/stepper in place | Physical mobile camera validation |
-| Variants | List/create/edit, barcode scanner, server ownership checks | Browser lifecycle, upgrade persistence and isolated Grocy integration |
-| Receipt upload, preview, commit | Simulation digest, shared preview/commit lock, write-ahead marker, UI resubmission block | Full browser import/restart workflow with isolated Grocy |
-| Product creation/editing | Duplicate detection, existing-sheet link, verified Pack conversion, preserves purchase/photo metadata on rename | Live Pack contract and partial-create reconciliation |
-| Product deletion | Read-only eligibility audit, destructive operation blocked | Complete dependency/history contract; no stock-consuming deletion |
-| Stock adjustments | Expected-stock guard, current product query, no extra confirmation screen | Live units and audit verification |
-| Consumption | Product ID without EAN, precise quantity, optional refill, durable operation replay/uncertainty guard | Isolated Grocy endpoint and restart integration |
-| Barcode association/removal | API safeguards, variant ownership protection, scanner, photo discovery | Complete reassignment and browser regression matrix |
-| Product merge | Read-only dependency preview, disabled merge | Explicitly approved consolidation plan and complete reference migration |
-| Product photos | Exact-code preview/save, trusted server URL, sanitized local upload, all three views, cache version | Physical camera and upgrade persistence validation |
-| Catalog audit | Read-only review and JSON export | Integration against installed Grocy schema |
-| Standalone authentication | Public CSRF bootstrap, rotation, logout, expired-session cache clearing | Final security review of candidate deployment |
-| Mobile and HA ingress | Three primary tabs, focus/scroll management, fixed action columns, prefixed assets/APIs | Physical Android/HA validation and broader browser coverage |
-| Packaging | Multi-stage React build, runtime API modules, npm lockfile, source/dependency checks | Final-head Docker CI result and isolated container startup |
+| Compra inicial, comprado, retirar, limpiar completados | Lista de Grocy, filas por ID, errores y recarga de consultas | Python; navegador móvil/ingress; contrato real de otras listas/notas/completados |
+| Despensa y carrito/cantidad | Búsqueda nombre/EAN, pasos kg/pieza, sin recarga ni salto | Vitest; Chromium móvil; Grocy real |
+| Crear producto / duplicados | Alta con stock cero, enlace al existente, conversión Pack verificada | Python; navegador real con alta y Pack |
+| Editar nombre / stock / unidades | Conserva descripción/foto/compra; estado esperado; compra futura independiente | Python; contratos reales; compra de 2 packs = 8 piezas |
+| Consumir y reponer | ID canónico, precisión, operación persistente, resultado parcial seguro | Python de fallos/repetición; consumo real e idempotencia |
+| Códigos y variantes | Propiedad auditada; ficha y escáner; edición de variante conserva EAN | Python; navegador y persistencia real |
+| Fotos | Búsqueda exacta validada y subida saneada, URL compartida/versionada | Python; navegador; archivo servido tras reinicio real |
+| Tickets | Subir/revisar/simular/confirmar; ledger y marcadores contra duplicados | Python; importador real en subprocess; segundo ticket no duplica stock |
+| Alexa | Sugerencias, elección y mantener original; asociación explícita de nota y checkpoint | Python de conflictos/fallos; navegador con worker real y HA desechable |
+| Auditoría / duplicados | Exportación y vista de solo lectura | Python; conserva protección de consolidación |
+| Ciclo de producto | Archivado y restauración reversibles, cero stock y referencias verificadas | Python y Grocy real: historial idéntico antes/después |
+| Autenticación standalone / ingress | Login/logout, CSRF, caducidad y caché limpia; prefijos de assets/API | Python, Vitest y Chromium ingress |
+| Acceso sin JavaScript | Página básica autenticada con controles de compra y CSRF | Python y Chromium con JavaScript desactivado |
+| Empaquetado | React compilado, runtime completo, espejos Python | CI AMD64/ARM64: build y arranque de contenedor |
 
-## Validation and release criteria
+La antigua eliminación permanente podía borrar historia mediante cascadas de Grocy: se sustituye por archivado reversible. La consolidación sigue en auditoría, igual que la función estable protegida; no existe autorización para fusionar productos de usuario.
 
-1. Preserve the stable UI until every required workflow is implemented or the user explicitly scopes it out. Keep `PAGE`, legacy routes and their dependencies until then.
-2. Run Python tests, source-mirror checks, embedded JavaScript syntax, React tests, TypeScript/build, mobile/ingress Playwright and container build on the **final** head.
-3. Browser fixtures replace external Grocy/Alexa I/O; passing them is not validation against the installed services.
-4. Test upgrade persistence of receipt ledger, photos, generic/variant catalog, scoped Alexa queue/checkpoints and stock-command journal. Never delete persistent state as source cleanup.
-5. Live Pack validation and destructive product lifecycle remain release blockers. Do not describe the migration as complete, enable destructive operations or remove legacy based only on a passing frontend build.
-6. Only after parity and green CI: switch the default UI, separately remove obsolete HTML/JS/routes, then prepare release notes and 1.0.0. No version bump or publication is authorized before these gates.
+## Retirada del código anterior
+
+Retirados `PAGE`, scripts incrustados y rutas antiguas de formularios de aplicación completa. `web.py` solo compone auth, ingress, estáticos, API y alternativa básica. No se retiran bases de datos, fotos, opciones, registros de comandos, historiales ni checkpoints. Los espejos Python se conservan por compatibilidad del empaquetado y se verifican byte a byte.
+
+## Límites de la evidencia
+
+Véase [VALIDATION_V1.md](VALIDATION_V1.md). Grocy es el release oficial 4.7.1 sin modificar, con datos temporales. Solo OpenAI, búsqueda pública de fotos y HA todo se sustituyen en esas pruebas. No prueba cámara física, la infraestructura Supervisor ni la cuenta Alexa real. La consulta a Grocy instalado devuelve 403. No publicar ni afirmar aceptación de despliegue hasta resolver esas comprobaciones externas.

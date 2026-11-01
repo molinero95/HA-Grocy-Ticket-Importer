@@ -114,7 +114,9 @@ describe("inventory interactions", () => {
       name: "Buscar por nombre o código de barras",
     });
     await user.type(search, "8412345678901");
-    await waitFor(() => expect(api.lookupBarcode).toHaveBeenCalledWith("8412345678901"));
+    await waitFor(() =>
+      expect(api.lookupBarcode).toHaveBeenCalledWith("8412345678901"),
+    );
     await user.clear(search);
     await user.type(search, "tomate");
     await act(async () => resolve(2));

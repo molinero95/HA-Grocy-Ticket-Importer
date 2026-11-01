@@ -51,9 +51,10 @@ verified checkpoints for deletion propagation.
 
 The review screen **Acciones → Coincidencias Alexa** persists explicit
 selections in `/config/alexa-match-queue-<entity-hash>.sqlite3`. It never
-merges Grocy products or rewrites existing shopping notes. If a selected
-product conflicts with an existing note (including its canonical name), the
-worker fails closed until the user reviews the conflict. Stale selections,
+merges Grocy products. An explicit choice may associate its existing free-text
+row with that product during enabled sync, preserving row ID, amount and note.
+A collision with another canonical row or a concurrent edit fails closed.
+Keep-original dismissal leaves the remote note unchanged. Stale selections,
 duplicate identities, changed quantities and concurrent edits also stop
 mutations. A successful cycle re-reads both remote lists and atomically saves
 the checkpoint only after identity verification.
@@ -86,23 +87,33 @@ review queues. The read-only catalog audit under
 barcodes, shopping references and variants. Review it before any proposed
 consolidation; explicit approval is required.
 
-Variant purchase factors are informational until Grocy/receipt conversion is
-implemented and verified. Real barcode association, camera capture and
-persistence across an add-on upgrade still need end-to-end validation.
+Variant factors are descriptive metadata; the canonical product purchase
+configuration controls receipt conversion. Barcode association and restart
+persistence are tested against isolated Grocy 4.7.1. Physical camera and
+Supervisor upgrade acceptance remain deployment checks.
 
 ## Candidata Despensa 1.0 (sin publicar)
 
-La rama de migración incluye una vista React opcional en `/react/`; la entrada
-principal conserva la interfaz estable. No se requiere cambiar opciones ni
-reinicializar bases de datos. Fotos, historial de tickets, metadatos de variantes
-y checkpoints de Alexa deben conservarse durante cualquier actualización.
+La rama sirve React en `/`, conserva `/react/` como alias y ofrece compras
+sin JavaScript en `/basic`. El frontend completo anterior está retirado solo
+en esta rama. No se despliega ni cambia la versión estable 0.16.4.
 
-Los consumos de la vista React registran un identificador persistente en
-`/config/stock-commands.sqlite3`. Una respuesta incierta bloquea su repetición:
-comprueba las existencias en Grocy antes de iniciar otra operación. Si el consumo
-funciona y falla la reposición en la lista, añade la compra desde Mi despensa sin
-repetir el consumo. No borres el registro para forzar un reintento.
+No se requieren opciones nuevas ni reinicializar bases de datos. Conservar
+`/config` y `/data`: ledger de tickets, fotos, variantes, colas, checkpoints y
+`stock-commands.sqlite3`. Antes de actualizar hacer copia HA; no desinstalar.
+Los comandos con respuesta incierta no deben repetirse borrando sus registros.
+Si el consumo se confirmó y falló la reposición, añadir únicamente la compra.
 
-La candidata no se considera lista hasta validar la paridad, el contenedor y los
-flujos reales de Grocy/HA. La versión estable sigue siendo 0.16.4; no hay publicación
-1.0 ni migración automática de existencias Pack.
+Pack es compra, Piece es stock. La conversión oficial de Grocy se verifica
+antes de añadir existencias. Cambiar la compra afecta al futuro, nunca convierte
+stock previo. Se pueden añadir cantidades exactas en las unidades verificadas.
+
+Archivar exige cero stock y ausencia de referencias activas; restaurar mantiene
+ID, historial, códigos y fotos. No hay borrado permanente ni consolidación.
+
+La suite prueba Grocy oficial 4.7.1 con datos temporales, importador real,
+worker Alexa, navegador móvil/ingress y reinicio. OpenAI, proveedor público de
+fotos y HA todo se sustituyen. La consulta a la instalación real devolvió 403;
+no se han debilitado protecciones ni modificado datos. Cámara física, entidad
+Alexa real y actualización Supervisor requieren aceptación antes de publicar.
+Véanse `docs/VALIDATION_V1.md` y `docs/REACT_PARITY.md` en el repositorio.

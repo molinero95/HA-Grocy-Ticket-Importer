@@ -1,0 +1,294 @@
+import { expect, test, type Page } from "@playwright/test";
+
+test.skip(
+  !process.env.GROCY_TEST_DIST,
+  "Requires verified real Grocy distribution",
+);
+test.describe.configure({ mode: "serial" });
+const base = "http://127.0.0.1:8767/";
+async function command(page: Page, path: string, data?: object) {
+  await expect(
+    page.getByRole("navigation", { name: "Secciones" }),
+  ).toBeVisible();
+  const session = await (
+    await page.request.get(base + "api/v1/auth/status")
+  ).json();
+  return page.request.post(
+    base + (path.startsWith("__test/") ? "api/v1/" : "") + path,
+    { headers: { "X-CSRF-Token": session.csrf_token }, data },
+  );
+}
+async function pantry(page: Page) {
+  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
+}
+async function tickets(page: Page) {
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Escanear ticket", exact: true })
+    .click();
+}
+
+test("catalog, variants, barcode ownership, stock and photos survive a Grocy restart", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "BarcodeDetector", {
+      configurable: true,
+      value: class {
+        async detect() {
+          return [{ rawValue: "8411111111111" }];
+        }
+      },
+    });
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+      configurable: true,
+      value: async () => new MediaStream(),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "readyState", {
+      configurable: true,
+      get: () => 4,
+    });
+    HTMLMediaElement.prototype.play = async () => {};
+  });
+  await page.goto(base + "react/");
+  await pantry(page);
+  await page.getByRole("button", { name: "+ Nuevo producto" }).click();
+  await page.getByLabel("Nombre", { exact: true }).fill("Producto E2E");
+  await page
+    .getByLabel("Unidad", { exact: true })
+    .selectOption({ label: "Piece" });
+  await page
+    .getByRole("button", { name: "Guardar producto", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Abrir ficha del producto" }).click();
+  await page.getByLabel("Cantidad final", { exact: true }).fill("3");
+  await page.getByRole("button", { name: "Actualizar stock" }).click();
+  await expect(page.getByText("Stock actualizado correctamente")).toBeVisible();
+  await page.getByRole("button", { name: "+ Añadir variante" }).click();
+  await page
+    .getByLabel("Código de barras", { exact: true })
+    .fill("8411111111111");
+  await page
+    .getByLabel("Nombre de la variante", { exact: true })
+    .fill("Variante E2E");
+  await page
+    .getByLabel("Supermercado", { exact: true })
+    .fill("Tienda de prueba");
+  await page.getByRole("button", { name: "Guardar variante" }).click();
+  await expect(page.getByText("Variante E2E", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
+  await expect(
+    page.getByLabel("Código de barras", { exact: true }),
+  ).toHaveAttribute("readonly", "");
+  await page.getByLabel("Marca", { exact: true }).fill("Marca editada");
+  await page.getByRole("button", { name: "Guardar variante" }).click();
+  const image = await (
+    await page.request.get(base + "__test/photo.png")
+  ).body();
+  await page
+    .getByLabel(/Elegir fotografía/)
+    .setInputFiles({ name: "test.png", mimeType: "image/png", buffer: image });
+  await page.getByRole("button", { name: "Guardar fotografía" }).click();
+  await expect(
+    page.getByRole("img", { name: "Fotografía de Producto E2E" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar ficha" }).click();
+  await page
+    .getByRole("button", { name: "Abrir cámara para escanear", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Buscar por nombre o código de barras"),
+  ).toHaveValue("8411111111111");
+  await expect(page.locator(".inventory-item")).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: "Producto E2E", exact: true }),
+  ).toBeVisible();
+  expect((await command(page, "__test/restart")).ok()).toBe(true);
+  await page.reload();
+  await pantry(page);
+  await page.getByRole("button", { name: "Producto E2E", exact: true }).click();
+  await expect(page.getByText("Variante E2E", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Fotografía de Producto E2E" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Stock actual: 3 Piece.", { exact: false }),
+  ).toBeVisible();
+});
+
+test("receipt preview/commit converts packs and re-upload cannot duplicate consumed stock", async ({
+  page,
+}) => {
+  await page.goto(base + "react/");
+  await tickets(page);
+  const file = {
+    name: "test.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("isolated-browser-ticket"),
+  };
+  await page.getByLabel("Foto o PDF del ticket").setInputFiles(file);
+  await page.getByRole("button", { name: "Simular importación" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Resultado de la simulación" }),
+  ).toBeVisible();
+  await expect(page.locator("pre")).toContainText("10 Piece");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Confirmar e importar a Grocy" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Importación completada" }),
+  ).toBeVisible();
+  await pantry(page);
+  await page
+    .getByRole("button", { name: "Yogur de prueba", exact: true })
+    .click();
+  await expect(
+    page.getByText("Stock actual: 10 Piece.", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Añadir la misma cantidad a la lista de la compra")
+    .check();
+  await page.getByRole("button", { name: "Consumir", exact: true }).click();
+  await expect(
+    page.getByText("Consumo registrado.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Stock actual: 9 Piece.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar ficha" }).click();
+  await tickets(page);
+  await page.getByLabel("Foto o PDF del ticket").setInputFiles(file);
+  await page.getByRole("button", { name: "Simular importación" }).click();
+  await expect(page.locator("pre")).toContainText("SKIP imported");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Confirmar e importar a Grocy" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Importación completada" }),
+  ).toBeVisible();
+  await pantry(page);
+  await page
+    .getByRole("button", { name: "Yogur de prueba", exact: true })
+    .click();
+  await expect(
+    page.getByText("Stock actual: 9 Piece.", { exact: false }),
+  ).toBeVisible();
+});
+
+test("explicit Alexa selection converts its existing note without duplicates and persists", async ({
+  page,
+}) => {
+  await page.goto(base + "react/");
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await page.reload();
+  await page.getByText("Elegir producto para «Arroz»", { exact: true }).click();
+  const details = page
+    .locator("details")
+    .filter({ hasText: "Elegir producto para «Arroz»" });
+  await details.getByRole("combobox").selectOption({ label: "Arroz basmati" });
+  await details.getByRole("button", { name: "Guardar elección" }).click();
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await page.reload();
+  await expect(
+    page.getByText("Elegir producto para «Arroz»", { exact: true }),
+  ).toHaveCount(0);
+  const shopping = await (
+    await page.request.get(base + "api/v1/shopping")
+  ).json();
+  expect(
+    shopping.items.filter(
+      (item: { name: string }) => item.name === "Arroz basmati",
+    ),
+  ).toHaveLength(1);
+  expect(
+    shopping.items.filter((item: { name: string }) => item.name === "Arroz"),
+  ).toHaveLength(0);
+  await page.getByText("Elegir producto para «Pasta»", { exact: true }).click();
+  await page
+    .locator("details")
+    .filter({ hasText: "Elegir producto para «Pasta»" })
+    .getByRole("button", { name: "Mantener original" })
+    .click();
+  expect((await command(page, "__test/restart")).ok()).toBe(true);
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await page.reload();
+  await expect(
+    page.getByText("Elegir producto para «Pasta»", { exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (
+      await (await page.request.get(base + "api/v1/shopping")).json()
+    ).items.filter((item: { name: string }) => item.name === "Pasta"),
+  ).toHaveLength(1);
+});
+
+test("purchase configuration, exact pack shopping amount and reversible archive preserve history", async ({
+  page,
+}) => {
+  await page.goto(base + "react/");
+  await pantry(page);
+  await page
+    .getByRole("button", { name: "Producto sin uso", exact: true })
+    .click();
+  await page.getByLabel("Unidad para comprar").selectOption({ label: "Pack" });
+  await page.getByLabel("Piezas por pack", { exact: true }).fill("4");
+  await page.getByRole("button", { name: "Guardar unidad de compra" }).click();
+  await expect(page.getByLabel("Piezas por pack", { exact: true })).toHaveValue(
+    "4",
+  );
+  await expect(
+    page
+      .getByLabel("Unidad de la cantidad")
+      .getByRole("option", { name: "Pack" }),
+  ).toHaveCount(1);
+  await page
+    .getByLabel("Unidad de la cantidad")
+    .selectOption({ label: "Pack" });
+  await page.getByLabel("Cantidad para comprar").fill("2");
+  await page
+    .getByRole("button", { name: "Añadir cantidad", exact: true })
+    .click();
+  await expect(page.getByText("Cantidad añadida a la lista.")).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar ficha" }).click();
+  await page
+    .getByRole("button", { name: "Lista de la compra", exact: true })
+    .click();
+  const row = page.locator("article").filter({
+    has: page.getByRole("button", { name: "Producto sin uso", exact: true }),
+  });
+  await expect(row).toContainText("8 Piece");
+  await row
+    .getByRole("button", { name: "Quitar Producto sin uso", exact: true })
+    .click();
+  await pantry(page);
+  await page
+    .getByRole("button", { name: "Producto sin uso", exact: true })
+    .click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Archivar producto", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Producto sin uso", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Ver archivados", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Producto sin uso", exact: true })
+    .click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Restaurar producto", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Volver a Mi despensa", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Producto sin uso", exact: true }),
+  ).toBeVisible();
+});

@@ -5,7 +5,12 @@ import { Minus, Plus, Search, ShoppingBasket } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { ProductDetail } from "./ProductDetail";
 import { CreateProduct } from "./CreateProduct";
-import { getInventory, lookupBarcode, stepShopping } from "./api";
+import {
+  getArchivedProducts,
+  getInventory,
+  lookupBarcode,
+  stepShopping,
+} from "./api";
 import { isBarcode } from "./barcodes";
 
 const normalize = (value: string) =>
@@ -16,9 +21,10 @@ const normalize = (value: string) =>
     .trim();
 export function Inventory() {
   const client = useQueryClient();
+  const [archived, setArchived] = useState(false);
   const inventory = useQuery({
-    queryKey: ["inventory"],
-    queryFn: getInventory,
+    queryKey: [archived ? "archived" : "inventory"],
+    queryFn: archived ? getArchivedProducts : getInventory,
   });
   const [query, setQuery] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
@@ -62,11 +68,19 @@ export function Inventory() {
       <div className="heading">
         <div>
           <span className="eyebrow">LO QUE TIENES EN CASA</span>
-          <h2>Mi despensa</h2>
+          <h2>{archived ? "Productos archivados" : "Mi despensa"}</h2>
           <p>Stock de Grocy y cantidades pendientes de compra.</p>
         </div>
         <div>
           <span className="count">{items.length} artículos</span>
+          <button
+            onClick={() => {
+              setArchived(!archived);
+              setQuery("");
+            }}
+          >
+            {archived ? "Volver a Mi despensa" : "Ver archivados"}
+          </button>
           <button onClick={() => setCreating(true)}>+ Nuevo producto</button>
         </div>
       </div>
@@ -81,7 +95,9 @@ export function Inventory() {
         <button
           title="Buscar código de barras"
           onClick={() => void barcode.refetch()}
-          disabled={!isBarcode(code) || code !== lookupCode || barcode.isFetching}
+          disabled={
+            !isBarcode(code) || code !== lookupCode || barcode.isFetching
+          }
         >
           {barcode.isFetching ? "Buscando…" : "Buscar"}
         </button>
@@ -136,7 +152,11 @@ export function Inventory() {
                 </small>
               </div>
             </div>
-            {Number(item.shopping_amount) === 0 ? (
+            {archived ? (
+              <button onClick={() => setSelectedProductId(item.id)}>
+                Ver y restaurar
+              </button>
+            ) : Number(item.shopping_amount) === 0 ? (
               <button
                 className="cart-button"
                 disabled={step.isPending}

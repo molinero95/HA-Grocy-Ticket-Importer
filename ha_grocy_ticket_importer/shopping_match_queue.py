@@ -152,3 +152,11 @@ def resolved_choices(path, alexa_names, products):
         result[key] = {"product_id": selected, "product_name": catalog[selected]["name"],
                        "original_name": entry["name"]}
     return result
+
+
+def acknowledge_choices(path, choices):
+    """Hide verified choices from UI without discarding identity bindings."""
+    with closing(connect(path)) as db, db:
+        for key, choice in choices.items():
+            db.execute("UPDATE pending_matches SET dismissed=1 WHERE normalized_name=? AND selected_product_id=?",
+                       (key, int(choice["product_id"])))

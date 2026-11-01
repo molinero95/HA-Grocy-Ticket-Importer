@@ -1,3 +1,5 @@
+import { ProductShopping } from "./ProductShopping";
+import { ProductPurchase } from "./ProductPurchase";
 import { useModal } from "./useModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isBarcode } from "./barcodes";
@@ -9,7 +11,7 @@ import { X } from "lucide-react";
 import {
   getCatalogProduct,
   saveDiscoveredPhoto,
-  checkCatalogDeletion,
+  setCatalogProductActive,
   adjustCatalogStock,
   editCatalogProduct,
   getCatalogBarcodes,
@@ -55,19 +57,14 @@ export function ProductDetail({
   const refreshProduct = async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["product", id] }),
+      client.invalidateQueries({ queryKey: ["shopping-options", id] }),
       client.invalidateQueries({ queryKey: ["inventory"] }),
       client.invalidateQueries({ queryKey: ["shopping"] }),
     ]);
   };
-  const [showDeletionCheck, setShowDeletionCheck] = useState(false);
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["variants", id],
     queryFn: () => getProductVariants(id),
-  });
-  const deletionCheck = useQuery({
-    queryKey: ["deletion-check", id, showDeletionCheck],
-    queryFn: () => checkCatalogDeletion(id, data!.product.name),
-    enabled: showDeletionCheck && !!data,
   });
   const barcodes = useQuery({
     queryKey: ["catalog-barcodes", id],
@@ -99,6 +96,20 @@ export function ProductDetail({
       void client.invalidateQueries({ queryKey: ["variants", id] });
     },
   });
+  const lifecycle = useMutation({
+    mutationFn: (active: boolean) =>
+      setCatalogProductActive(
+        id,
+        product.data!.name,
+        active,
+        crypto.randomUUID(),
+      ),
+    onSuccess: async () => {
+      await refreshProduct();
+      await client.invalidateQueries({ queryKey: ["archived"] });
+      onClose();
+    },
+  });
   const [photo, setPhoto] = useState<File | null>(null);
   const uploadPhoto = useMutation({
     mutationFn: (file: File) => uploadCatalogPhoto(id, file),
@@ -107,6 +118,7 @@ export function ProductDetail({
       void refreshProduct();
     },
   });
+  const [editingBarcode, setEditingBarcode] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [desiredStock, setDesiredStock] = useState<string | null>(null);
   const targetStock = desiredStock ?? currentStock;
@@ -156,6 +168,7 @@ export function ProductDetail({
       <input
         value={form[key]}
         required={required}
+        readOnly={key === "barcode" && editingBarcode !== null}
         maxLength={
           key === "name"
             ? 200
@@ -263,6 +276,17 @@ export function ProductDetail({
                   </button>
                 </div>
               </form>
+            )}
+            {product.data && (
+              <ProductPurchase
+                key={
+                  String(product.data.purchase_unit_id) +
+                  ":" +
+                  String(product.data.pack_size)
+                }
+                product={product.data}
+                onSaved={refreshProduct}
+              />
             )}
             <h3>Fotografía</h3>
             {product.data?.image_url && (
@@ -394,6 +418,7 @@ export function ProductDetail({
                 <p role="alert">{saveBarcode.error.message}</p>
               )}
             </form>
+            {product.data?.active !== false && <ProductShopping id={id} />}
             <h3>Existencias</h3>
             {product.isError && (
               <p role="alert">
@@ -454,34 +479,39 @@ export function ProductDetail({
                 />
               )}
             </>
-            <h3>Eliminar producto</h3>
+            <h3>
+              {product.data?.active === false
+                ? "Producto archivado"
+                : "Archivar producto"}
+            </h3>
             <p>
-              Antes de eliminar un producto es necesario verificar stock,
-              variantes y referencias históricas. La eliminación está
-              deshabilitada mientras no sea segura.
+              Archivar oculta el producto de Mi despensa y conserva sus códigos,
+              fotos e historial. Puedes restaurarlo desde Archivados. Requiere
+              stock cero y no tener referencias activas.
             </p>
             <button
               type="button"
-              onClick={() => setShowDeletionCheck(true)}
-              disabled={deletionCheck.isFetching}
+              disabled={
+                !product.data ||
+                lifecycle.isPending ||
+                (product.data.active !== false && Number(currentStock) !== 0)
+              }
+              onClick={() => {
+                if (
+                  window.confirm(
+                    product.data?.active === false
+                      ? "¿Restaurar este producto?"
+                      : "¿Archivar este producto conservando su historial?",
+                  )
+                )
+                  lifecycle.mutate(product.data?.active === false);
+              }}
             >
-              Comprobar si se puede eliminar
+              {product.data?.active === false
+                ? "Restaurar producto"
+                : "Archivar producto"}
             </button>
-            {deletionCheck.isFetching && (
-              <p role="status">Comprobando referencias…</p>
-            )}
-            {deletionCheck.isError && (
-              <p role="alert">{deletionCheck.error.message}</p>
-            )}
-            {deletionCheck.data && (
-              <p role="status">
-                Eliminación bloqueada:{" "}
-                {deletionCheck.data.details ?? deletionCheck.data.error}
-                {deletionCheck.data.collection
-                  ? " (" + deletionCheck.data.collection + ")"
-                  : ""}
-              </p>
-            )}
+            {lifecycle.isError && <p role="alert">{lifecycle.error.message}</p>}
             <h3>Variantes por supermercado</h3>
             {data.variants.length === 0 ? (
               <p>Este producto aún no tiene variantes asociadas.</p>
@@ -499,6 +529,7 @@ export function ProductDetail({
                     <button
                       className="variant-edit"
                       onClick={() => {
+                        setEditingBarcode(v.barcode);
                         setForm({
                           barcode: v.barcode,
                           name: v.name,
@@ -522,6 +553,7 @@ export function ProductDetail({
             <button
               className="variant-add"
               onClick={() => {
+                setEditingBarcode(null);
                 setForm(empty);
                 setEditing(true);
               }}
@@ -542,11 +574,13 @@ export function ProductDetail({
                     : "Nueva variante"}
                 </h3>
                 {field("barcode", "Código de barras", true)}
-                <BarcodeScanner
-                  onDetect={(code) =>
-                    setForm((previous) => ({ ...previous, barcode: code }))
-                  }
-                />
+                {!editingBarcode && (
+                  <BarcodeScanner
+                    onDetect={(code) =>
+                      setForm((previous) => ({ ...previous, barcode: code }))
+                    }
+                  />
+                )}
                 {field("name", "Nombre de la variante", true)}
                 {field("supermarket", "Supermercado")}
                 {field("brand", "Marca")}

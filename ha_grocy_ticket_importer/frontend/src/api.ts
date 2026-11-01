@@ -4,7 +4,7 @@ import type {
   ProductVariantsResponse,
 } from "./types";
 
-/** The preview's base element points at the ingress root; credentials stay same-origin. */
+/** The document's base element points at the ingress root; credentials stay same-origin. */
 const base = "api/v1/";
 let csrfToken: string | undefined;
 
@@ -22,6 +22,42 @@ async function token(): Promise<string> {
   // Auth status is deliberately public, so the login form can bootstrap CSRF.
   return (await getAuthStatus()).csrf_token;
 }
+
+const errorMessages: Record<string, string> = {
+  operation_in_progress:
+    "Hay otra operación en curso. Actualiza los datos antes de continuar.",
+  invalid_credentials: "Contraseña incorrecta.",
+  stale_or_invalid_candidate:
+    "La sugerencia ha cambiado. Actualiza la lista y vuelve a elegir.",
+  selection_failed: "No se pudo guardar la selección. Actualiza la lista.",
+  shopping_update_failed:
+    "No se pudo confirmar el cambio. Actualiza la lista antes de reintentar.",
+  shopping_remove_failed:
+    "No se pudo confirmar la eliminación. Actualiza la lista.",
+  catalog_edit_uncertain:
+    "No se pudo confirmar el cambio. Comprueba la ficha en Grocy antes de reintentar.",
+  invalid_payload: "Los datos enviados no son válidos. Actualiza la página.",
+  catalog_units_unavailable: "No se pudieron cargar las unidades de Grocy.",
+  barcodes_unavailable: "No se pudieron cargar los códigos de barras.",
+  import_in_progress: "Hay una importación en curso. Espera a que termine.",
+  single_receipt_required: "Selecciona un solo ticket.",
+  unsupported_receipt_format: "El ticket debe ser PDF, JPG o PNG.",
+  receipt_extraction_failed:
+    "No se pudo leer el ticket. Comprueba la conexión y la configuración de OpenAI.",
+  receipt_not_found: "No se encontró el ticket. Vuelve a abrirlo.",
+  invalid_receipt_items: "Revisa los nombres y las piezas por pack del ticket.",
+  receipt_preview_failed:
+    "No se pudo simular la importación. Comprueba la conexión.",
+  receipt_preview_rejected:
+    "Grocy ha rechazado la simulación. Revisa los productos.",
+  preview_required: "Simula el ticket antes de importarlo.",
+  receipt_changed_since_preview:
+    "El ticket ha cambiado. Vuelve a simular antes de importarlo.",
+  receipt_already_submitted:
+    "Este ticket ya se ha enviado. Comprueba el stock antes de continuar.",
+  receipt_commit_uncertain:
+    "No se pudo confirmar toda la importación. Comprueba Grocy antes de reintentar.",
+};
 
 async function request<T>(
   path: string,
@@ -50,7 +86,7 @@ async function request<T>(
       window.dispatchEvent(new Event("despensa:session-expired"));
     throw new ApiError(
       data.details ??
-        data.error ??
+        (data.error ? (errorMessages[data.error] ?? data.error) : undefined) ??
         "No se pudo completar la operación. Comprueba la conexión.",
       response.status,
     );
@@ -168,24 +204,6 @@ export const getMergePreview = (sourceId: number, targetId: number) =>
       }),
   );
 export const getCatalogAudit = () => request<CatalogAudit>("catalog/audit");
-export async function checkCatalogDeletion(
-  id: number,
-  expectedName: string,
-): Promise<DeletionCheck> {
-  // A blocked eligibility check is a report, not a failed mutation.
-  try {
-    return await request<DeletionCheck>(
-      "catalog/products/" +
-        id +
-        "/deletion-check?expected_name=" +
-        encodeURIComponent(expectedName),
-    );
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 409)
-      return { error: error.message };
-    throw error;
-  }
-}
 export async function getAuthStatus(): Promise<AuthStatus> {
   const status = await request<AuthStatus>("auth/status");
   csrfToken = status.csrf_token;
@@ -224,6 +242,7 @@ export const saveDiscoveredPhoto = (id: number, code: string) =>
     { barcode: code },
   );
 export type CatalogProduct = {
+  active?: boolean;
   id: number;
   name: string;
   unit_id: number;
@@ -311,11 +330,6 @@ export type CatalogAudit = {
   unlinked_shopping_entries: number[];
   shopping_notes?: unknown[];
 };
-export type DeletionCheck = {
-  error: string;
-  details?: string;
-  collection?: string;
-};
 export type AuthStatus = {
   authenticated: boolean;
   ingress: boolean;
@@ -338,3 +352,50 @@ export const consumeCatalogProduct = (
       operation_id: operationId,
     },
   );
+
+export const getArchivedProducts = () =>
+  request<InventoryResponse>("catalog/archived");
+export const setCatalogProductActive = (
+  id: number,
+  name: string,
+  active: boolean,
+  operationId: string,
+) =>
+  request("catalog/products/" + id + "/active", "POST", {
+    expected_name: name,
+    active,
+    operation_id: operationId,
+  });
+
+export const savePurchaseConfiguration = (
+  id: number,
+  purchaseUnit: number,
+  factor: string,
+  expected: { unit_id: number; purchase_unit_id: number; factor: number },
+  operationId: string,
+) =>
+  request("catalog/products/" + id + "/purchase", "POST", {
+    purchase_unit_id: purchaseUnit,
+    factor,
+    expected,
+    operation_id: operationId,
+  });
+
+export type ShoppingOptions = {
+  id: number;
+  name: string;
+  units: { id: number; name: string; factor: string }[];
+};
+export const getShoppingOptions = (id: number) =>
+  request<ShoppingOptions>("shopping/products/" + id + "/options");
+export const addShoppingAmount = (
+  id: number,
+  amount: string,
+  unitId: number,
+  operationId: string,
+) =>
+  request("shopping/products/" + id + "/add", "POST", {
+    amount,
+    unit_id: unitId,
+    operation_id: operationId,
+  });

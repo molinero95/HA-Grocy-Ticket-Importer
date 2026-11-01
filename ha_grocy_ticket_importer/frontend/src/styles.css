@@ -723,4 +723,18 @@ select:focus-visible {
   color: #176d4b;
 }
 
-@media(max-width:580px){.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.tabs button{flex-direction:column;justify-content:center;text-align:center;padding:8px 4px;line-height:1.2;min-height:64px;gap:4px}}
+@media (max-width: 580px) {
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tabs button {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 8px 4px;
+    line-height: 1.2;
+    min-height: 64px;
+    gap: 4px;
+  }
+}

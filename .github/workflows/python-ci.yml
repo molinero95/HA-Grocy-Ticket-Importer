@@ -11,7 +11,9 @@ permissions:
 jobs:
   frontend:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      GROCY_TEST_DIST: ${{ runner.temp }}/despensa-grocy-4.7.1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,6 +35,15 @@ jobs:
           python-version: '3.13'
       - name: Install browser smoke-test dependencies
         run: python -m pip install Flask python-dotenv websocket-client pillow
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: fileinfo, pdo_sqlite, gd, ctype, intl, mbstring
+          coverage: none
+      - name: Download and verify Grocy 4.7.1
+        run: python tests/download_grocy.py "$GROCY_TEST_DIST"
+      - name: Real Grocy API, import and restart contracts
+        run: python tests/real_stack_server.py --check
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
         working-directory: frontend
@@ -40,10 +51,11 @@ jobs:
         run: npm run test:e2e
         working-directory: frontend
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     strategy:
       matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
         python-version: ['3.13']
     steps:
       - name: Checkout
@@ -64,35 +76,32 @@ jobs:
               py_compile.compile(str(path), doraise=True)
           print(f'Compiled {len(files)} Python files')
           PY
-      - name: Check embedded browser JavaScript syntax
+      - name: Check retired legacy frontend is absent
         run: |
-          python - <<'PY'
-          import re
-          import subprocess
-          import tempfile
+          python - <<'PYCODE'
           from pathlib import Path
-          html_source = Path('web.py').read_text(encoding='utf-8')
-          blocks = re.findall(r'<script>(.*?)</script>', html_source, re.DOTALL)
-          if len(blocks) < 2:
-              raise SystemExit('Expected barcode scanner and product search scripts')
-          for script in blocks:
-              with tempfile.NamedTemporaryFile(suffix='.js', mode='w', encoding='utf-8') as temp:
-                  temp.write(script)
-                  temp.flush()
-                  subprocess.run(['node', '--check', temp.name], check=True)
-          print(f'Validated {len(blocks)} JavaScript blocks')
-          PY
+          source = Path('web.py').read_text()
+          assert '<script>' not in source and 'PAGE =' not in source
+          print('React is the single full frontend; basic fallback has no scripts')
+          PYCODE
       - name: Check Home Assistant packaged sources are synchronized
         run: |
-          for file in extract.py importer.py barcode_stock.py product_images.py web.py generic_catalog.py variant_catalog.py catalog_audit.py shopping_match_queue.py shopping_sync_worker.py shopping_sync.py shopping_sync_adapters.py shopping_sync_runtime.py shopping_identity_sync.py shopping_identity_runtime.py shopping_sync_events.py api_photos.py stock_commands.py purchase_units.py api_variants.py api_inventory.py api_shopping.py api_receipts.py api_catalog.py duplicate_candidates.py merge_audit.py; do
+          for file in extract.py importer.py barcode_stock.py product_images.py web.py generic_catalog.py variant_catalog.py catalog_audit.py shopping_match_queue.py shopping_sync_worker.py shopping_sync.py shopping_sync_adapters.py shopping_sync_runtime.py shopping_identity_sync.py shopping_identity_runtime.py shopping_sync_events.py api_photos.py stock_commands.py purchase_units.py catalog_lifecycle.py shopping_choice_conversion.py api_variants.py api_inventory.py api_shopping.py api_receipts.py api_catalog.py duplicate_candidates.py merge_audit.py; do
             cmp "$file" "ha_grocy_ticket_importer/$file"
           done
       - name: Build Home Assistant add-on container
-        run: docker build --pull --file ha_grocy_ticket_importer/Dockerfile ha_grocy_ticket_importer
+        run: docker build --pull --tag despensa:migration --file ha_grocy_ticket_importer/Dockerfile ha_grocy_ticket_importer
+      - name: Verify container entrypoint serves React without Grocy writes
+        run: |
+          docker run --detach --name despensa-smoke --publish 8768:8765 --env HA_INGRESS_MODE=1 --env WEB_SESSION_SECRET=disposable-container-test --entrypoint /venv/bin/gunicorn despensa:migration --chdir /app --bind 0.0.0.0:8765 web:app
+          trap 'docker rm --force despensa-smoke' EXIT
+          curl --retry 15 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8768/ --output /tmp/despensa-index.html
+          python -c "from pathlib import Path; page=Path('/tmp/despensa-index.html').read_text(); assert 'id=\"root\"' in page and 'assets/' in page"
+
       - name: Run unit tests without external API calls
         run: python -m unittest discover -v -p 'test_*.py'
       - name: Package local Home Assistant app
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.13' && matrix.runner == 'ubuntu-24.04'
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -100,11 +109,11 @@ jobs:
           app = Path("ha_grocy_ticket_importer")
           with ZipFile("ha-grocy-local-addon.zip", "w", ZIP_DEFLATED) as package:
               for path in sorted(app.rglob("*")):
-                  if path.is_file() and "__pycache__" not in path.parts:
+                  if path.is_file() and not {"__pycache__", "node_modules", "dist", "test-results", "playwright-report"}.intersection(path.parts):
                       package.write(path, path.as_posix())
           PY
       - name: Upload local installation package
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.13' && matrix.runner == 'ubuntu-24.04'
         uses: actions/upload-artifact@v4
         with:
           name: ha-grocy-local-addon

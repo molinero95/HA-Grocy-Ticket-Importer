@@ -10,6 +10,15 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: [
+    ...(process.env.GROCY_TEST_DIST
+      ? [
+          {
+            command: "python3 ../../tests/real_stack_server.py",
+            url: "http://127.0.0.1:8767/react/",
+            reuseExistingServer: false,
+          },
+        ]
+      : []),
     {
       command: "python3 ../../tests/preview_server.py",
       url: "http://127.0.0.1:8765/react/",

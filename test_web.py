@@ -1,567 +1,75 @@
-"""Web UI tests; never call OpenAI or Grocy."""
-import io
+"""React entrypoint, authentication, prefix and no-JavaScript fallback contracts."""
 import os
+from pathlib import Path
 import tempfile
 import unittest
-from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
-with patch.dict(os.environ, {"WEB_PASSWORD": "test-password", "WEB_SESSION_SECRET": "test-secret-key"}, clear=False):
+with patch.dict(os.environ, {"WEB_PASSWORD":"test-password", "WEB_SESSION_SECRET":"test-secret-key"}):
     import web
 
-class WebTests(unittest.TestCase):
+
+class WebEntrypointTests(unittest.TestCase):
     def setUp(self):
-        # Keep credentials active throughout each test, not just during module import.
-        env_patch = patch.dict(os.environ, {"WEB_PASSWORD": "test-password",
-                                           "WEB_SESSION_SECRET": "test-secret-key",
-                                           "HA_INGRESS_MODE": "0"})
-        env_patch.start()
-        self.addCleanup(env_patch.stop)
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.patcher = patch.object(web, "DATA", Path(self.temp.name))
-        self.patcher.start()
-        self.addCleanup(self.patcher.stop)
-        web.app.config["TESTING"] = True
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        Path(self.directory.name, 'index.html').write_text('<!doctype html><html><head></head><body><div id="root"></div></body></html>')
+        env = patch.dict(os.environ, {"WEB_PASSWORD":"test-password", "FRONTEND_DIST_DIR":self.directory.name})
+        env.start(); self.addCleanup(env.stop)
         self.client = web.app.test_client()
 
-    def csrf(self):
-        self.client.get("/?view=actions")
-        with self.client.session_transaction() as session:
-            return session["csrf"]
+    def test_root_and_preview_serve_the_same_react_app_without_grocy_reads(self):
+        with patch.object(web, 'INGRESS_MODE', False), patch.object(web.barcode_stock, 'grocy') as grocy:
+            root = self.client.get('/')
+            preview = self.client.get('/react/')
+        self.assertEqual(root.status_code, 200)
+        self.assertEqual(root.data, preview.data)
+        self.assertIn(b'<noscript>', root.data)
+        self.assertIn(b'/basic', root.data)
+        grocy.assert_not_called()
 
-    def login(self):
-        token = self.csrf()
-        r = self.client.post("/login", data={"password": "test-password", "csrf": token})
-        self.assertEqual(r.status_code, 302)
-        return self.csrf()
+    def test_prefix_is_used_for_base_and_basic_link(self):
+        with patch.object(web, 'INGRESS_MODE', True):
+            response = self.client.get('/', headers={'X-Ingress-Path':'/api/hassio_ingress/sample'})
+        self.assertIn(b'<base href="/api/hassio_ingress/sample/">', response.data)
+        self.assertIn(b'href="/api/hassio_ingress/sample/basic"', response.data)
 
-    def test_create_product_zero_stock_success(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "create_catalog_product",
-                          return_value={"created": True, "product_id": 42, "name": "Salsa ranchera"} ) as create:
-            response = self.client.post("/barcode/add", data={
-                "csrf": token, "name": "Salsa ranchera", "unit_id": "2",
-                "initial_stock": "0", "barcode": ""
-            })
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("product_id=42", response.headers["Location"])
-        self.assertEqual(create.call_args.args[:4], ("Salsa ranchera", "", "2", "0"))
+    def test_old_write_routes_are_removed_and_cannot_modify_grocy(self):
+        with patch.object(web, 'INGRESS_MODE', True), patch.object(web.barcode_stock, 'grocy') as grocy:
+            token = self.client.get('/api/v1/auth/status').json['csrf_token']
+            for path in ('/barcode/add','/product/1/delete','/commit/'+'a'*32,'/product/1/edit-all'):
+                response = self.client.post(path, data={'csrf':token})
+                self.assertEqual(response.status_code, 404, path)
+        grocy.assert_not_called()
 
-    def test_create_product_backend_error_is_logged(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "create_catalog_product",
-                          side_effect=RuntimeError("simulated backend failure")):
-            with self.assertLogs(web.app.logger.name, level="ERROR") as logs:
-                response = self.client.post("/barcode/add", data={
-                    "csrf": token, "name": "Salsa ranchera", "unit_id": "2",
-                    "initial_stock": "0"
-                })
-        self.assertEqual(response.status_code, 502)
-        self.assertIn(b"catalog_product_create_failed", response.data)
-        self.assertIn("simulated backend failure", "\\n".join(logs.output))
+    def test_basic_login_and_writes_require_csrf(self):
+        with patch.object(web, 'INGRESS_MODE', False):
+            self.assertEqual(self.client.post('/basic/login', data={'password':'test-password'}).status_code, 403)
+            self.client.get('/api/v1/auth/status')
+            self.assertEqual(self.client.post('/api/v1/auth/login', json={'password':'test-password'}, headers={'X-CSRF-Token':'ñ'}).status_code, 403)
+            self.client.get('/basic')
+            with self.client.session_transaction() as session: token = session['csrf']
+            self.assertEqual(self.client.post('/basic/login', data={'password':'contraseña','csrf':token}).status_code, 401)
+            response = self.client.post('/basic/login', data={'password':'test-password','csrf':token})
+            self.assertEqual(response.status_code, 303)
+            self.assertEqual(self.client.post('/basic/shopping/1', data={'direction':'plus'}).status_code, 403)
 
-    def test_lookup_name_without_photo(self):
-        self.login()
-        with patch.object(web.product_images, "lookup_image", return_value={
-            "name": "Salsa ranchera", "image_url": None}):
-            response = self.client.get("/photo/lookup?barcode=8412345678901")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["name"], "Salsa ranchera")
-        self.assertIsNone(response.json["image_url"])
+    def test_basic_fallback_escapes_names_and_preserves_safe_forms(self):
+        row = {'id':1,'name':'<script>bad</script>','amount':'0','unit':'Piece','shopping_amount':'0','shopping_unit':'Piece','shopping_step':'1','shopping_can_subtract':False}
+        with patch.object(web, 'INGRESS_MODE', True), patch.object(web.barcode_stock, 'inventory_with_shopping', return_value=[row]):
+            response = self.client.get('/basic')
+        self.assertIn(b'&lt;script&gt;',response.data)
+        self.assertNotIn(b'<script>',response.data)
+        self.assertIn(b'action="/basic/shopping/1"',response.data)
 
-    def test_new_product_form_autofill_script(self):
-        self.login()
-        with patch.object(web.barcode_stock, "new_product_units", return_value=[{"id": 2, "name": "Piece"}]):
-            response = self.client.get("/?view=add")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"data.name", response.data)
-        self.assertIn(b"new-product-name", response.data)
+    def test_api_responses_are_private_and_non_sniffable(self):
+        response = self.client.get('/api/v1/auth/status')
+        self.assertEqual(response.headers['Cache-Control'],'no-store')
+        self.assertEqual(response.headers['X-Content-Type-Options'],'nosniff')
+        self.assertIn("object-src 'none'", response.headers['Content-Security-Policy'])
 
-    def test_created_product_success_banner(self):
-        self.login()
-        with patch.object(web.barcode_stock, "product_detail", return_value=None):
-            response = self.client.get("/?view=product&product_id=42&created=1")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Producto creado correctamente".encode(), response.data)
-
-    def test_configuration_needed(self):
-        with patch.dict(os.environ, {"WEB_PASSWORD": ""}):
-            self.assertEqual(self.client.get("/").status_code, 503)
-
-    def test_login_csrf_required(self):
-        self.assertEqual(self.client.post("/login", data={"password": "test-password"}).status_code, 403)
-
-    def test_login_wrong_password(self):
-        self.assertEqual(self.client.post("/login", data={"csrf": self.csrf(), "password": "wrong"}).status_code, 401)
-
-    def test_requires_login_for_upload(self):
-        self.assertEqual(self.client.post("/upload", data={"csrf": self.csrf()}).status_code, 401)
-
-    def test_product_association_uses_searchable_list(self):
-        with patch.object(web.barcode_stock, "list_products", return_value=[
-                {"id": 12, "name": "Nutella 350 g"},
-                {"id": 14, "name": "Leche Asturiana"}]):
-            self.login()
-            response = self.client.get("/?view=associate")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'id="product-search"', response.data)
-        self.assertIn(b'data-product-id="12"', response.data)
-        self.assertIn(b'Nutella 350 g', response.data)
-        self.assertIn(b'id="selected-product-id"', response.data)
-        self.assertNotIn(b'<select name="product_id"', response.data)
-
-    def test_inventory_home_and_actions_are_separate(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=[
-            {"id": 5, "name": "Leche", "amount": "3", "unit": "Unidad", "shopping_amount": "2", "shopping_unit": "Unidad", "shopping_step": "1", "shopping_can_subtract": True},
-            {"id": 8, "name": "Tomate", "amount": "1.5", "unit": "Kilogramo", "shopping_amount": "0.2", "shopping_unit": "kg", "shopping_step": "0.10", "shopping_can_subtract": True}]):
-            response = self.client.get("/?view=inventory")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'id="inventory-search"', response.data)
-        self.assertIn(b'Leche', response.data)
-        self.assertIn(b'3', response.data)
-        self.assertNotIn(b'<input name="barcode"', response.data)
-        self.assertIn(b'/shopping/step/5/plus', response.data)
-        self.assertIn(b'/shopping/step/8/minus', response.data)
-        self.assertIn(b'0.2', response.data)
-        self.assertIn(b'view=actions', response.data)
-        self.assertTrue(token)
-
-        with patch.object(web.barcode_stock, "inventory_with_shopping", side_effect=AssertionError("Should not fetch")):
-            actions = self.client.get("/?view=actions")
-        self.assertEqual(actions.status_code, 200)
-        self.assertIn(b'class="action-grid"', actions.data)
-        self.assertNotIn(b'<strong>Asociar c', actions.data)
-        self.assertNotIn(b'<input name="barcode"', actions.data)
-
-    def test_new_product_form_has_unit_optional_barcode_and_initial_stock(self):
-        self.login()
-        with patch.object(web.barcode_stock, "new_product_units", return_value=[
-                {"id": 2, "name": "Piece"}, {"id": 4, "name": "Kilogram"}]):
-            response = self.client.get("/?view=add")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'A\xc3\xb1adir producto nuevo', response.data)
-        self.assertIn(b'name="unit_id"', response.data)
-        self.assertIn(b'name="initial_stock"', response.data)
-        self.assertIn(b'step="0.01"', response.data)
-        self.assertIn(b'Crear producto', response.data)
-        self.assertNotIn(b'A\xc3\xb1adir 1 al stock', response.data)
-
-    def test_existing_product_shows_link_to_edit_not_new_stock(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "create_catalog_product", return_value={
-                "created": False, "product_id": 17, "name": "Tomate"}):
-            with patch.object(web.barcode_stock, "new_product_units", return_value=[]):
-                r = self.client.post("/barcode/add", data={
-                    "csrf": token, "name": "Tomate", "barcode": "",
-                    "unit_id": "4", "initial_stock": "2"})
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b'Ir a editar producto', r.data)
-        self.assertIn(b'product_id=17', r.data)
-
-    def test_new_product_redirects_to_its_sheet(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "create_catalog_product", return_value={
-                "created": True, "product_id": 18, "name": "Tomate"}) as create:
-            r = self.client.post("/barcode/add", data={
-                "csrf": token, "name": "Tomate", "barcode": "",
-                "unit_id": "4", "initial_stock": "0.5"})
-        self.assertEqual(r.status_code, 302)
-        self.assertIn("product_id=18", r.headers["Location"])
-        create.assert_called_once_with("Tomate", "", "4", "0.5", location_id=2, image_url=None, pack_size="1")
-
-    def test_consume_form_has_amount_and_shopping_checkbox(self):
-        self.login()
-        r = self.client.get("/?view=remove")
-        self.assertNotIn(b'Consumir producto', r.data)
-        self.assertNotIn(b'Confirmar: quitar 1 unidad', r.data)
-        self.assertNotIn(b'<strong>Asociar c', self.client.get("/?view=actions").data)
-
-    def test_consume_selected_quantity_and_replenish(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "consume_quantity", return_value={
-                "amount": "0.50", "name": "Tomate",
-                "shopping_added": True, "shopping_error": False}) as consume:
-            with self.client.session_transaction() as sess:
-                sess["remove_barcode"] = "1234567890123"
-            r = self.client.post("/barcode/remove", data={
-                "csrf": token, "barcode": "1234567890123", "amount": "0.50",
-                "add_to_list": "1"})
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b'lista de la compra', r.data)
-        consume.assert_called_once_with("1234567890123", "0.50", True)
-
-    def test_duplicates_action_navigates_to_read_only_results(self):
-        self.login()
-        actions = self.client.get("/?view=actions")
-        self.assertIn(b"view=duplicates", actions.data)
-        with patch.object(web, "detect_duplicates", return_value=[
-            {"reason": "Nombre idéntico", "items": [
-                {"id": 5, "name": "Leche", "barcodes": []},
-                {"id": 8, "name": "Leche", "barcodes": []}]}]):
-            result = self.client.get("/?view=duplicates")
-        self.assertEqual(result.status_code, 200)
-        self.assertIn(b"Posibles duplicados", result.data)
-        self.assertIn(b"product_id=5", result.data)
-        self.assertIn(b"product_id=8", result.data)
-        self.assertNotIn("<h2>🛒 Lista de la compra</h2>".encode("utf-8"), result.data)
-
-    def test_action_forms_are_separate(self):
-        self.login()
-        for view, endpoint in [
-            ("add", b'/barcode/add'),
-            ("associate", b'/barcode/associate'), ("photo", b'/barcode/photo'),
-            ("ticket", b'/upload')]:
-            result = self.client.get("/?view=" + view)
-            self.assertEqual(result.status_code, 200, view)
-            self.assertIn(endpoint, result.data, view)
-            self.assertIn(b'Volver a acciones', result.data)
-            self.assertIn(b'class="bottom-nav"', result.data)
-        self.assertIn(b'class="ticket-review-item"', web.PAGE.encode("utf-8"))
-        self.assertIn(b'name="pieces_per_pack_{{ loop.index0 }}"', web.PAGE.encode("utf-8"))
-        self.assertNotIn(b'class="ticket-table"', self.client.get("/?view=ticket").data)
-
-    def test_inventory_backend_failure_has_no_fake_zeroes(self):
-        self.login()
-        with patch.object(web.barcode_stock, "inventory_with_shopping", side_effect=RuntimeError("offline")):
-            response = self.client.get("/?view=inventory")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'No se ha podido consultar', response.data)
-
-    def test_shopping_is_home_and_displays_grocy_items(self):
-        self.login()
-        with patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=[
-                {"id": 9, "product_id": 5, "name": "Leche", "amount": "2",
-                 "unit": "Unidad", "done": False}]):
-            with patch.object(web.barcode_stock, "inventory_with_shopping",
-                              side_effect=AssertionError("inventory should not load")):
-                response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Lista de la compra', response.data)
-        self.assertIn(b'Leche', response.data)
-        self.assertIn(b'/shopping/9/toggle', response.data)
-        self.assertIn(b'/shopping/9/remove', response.data)
-        self.assertNotIn(b'id="inventory-search"', response.data)
-
-    def test_pantry_adds_one_product_to_shopping_list(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "add_to_shopping_list", return_value="Leche") as add:
-            with patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=[]):
-                response = self.client.post("/shopping/add/5", data={"csrf": token, "amount": "1.50", "unit_id": "4"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Leche', response.data)
-        add.assert_called_once_with(5, "1.50", "4")
-
-    def test_shopping_add_screen_has_amount_and_unit(self):
-        self.login()
-        with patch.object(web.barcode_stock, "shopping_product_options", return_value={
-                "id": 5, "name": "Tomate", "units": [
-                    {"id": 4, "name": "Kilogramo", "factor": "1"}]}):
-            response = self.client.get("/?view=shopping_add&product_id=5")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'name="amount"', response.data)
-        self.assertIn(b'name="unit_id"', response.data)
-        self.assertIn(b'step="0.01"', response.data)
-
-    def test_inline_shopping_buttons_change_quantity_without_form_page(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "change_shopping_quantity") as change:
-            response = self.client.post("/shopping/step/5/plus", data={"csrf": token})
-            self.assertEqual(response.status_code, 302)
-            self.assertIn("view=inventory", response.headers["Location"])
-            change.assert_called_once_with(5, "plus")
-            response = self.client.post("/shopping/step/5/minus", data={"csrf": token})
-            self.assertEqual(response.status_code, 302)
-            self.assertEqual(change.call_count, 2)
-
-    def test_shopping_step_json_updates_without_redirect(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "change_shopping_quantity",
-                          return_value={"name": "Tomate", "amount": "0.4"}) as change:
-            response = self.client.post(
-                "/shopping/step/5/plus", data={"csrf": token},
-                headers={"Accept": "application/json"})
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json, {"amount": "0.4", "product_id": 5})
-            change.assert_called_once_with(5, "plus")
-
-    def test_shopping_step_json_error_is_not_html(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "change_shopping_quantity",
-                          side_effect=web.barcode_stock.BarcodeError("Sin stock")):
-            response = self.client.post(
-                "/shopping/step/5/minus", data={"csrf": token},
-                headers={"Accept": "application/json"})
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json["error"], "Sin stock")
-
-    def test_shopping_stepper_has_in_place_controls(self):
-        self.login()
-        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=[{
-                "id": 5, "name": "Tomate", "amount": "1.3", "unit": "Kilogram",
-                "shopping_amount": "0.3", "shopping_unit": "kg",
-                "shopping_step": "0.10", "shopping_can_subtract": True}]):
-            response = self.client.get("/?view=inventory")
-        self.assertIn(b'class="shopping-amount"', response.data)
-        self.assertIn(b'class="shopping-stepper-message"', response.data)
-        self.assertIn(b'0.3', response.data)
-        self.assertIn(b'view=inventory', response.data)
-
-    def test_pantry_shows_cart_only_for_products_not_on_shopping_list(self):
-        self.login()
-        products = [
-            {"id": 5, "name": "Leche", "amount": "3", "unit": "Piece",
-             "shopping_amount": "0", "shopping_unit": "Piece", "shopping_step": "1",
-             "shopping_can_subtract": False},
-            {"id": 8, "name": "Tomate", "amount": "1.5", "unit": "Kilogram",
-             "shopping_amount": "0.3", "shopping_unit": "kg", "shopping_step": "0.10",
-             "shopping_can_subtract": True},
-        ]
-        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=products):
-            response = self.client.get("/?view=inventory")
-        self.assertEqual(response.status_code, 200)
-        html = response.data.decode()
-        self.assertIn('class="shopping-cart-form"', html)
-        self.assertIn('class="shopping-cart-form" method="post"', html)
-        self.assertIn('class="shopping-cart-form" method="post" action="/shopping/step/5/plus"', html)
-        self.assertIn('class="shopping-cart-form" method="post" action="/shopping/step/8/plus" hidden', html)
-        self.assertIn('class="shopping-stepper" aria-label="Cantidad de Leche en lista de compra" hidden', html)
-        self.assertIn('class="shopping-stepper" aria-label="Cantidad de Tomate en lista de compra"', html)
-        self.assertIn('class="shopping-quick"', html)
-
-    def test_embedded_javascript_is_template_free_for_node_syntax_check(self):
-        # Node --check parses the script from the Python source before Jinja renders.
-        script = web.PAGE.split("<script>", 1)[1].split("</script>", 1)[0]
-        self.assertNotIn("{{", script)
-        self.assertNotIn("{%", script)
-        self.assertIn("dialog.dataset.photoLookupUrl", script)
-        self.assertIn("data-photo-lookup-url=", web.PAGE)
-        self.login()
-        response = self.client.get("/?view=inventory")
-        self.assertIn(b'data-photo-lookup-url="/photo/lookup"', response.data)
-
-    def test_shopping_toggle_and_remove(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "update_shopping_list_item") as toggle:
-            self.assertEqual(self.client.post("/shopping/9/toggle",
-                data={"csrf": token, "done": "1"}).status_code, 302)
-            toggle.assert_called_once_with(9, True)
-        with patch.object(web.barcode_stock, "remove_shopping_list_item") as remove:
-            self.assertEqual(self.client.post("/shopping/9/remove",
-                data={"csrf": token}).status_code, 302)
-            remove.assert_called_once_with(9)
-
-    def test_product_sheet_from_inventory_and_picture_inside_sheet(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "inventory_with_shopping", return_value=[
-            {"id": 5, "name": "Aroma de vainilla", "amount": "1", "unit": "Unidad", "shopping_amount": "0", "shopping_unit": "Unidad", "shopping_step": "1", "shopping_can_subtract": False}]):
-            home = self.client.get("/?view=inventory")
-        self.assertIn(b'view=product', home.data)
-        self.assertIn(b'product_id=5', home.data)
-        self.assertNotIn(b'Buscar fotograf', self.client.get("/?view=actions").data)
-        with patch.object(web.barcode_stock, "product_detail", return_value={
-                "id": 5, "name": "Aroma de vainilla", "pack_size": 4,
-                "description": "", "barcodes": ["1234567890123"],
-                "unit_id": 2, "units": [{"id": 2, "name": "Unidad"}, {"id": 4, "name": "Kilogramo"}], "stock_amount": "1.25"}):
-            sheet = self.client.get("/?view=product&product_id=5")
-            self.assertEqual(sheet.status_code, 200)
-            self.assertIn(b'id="product-edit-form"', sheet.data)
-            self.assertIn(b'id="product-camera-open"', sheet.data)
-            self.assertIn(b'id="product-photo-upload"', sheet.data)
-            self.assertIn(b'/product/5/edit-all', sheet.data)
-            with patch.object(web.barcode_stock, "update_product_info",
-                              return_value={"id": 5, "name": "Aroma", "pack_size": 4}) as change:
-                response = self.client.post("/product/5/edit", data={
-                    "csrf": token, "name": "Aroma", "pack_size": "4", "unit_id": "2"})
-                self.assertEqual(response.status_code, 200)
-                self.assertIn(b'Existencias sin cambios', response.data)
-                change.assert_called_once_with(5, "Aroma", "1", "2")
-
-    def test_product_picture_lookup_saves_reference(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "product_detail", return_value={
-                "id": 5, "name": "Aroma", "pack_size": 4, "description": "",
-                "barcodes": ["1234567890123"],
-                "unit_id": 2, "units": [{"id": 2, "name": "Unidad"}], "stock_amount": "1"}):
-            with patch.object(web.product_images, "lookup_image", return_value={
-                    "name": "Aroma", "image_url": "https://images.openfoodfacts.org/a.jpg",
-                    "source_url": "https://world.openfoodfacts.org/a"}) as lookup:
-                with patch.object(web.barcode_stock, "save_product_photo") as save:
-                    response = self.client.post("/product/5/photo", data={"csrf": token})
-                    self.assertEqual(response.status_code, 200)
-                    self.assertIn(b'Fotograf', response.data)
-                    lookup.assert_called_once_with("1234567890123")
-                    save.assert_called_once_with(5, "https://images.openfoodfacts.org/a.jpg")
-
-    def test_photo_lookup_api_returns_found_image(self):
-        self.login()
-        with patch.object(web.product_images, "lookup_image", return_value={
-                "image_url": "https://images.openfoodfacts.org/sample.jpg"}):
-            r = self.client.get("/photo/lookup?barcode=1234567890123")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json["image_url"], "https://images.openfoodfacts.org/sample.jpg")
-
-    def test_pack_size_field_only_shows_when_unit_is_pack(self):
-        self.login()
-        with patch.object(web.barcode_stock, "product_detail", return_value={
-                "id": 5, "name": "Arroz", "is_pack": False,
-                "image_url": None, "pack_size": 1, "unit_id": 2,
-                "units": [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}],
-                "stock_amount": "0", "barcodes": []}):
-            r = self.client.get("/?view=product&product_id=5")
-        self.assertEqual(r.status_code, 200)
-        self.assertNotIn(b'id="pack-size-fields"', r.data)
-
-    def test_product_sheet_displays_quantity_unit_and_barcode_actions(self):
-        self.login()
-        with patch.object(web.barcode_stock, "product_detail", return_value={
-                "id": 5, "name": "Tomate en rama", "pack_size": 1,
-                "description": "", "barcodes": [],
-                "unit_id": 4,
-                "units": [{"id": 2, "name": "Unidad"}, {"id": 4, "name": "Kilogramo"}],
-                "stock_amount": "1.25"}):
-            response = self.client.get("/?view=product&product_id=5")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'name="unit_id"', response.data)
-        self.assertIn(b'name="desired_amount"', response.data)
-        self.assertIn(b'step="0.01"', response.data)
-        self.assertIn(b'/product/5/edit-all', response.data)
-
-    def test_stock_edit_saves_without_confirmation(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "prepare_stock_adjustment", return_value={
-                "product_id": 5, "before": "1.25", "after": "1.50",
-                "difference": "0.25", "direction": "add"}) as preview:
-            with patch.object(web.barcode_stock, "apply_stock_adjustment", return_value={
-                    "after": "1.50"}) as commit:
-                r = self.client.post("/product/5/stock-save", data={
-                    "csrf": token, "desired_amount": "1.50", "expected_amount": "1.25"})
-                self.assertEqual(r.status_code, 200)
-                self.assertIn(b'Stock actualizado', r.data)
-                preview.assert_called_once_with(5, "1.50", "1.25")
-                commit.assert_called_once()
-        self.assertNotIn(b'Confirmar cambio de existencias', r.data)
-
-    def test_stock_edit_rejects_stale_values(self):
-        token = self.login()
-        with patch.object(web.barcode_stock, "prepare_stock_adjustment",
-                          side_effect=web.barcode_stock.BarcodeError("Stock actualizado por otro")):
-            with patch.object(web.barcode_stock, "apply_stock_adjustment") as commit:
-                r = self.client.post("/product/5/stock-save", data={
-                    "csrf": token, "desired_amount": "1.50", "expected_amount": "1.25"})
-                self.assertEqual(r.status_code, 409)
-                commit.assert_not_called()
-
-    def test_camera_scanner_available_for_all_barcode_actions(self):
-        self.login()
-        with patch.object(web.barcode_stock, "list_products", return_value=[]):
-            response = self.client.get("/?view=add")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data.count(b'class="scan-trigger"'), 1)
-        self.assertIn(b'id="scanner-dialog"', response.data)
-        self.assertIn(b'new BarcodeDetector', response.data)
-        self.assertIn(b'getUserMedia', response.data)
-        self.assertIn(b'input[name="barcode"]', response.data)
-        self.assertIn(b'No se a', response.data)
-        self.assertIn(b'id="scanner-stop"', response.data)
-
-    def test_invalid_file_type_blocked(self):
-        token = self.login()
-        r = self.client.post("/upload", data={"csrf": token,
-                         "ticket": (io.BytesIO(b"bad"), "malware.exe")},
-                         content_type="multipart/form-data")
-        self.assertEqual(r.status_code, 400)
-
-    @patch.object(web.extract, "extract")
-    def test_upload_then_preview_requires_explicit_commit(self, mock_extract):
-        mock_extract.return_value = {"merchant": "Test", "receipt_date": "2026-09-28",
-            "total": 1.0, "items": [{"name": "Milk", "quantity": 1,
-            "unit_price": 1.0, "ambiguous": False, "reason": ""}],
-            "source_sha256": "ab" * 32}
-        token = self.login()
-        r = self.client.post("/upload", data={"csrf": token,
-                         "ticket": (io.BytesIO(b"%PDF-1.4"), "receipt.pdf")},
-                         content_type="multipart/form-data")
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b"1 l\xc3\xadneas", r.data)
-        self.assertIn(b"Milk", r.data)
-        self.assertIn(b'name="pieces_per_pack_0"', r.data)
-        self.assertIn(b'id="ticket-live-camera"', r.data)
-        mock_extract.assert_called_once()
-        with self.client.session_transaction() as session:
-            rid = session["receipt_id"]
-        self.assertEqual(self.client.post("/commit/" + rid, data={"csrf": token}).status_code, 403)
-        with patch.object(web, "run_import", return_value=Mock(returncode=0, stdout="WOULD IMPORT", stderr="")) as run:
-            self.assertEqual(self.client.post("/preview/" + rid, data={"csrf": token}).status_code, 200)
-            run.assert_called_once_with(rid, "--dry-run")
-        with patch.object(web, "run_import", return_value=Mock(returncode=0, stdout="IMPORTED", stderr="")) as run:
-            self.assertEqual(self.client.post("/commit/" + rid, data={"csrf": token}).status_code, 200)
-            run.assert_called_once_with(rid, "--commit")
-            self.assertEqual(self.client.post("/commit/" + rid, data={"csrf": token}).status_code, 403)
-
-    def test_variant_save_requires_csrf_and_redirects_to_same_generic(self):
-        token = self.login()
-        with patch.object(web.variant_catalog, "save_variant",
-                          return_value={"product_id": 42, "barcode": "8480000000001", "name": "Leche"}) as save:
-            data = {"barcode": "8480000000001", "name": "Leche", "units_per_purchase": "1"}
-            self.assertEqual(self.client.post("/product/42/variant", data=data).status_code, 403)
-            data["csrf"] = token
-            response = self.client.post("/product/42/variant", data=data)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("product_id=42", response.headers["Location"])
-        save.assert_called_once()
-
-    def test_variant_conflict_does_not_write_stock(self):
-        token = self.login()
-        with patch.object(web.variant_catalog, "save_variant",
-                          side_effect=ValueError("Este código pertenece a otro producto")), \
-             patch.object(web.barcode_stock, "product_detail", side_effect=ValueError("not available")), \
-             patch.object(web.barcode_stock, "apply_stock_adjustment") as adjust:
-            response = self.client.post("/product/42/variant", data={
-                "csrf": token, "barcode": "8480000000001", "name": "Leche"})
-        self.assertEqual(response.status_code, 409)
-        self.assertIn("Variante no guardada".encode(), response.data)
-        adjust.assert_not_called()
-
-    def test_alexa_match_choice_requires_csrf_and_does_not_touch_stock(self):
-        token = self.login()
-        with patch.object(web.shopping_match_queue, "choose") as choose, \
-             patch.object(web.barcode_stock, "apply_stock_adjustment") as adjust:
-            data = {"key": "arroz", "product_id": "2"}
-            self.assertEqual(self.client.post("/alexa/match/choose", data=data).status_code, 403)
-            data["csrf"] = token
-            response = self.client.post("/alexa/match/choose", data=data)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("view=shopping", response.headers["Location"])
-        choose.assert_called_once()
-        adjust.assert_not_called()
-
-
-
-class AlexaInlineShoppingTests(unittest.TestCase):
-
-    def test_inline_alexa_shopping_template_renders_without_500(self):
-        from flask import render_template_string
-        with web.app.test_request_context("/"):
-            rendered = render_template_string(web.PAGE, view="shopping", shopping=[{
-                "id": 1, "name": "Arroz", "amount": 1, "unit": "unidad",
-                "product_id": None, "done": False, "image_url": None,
-                "alexa_match": {"key": "arroz", "name": "Arroz", "candidates": [
-                    {"id": 2, "name": "Arroz basmati"},
-                    {"id": 3, "name": "Arroz integral"}],
-                    "selected_product_id": None}
-            }], shopping_error=False, pending_matches=[], shopping_match_keys={"arroz"},
-                csrf="test", ingress_mode=True, authenticated=True)
-            self.assertIn("Arroz basmati", rendered)
-            self.assertIn("Arroz integral", rendered)
-            self.assertIn("Elegir producto para", rendered)
-
-    def test_shopping_view_renders_pending_alexa_choices(self):
-        self.assertIn('class="ticket-review-item alexa-inline-match"', web.PAGE)
-        self.assertIn('Elegir producto para', web.PAGE)
-        self.assertIn('if view in ("alexa_matches", "shopping")',
-                      __import__("inspect").getsource(web.render))
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_configuration_failure_is_structured(self):
+        with patch.object(web, 'INGRESS_MODE', False), patch.dict(os.environ, {'WEB_PASSWORD':''}):
+            response = self.client.get('/api/v1/auth/status')
+        self.assertEqual(response.status_code,503)
+        self.assertTrue(response.is_json)
