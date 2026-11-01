@@ -393,3 +393,14 @@ export const savePurchaseConfiguration = (
     expected,
     operation_id: operationId,
   });
+
+export type ShoppingSyncStatus = {
+  configured: boolean;
+  enabled: boolean;
+  interval_seconds: number;
+  worker: "unknown" | "stale" | "failed" | "disabled" | "ok";
+  last_check: number | null;
+  error: string | null;
+};
+export const getShoppingSyncStatus = () =>
+  request<ShoppingSyncStatus>("shopping/sync-status");
