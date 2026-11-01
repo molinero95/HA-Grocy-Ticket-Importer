@@ -112,6 +112,12 @@ export const chooseAlexaMatch = (
   });
 export const removeAlexaMatch = (key: string) =>
   request("alexa/matches/" + encodeURIComponent(key), "DELETE");
+export type AlexaAlias = { key: string; name: string; product_id: number };
+export const getAlexaAliases = () => request<{ aliases: AlexaAlias[] }>("alexa/aliases");
+export const saveAlexaAlias = (name: string, product_id: number) =>
+  request("alexa/aliases", "POST", { name, product_id });
+export const deleteAlexaAlias = (key: string) =>
+  request("alexa/aliases/" + encodeURIComponent(key), "DELETE");
 export const getInventory = () => request<InventoryResponse>("inventory");
 export async function lookupBarcode(code: string): Promise<number | null> {
   return (

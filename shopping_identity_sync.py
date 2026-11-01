@@ -31,8 +31,9 @@ def identities(alexa_names, grocy_rows, products, choices=None):
             if pid not in by_id:
                 raise IdentityConflict("Selected product is no longer in Grocy")
             decision, candidates = suggest_catalog_matches(name, products)
-            if (decision != "review" or
-                    pid not in {int(candidate["id"]) for candidate in candidates}):
+            if (not selected.get("trusted_alias") and
+                    (decision != "review" or
+                     pid not in {int(candidate["id"]) for candidate in candidates})):
                 raise IdentityConflict("Selected product is no longer a valid candidate")
             key = "p:" + str(pid)
         else:

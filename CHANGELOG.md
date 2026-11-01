@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0] — 2026-11-01
+
+### Added
+- Introduce persistent many-to-one Alexa aliases for canonical Grocy products.
+- Add authenticated alias management endpoints and a React screen under Actions.
+- Resolve trusted, explicitly saved aliases during identity-based shopping synchronization.
+
+### Fixed
+- Keep root and add-on Python modules synchronized to support both runtime entrypoints and CI.
+
+### Tests
+- Add regression coverage for alias collisions, persistence, missing products, purchase identity, and safe Alexa item removal.
+
+
 ## [1.3.0] — 2026-11-01
 
 ### Changed

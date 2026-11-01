@@ -78,6 +78,12 @@ def _run_once(*, dry_run=True):
         alexa = [name for name in alexa if normalize(name) not in removed_names]
         grocy_rows = [(name, row) for name, row in grocy_rows if int(row["id"]) not in removed_ids]
     choices = resolved_choices(MATCH_QUEUE, alexa, products)
+    # Persistent aliases are explicit user mappings, not fuzzy suggestions.
+    from shopping_aliases import choices as alias_choices
+    for alias, selected in alias_choices(MATCH_QUEUE, products).items():
+        if alias in choices and int(choices[alias]["product_id"]) != int(selected["product_id"]):
+            raise IdentityConflict("Alexa alias conflicts with a pending manual choice")
+        choices[alias] = {**selected, "trusted_alias": True}
     # An old manual selection that is no longer a valid candidate must never
     # silently become free text and trigger a deletion via the old checkpoint.
     for row in pending_matches(MATCH_QUEUE):
