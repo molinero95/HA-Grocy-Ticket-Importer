@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.13.0] — 2026-11-01
+
+### Added
+- Prepare a separate, disabled-by-default Alexa stock listener at `POST /alexa/despensa` on optional port 8100. Query actual stock by product/name alias, clarify ambiguous names and summarize low-stock products using visual thresholds and warning opt-outs. Mount no application, photo, shopping or receipt routes on this listener.
+- Verify SHA-256 request signatures, system-trusted certificate chains, the exact Amazon signing identity, signed timestamps, configured skill ID and authorized Amazon account. Restrict certificate downloads to the approved Amazon path with no redirects and bounded reads/timeouts. Include an importable es-ES interaction model and setup instructions for the later Cloudflare/Alexa configuration.
+- Offer explicit OpenAI identification from a complete product photo when public barcode lookup finds no name or is unavailable. Keep the scanner's full field of view in browser memory, allow a new package-front photo and send it only on the analysis action. Show advisory name/brand/visible format for explicit review; never change barcode, stock, pack conversions or catalog automatically.
+
+### Privacy and validation
+- Strip EXIF, bound image bytes/pixels, preserve full-frame aspect ratio, send structured Responses API requests with `store=false` and never auto-retry recognition. Ignore late results, guard double clicks and release browser photo previews. Keep manual entry available.
+- Keep HA ingress authentication unchanged; the public Alexa process has its own mandatory signature/owner checks and no panel access. Existing options default to voice disabled; production tunnels, options and Amazon accounts are not configured by this release.
+
+### Tests
+- Signed ephemeral-CA transport tests, identity/certificate/timestamp/SSRF/body-size rejection, Grocy read-only contract, full-photo request/EXIF tests, CSRF/consent protections and mobile recognition with editable suggestions.
+
 ## [1.12.0] — 2026-11-01
 
 ### Added

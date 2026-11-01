@@ -361,3 +361,18 @@ class RealStackTests(unittest.TestCase):
             self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 18)
             from receipt_review import mappings
             self.assertEqual(mappings(importer.DB_PATH, 'Unrelated supermarket'), {})
+
+    def test_alexa_voice_stock_reads_real_grocy_without_catalog_list_or_stock_writes(self):
+        import alexa_endpoint as voice
+        import barcode_stock
+        from unittest.mock import patch
+        units={u['name']:u['id'] for u in self.instance.http('GET','objects/quantity_units')}
+        pid=barcode_stock.create_catalog_product('Voz contrato leche',unit_id=units['Piece'],initial_stock='4')['product_id']
+        snapshot={entity:self.instance.http('GET','objects/'+entity) for entity in ('products','stock','stock_log','shopping_list')}
+        request={'request':{'type':'IntentRequest','locale':'es-ES','intent':{'name':'GetStockIntent','slots':{'Product':{'value':'Voz contrato leche'}}}}}
+        # Cryptographic transport and owner validation use a real test CA in test_alexa_endpoint.
+        with patch.dict(voice.os.environ,{'ALEXA_SKILL_ENABLED':'1','ALEXA_SKILL_ID':'test','ALEXA_SKILL_USER_ID':'test'}),patch.object(voice,'verify',return_value=request):
+            response=voice.app.test_client().post('/alexa/despensa',data=b'synthetic transport fixture')
+        self.assertEqual(response.status_code,200,response.json)
+        self.assertIn('4 unidades',response.json['response']['outputSpeech']['text'])
+        for entity,rows in snapshot.items():self.assertEqual(self.instance.http('GET','objects/'+entity),rows)

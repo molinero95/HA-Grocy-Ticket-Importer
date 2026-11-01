@@ -33,6 +33,8 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
     null,
   );
   const [creating, setCreating] = useState(false);
+  const [creationCode, setCreationCode] = useState("");
+  const [captured, setCaptured] = useState<{ code: string; frame: Blob } | null>(null);
   const code = query.trim();
   const lookupCode = useDebouncedValue(code);
   // Query identity isolates late responses: a previous scan cannot change a newer search.
@@ -84,7 +86,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
           {!archived && (
             <button
               className="primary-button"
-              onClick={() => setCreating(true)}
+              onClick={() => { setCreationCode(""); setCreating(true); }}
             >
               <Plus size={18} aria-hidden="true" /> Nuevo producto
             </button>
@@ -98,7 +100,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <BarcodeScanner onDetect={setQuery} />
+        <BarcodeScanner onDetect={setQuery} onCapture={archived ? undefined : (code, frame) => setCaptured({ code, frame })} />
       </div>
       {inventory.isLoading && <p role="status">Cargando inventario…</p>}
       {inventory.isError && (
@@ -114,7 +116,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
         </p>
       )}
       {isBarcode(code) && barcode.data === null && (
-        <p role="status">Código de barras no asociado a ningún producto</p>
+        <div><p role="status">Código de barras no asociado a ningún producto</p>{!archived && <button className="secondary-button" onClick={() => { setCreationCode(code); setCreating(true); }}>Dar de alta este código</button>}</div>
       )}
       <div className="items">
         {items.map((item) => (
@@ -212,6 +214,8 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
         )}
       {creating && (
         <CreateProduct
+          initialBarcode={creationCode}
+          initialFrame={captured?.code === creationCode ? captured.frame : undefined}
           onClose={() => setCreating(false)}
           onOpenProduct={(id) => {
             setCreating(false);

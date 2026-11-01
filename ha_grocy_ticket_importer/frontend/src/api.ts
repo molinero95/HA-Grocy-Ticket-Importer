@@ -450,3 +450,16 @@ export type ShoppingCreationContext = { key: string; name: string; generation: n
 export type ShoppingCreationResult = { product_id: number; created: boolean; associated: boolean; association_uncertain?: boolean };
 export const getShoppingCreationContext = (key: string) => request<ShoppingCreationContext>("alexa/matches/" + encodeURIComponent(key) + "/create-context");
 export const createShoppingProduct = (key: string, context: ShoppingCreationContext, product: CatalogProductInput, operationId: string) => request<ShoppingCreationResult>("alexa/matches/" + encodeURIComponent(key) + "/create-product", "POST", { expected_name: context.name, generation: context.generation, product: {...product, initial_stock: "0"}, operation_id: operationId });
+
+
+export type ProductSuggestion = {
+  name: string; brand: string; size_text: string; confidence: "high" | "medium" | "low";
+  visible_barcode: string; barcode: string; advisory: true;
+};
+export async function identifyProductPhoto(barcode: string, photo: Blob) {
+  const form = new FormData();
+  form.append("photo", photo, "product-photo.jpg");
+  form.append("barcode", barcode);
+  form.append("consent", "true");
+  return request<{ suggestion: ProductSuggestion }>("photos/identify", "POST", form);
+}

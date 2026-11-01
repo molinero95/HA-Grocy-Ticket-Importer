@@ -6,9 +6,9 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM ghcr.io/home-assistant/base:3.24
-RUN apk add --no-cache python3 py3-pip nginx && python3 -m venv /venv && /venv/bin/pip install --no-cache-dir flask python-dotenv gunicorn websocket-client pillow
+RUN apk add --no-cache python3 py3-pip nginx ca-certificates && python3 -m venv /venv && /venv/bin/pip install --no-cache-dir flask python-dotenv gunicorn websocket-client pillow pyOpenSSL==26.4.0
 COPY --from=frontend-build /build/dist /app/frontend_dist
-COPY api_*.py duplicate_candidates.py duplicate_review.py stock_thresholds.py merge_audit.py stock_commands.py receipt_review.py purchase_units.py catalog_lifecycle.py shopping_choice_conversion.py shopping_product_creation.py /app/
+COPY product_recognition.py alexa_endpoint.py alexa_verification.py api_*.py duplicate_candidates.py duplicate_review.py stock_thresholds.py merge_audit.py stock_commands.py receipt_review.py purchase_units.py catalog_lifecycle.py shopping_choice_conversion.py shopping_product_creation.py /app/
 COPY nginx.conf /etc/nginx/http.d/default.conf
 COPY run.sh /run.sh
 COPY addon_bootstrap.py /app/addon_bootstrap.py

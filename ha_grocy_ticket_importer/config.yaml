@@ -1,5 +1,5 @@
 name: "Grocy Ticket Importer"
-version: "1.12.0"
+version: "1.13.0"
 slug: "ha_grocy_ticket_importer"
 description: "Import receipts and manage Grocy stock via Home Assistant"
 url: "https://github.com/molinero95/HA-Grocy-Ticket-Importer"
@@ -19,7 +19,15 @@ map:
     read_only: false
     path: /config
 
+ports:
+  8100/tcp: null
+ports_description:
+  8100/tcp: "Endpoint de Alexa (opcional; solo /alexa/despensa)"
+
 options:
+  alexa_skill_enabled: false
+  alexa_skill_id: ""
+  alexa_skill_user_id: ""
   grocy_url: "http://a0d7b954-grocy:80"
   grocy_location_id: 2
   shopping_sync_enabled: false
@@ -27,6 +35,9 @@ options:
   alexa_shopping_list_entity: ""
   homeassistant_access_token: ""
 schema:
+  alexa_skill_enabled: "bool"
+  alexa_skill_id: "str?"
+  alexa_skill_user_id: "password?"
   grocy_url: "url"
   grocy_api_key: "password"
   openai_api_key: "password"

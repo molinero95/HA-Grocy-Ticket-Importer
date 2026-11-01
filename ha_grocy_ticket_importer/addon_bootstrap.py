@@ -31,7 +31,17 @@ def load_config(path=OPTIONS):
     interval = int(options.get("shopping_sync_interval_seconds", 120))
     if not 30 <= interval <= 3600:
         raise ValueError("shopping_sync_interval_seconds debe estar entre 30 y 3600")
+    skill_enabled = options.get('alexa_skill_enabled', False)
+    skill_id = str(options.get('alexa_skill_id') or '').strip()
+    user_id = str(options.get('alexa_skill_user_id') or '').strip()
+    if type(skill_enabled) is not bool:
+        raise ValueError('alexa_skill_enabled debe ser booleano')
+    if skill_enabled and (not skill_id.startswith('amzn1.ask.skill.') or not user_id.startswith('amzn1.ask.account.') or len(skill_id) > 256 or len(user_id) > 512):
+        raise ValueError('Configura la skill y el usuario autorizado antes de activarla')
     return {
+        "ALEXA_SKILL_ENABLED": '1' if skill_enabled else '0',
+        "ALEXA_SKILL_ID": skill_id,
+        "ALEXA_SKILL_USER_ID": user_id,
         "HA_TOKEN": str(options.get("homeassistant_access_token") or "").strip(),
         "HA_URL": "http://homeassistant:8123" if str(options.get("homeassistant_access_token") or "").strip() else "http://supervisor/core",
         "ALEXA_SHOPPING_LIST_ENTITY": alexa_entity,
@@ -83,6 +93,10 @@ def main():
     # it reads both lists but never writes to Grocy or Alexa.
     if should_start_shopping_worker(config):
         subprocess.Popen(["/venv/bin/python", "/app/shopping_sync_worker.py"], env=os.environ,
+                         stdout=sys.stdout, stderr=sys.stderr)
+    if config.get('ALEXA_SKILL_ENABLED') == '1':
+        subprocess.Popen(['/venv/bin/gunicorn', '--workers', '1', '--threads', '2', '--timeout', '25',
+                          '--bind', '0.0.0.0:8100', 'alexa_endpoint:app'], env=os.environ,
                          stdout=sys.stdout, stderr=sys.stderr)
     os.execvpe(
         "/venv/bin/gunicorn",

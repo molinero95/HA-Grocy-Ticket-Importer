@@ -23,7 +23,7 @@ DB_PATH = os.environ.get('GROCY_IMPORT_DB', str(Path(__file__).resolve().parent 
 class GrocyError(Exception):
     pass
 
-def grocy(method, path, body=None):
+def grocy(method, path, body=None, *, timeout=20):
     base = os.environ['GROCY_URL'].rstrip('/')
     headers = {'GROCY-API-KEY': os.environ['GROCY_API_KEY'], 'Accept': 'application/json'}
     data = None
@@ -32,7 +32,7 @@ def grocy(method, path, body=None):
         data = json.dumps(body).encode()
     request = urllib.request.Request(base + '/api/' + path, headers=headers, data=data, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read().decode()
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as exc:

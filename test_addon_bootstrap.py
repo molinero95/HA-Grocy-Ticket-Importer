@@ -28,6 +28,17 @@ class BootstrapTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 boot.load_config(file)
 
+    def test_voice_defaults_disabled_and_requires_both_skill_and_owner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file=Path(directory)/'options.json'
+            options={'grocy_url':'http://grocy:80','grocy_api_key':'test','openai_api_key':'test'}
+            file.write_text(json.dumps(options))
+            self.assertEqual(boot.load_config(file)['ALEXA_SKILL_ENABLED'],'0')
+            options['alexa_skill_enabled']=True;file.write_text(json.dumps(options))
+            with self.assertRaises(ValueError):boot.load_config(file)
+            options.update(alexa_skill_id='amzn1.ask.skill.test',alexa_skill_user_id='amzn1.ask.account.test')
+            file.write_text(json.dumps(options));self.assertEqual(boot.load_config(file)['ALEXA_SKILL_ENABLED'],'1')
+
     def test_new_and_existing_receipt_ledger(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "ledger.sqlite3"

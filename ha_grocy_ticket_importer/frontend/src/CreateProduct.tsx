@@ -13,11 +13,13 @@ import { PhotoPreview } from "./ProductPhotos";
 
 export function CreateProduct({
   onClose,
-  onOpenProduct, initialName = "", submitProduct = createCatalogProduct, zeroStockOnly = false, oneAttempt = false,
+  onOpenProduct, initialName = "", submitProduct = createCatalogProduct, zeroStockOnly = false, oneAttempt = false, initialBarcode = "", initialFrame,
 }: {
   onClose: () => void;
   onOpenProduct?: (id: number) => void;
   initialName?: string;
+  initialBarcode?: string;
+  initialFrame?: Blob;
   submitProduct?: typeof createCatalogProduct;
   zeroStockOnly?: boolean;
   oneAttempt?: boolean;
@@ -30,7 +32,8 @@ export function CreateProduct({
   });
   const [name, setName] = useState(initialName);
   const [attempted, setAttempted] = useState(false);
-  const [barcode, setBarcode] = useState("");
+  const [barcode, setBarcode] = useState(initialBarcode);
+  const [captured, setCaptured] = useState<{ code: string; frame: Blob } | null>(initialFrame ? { code: initialBarcode, frame: initialFrame } : null);
   const [unit, setUnit] = useState("");
   const [initialStock, setInitialStock] = useState("0");
   const [packSize, setPackSize] = useState("1");
@@ -142,8 +145,8 @@ export function CreateProduct({
                 onChange={(event) => setBarcode(event.target.value)}
               />
             </label>
-            <BarcodeScanner onDetect={setBarcode} label="Escanear código" />
-            <PhotoPreview barcode={barcode} onUseName={setName} />
+            <BarcodeScanner onDetect={setBarcode} onCapture={(code, frame) => setCaptured({ code, frame })} label="Escanear código" />
+            <PhotoPreview barcode={barcode} onUseName={setName} capturedFrame={captured?.code === barcode ? captured.frame : undefined} />
             <label className="variant-field">
               Unidad
               <select
