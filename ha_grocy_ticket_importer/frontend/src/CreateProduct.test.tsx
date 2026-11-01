@@ -13,6 +13,7 @@ vi.mock("./api", async (original) => ({
   lookupPhoto: vi.fn(),
   identifyProductPhoto: vi.fn(),
   uploadCatalogPhoto: vi.fn(),
+  discoverProduct: vi.fn(),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -247,4 +248,50 @@ it("keeps the created product and never replays creation after a photo-save fail
   expect(api.createCatalogProduct).toHaveBeenCalledTimes(1);
   expect(api.uploadCatalogPhoto).toHaveBeenCalledTimes(1);
   expect(screen.queryByRole("button", { name: "Guardar producto" })).toBeNull();
+});
+
+
+it("uses a verified catalog suggestion only on selection and saves its photo after creation", async () => {
+  const candidate: api.ProductDiscoveryCandidate = {
+    name: "Crema Example 100 ml", barcode: "4006000082295",
+    image_url: "https://images.openbeautyfacts.org/example.jpg",
+    source_url: "https://world.openbeautyfacts.org/product/4006000082295",
+    search_source_url: "https://world.openbeautyfacts.org/product/4006000082295",
+    attribution: "Datos: Open Beauty Facts",
+  };
+  vi.mocked(api.discoverProduct).mockResolvedValue({ candidates: [candidate], advisory: true });
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({ created: true, product_id: 72 });
+  vi.mocked(api.saveDiscoveredPhoto).mockResolvedValue({ saved: true, image_url: candidate.image_url });
+  mount();
+  await userEvent.type(screen.getByLabelText("Nombre"), "Crema Example 100 ml");
+  await userEvent.click(screen.getByRole("button", { name: "Buscar imagen y código con IA" }));
+  await screen.findByRole("button", { name: "Usar código e imagen" });
+  expect(screen.getByLabelText("Código de barras (opcional)")).toHaveProperty("value", "");
+  expect(api.createCatalogProduct).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Usar código e imagen" }));
+  expect(screen.getByLabelText("Código de barras (opcional)")).toHaveProperty("value", candidate.barcode);
+  await userEvent.selectOptions(screen.getByLabelText("Unidad"), "2");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar producto" }));
+  await screen.findByText("Producto creado correctamente");
+  expect(api.saveDiscoveredPhoto).toHaveBeenCalledExactlyOnceWith(72, candidate.barcode);
+  expect(api.createCatalogProduct).toHaveBeenCalledExactlyOnceWith({ name: "Crema Example 100 ml", barcode: candidate.barcode, unit_id: 2, initial_stock: "0", pack_size: "1" });
+});
+
+it("recognizes a new photo without a barcode and preserves it when no catalog match exists", async () => {
+  vi.mocked(api.identifyProductPhoto).mockResolvedValue({ suggestion: { name: "Crema Example", brand: "Example", size_text: "100 ml", confidence: "medium", visible_barcode: "", barcode: "", advisory: true } });
+  vi.mocked(api.discoverProduct).mockResolvedValue({ candidates: [], advisory: true });
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({ created: true, product_id: 73 });
+  vi.mocked(api.uploadCatalogPhoto).mockResolvedValue({ saved: true });
+  mount();
+  const file = new File(["front"], "front.jpg", { type: "image/jpeg" });
+  await userEvent.upload(screen.getByLabelText("Tomar foto del frontal o etiqueta del producto"), file);
+  await userEvent.click(screen.getByRole("button", { name: "Analizar foto con OpenAI" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Usar nombre sugerido" }));
+  await userEvent.click(screen.getByRole("button", { name: "Buscar imagen y código con IA" }));
+  await screen.findByText(/No se encontraron coincidencias/);
+  await userEvent.selectOptions(screen.getByLabelText("Unidad"), "2");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar producto" }));
+  await screen.findByText("Producto creado correctamente");
+  expect(api.identifyProductPhoto).toHaveBeenCalledExactlyOnceWith("", file);
+  expect(api.uploadCatalogPhoto).toHaveBeenCalledExactlyOnceWith(73, file);
 });

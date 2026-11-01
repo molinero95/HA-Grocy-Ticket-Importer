@@ -44,3 +44,6 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.15.0 añade selector nativo accesible mediante icono en Mi despensa: todos, falta de stock o compra; respeta umbrales/avisos, búsqueda por nombre/código y cambios de cantidad. No cambia datos al filtrar.
+
+
+1.16.0 añade búsqueda explícita de imagen/GTIN en alta: fuentes citadas, catálogo exacto, elección antes de guardar y protección de respuestas tardías. La foto se puede reconocer sin código previo. Pruebas de proveedor y navegador desechables; no implica aceptación del servicio pagado real.

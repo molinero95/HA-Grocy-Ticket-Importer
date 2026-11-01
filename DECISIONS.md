@@ -78,3 +78,8 @@ Por indicación del usuario, guardar la foto nueva analizada como imagen local a
 ## Filtros de despensa 1.15.0
 
 Icono junto a la cámara: Todos los productos / Falta de stock / En la lista de la compra. Falta de stock usa el mismo umbral inclusivo y opt-out del aviso visual; compra exige cantidad positiva. Combinar con nombre/código, actualizar tras controles de compra y quitar solo el estado mediante X. Sin escrituras al filtrar; archivados no muestran este control.
+
+
+## Búsqueda IA de imagen/código 1.16.0
+
+Alta con botón explícito a partir del nombre o del nombre de una foto reconocida sin código previo. Web search limitado a los tres catálogos Open Facts existentes; fuentes citadas y consultadas, GTIN con checksum y comprobación API exacta antes de mostrar. Hasta tres candidatos; el usuario revisa marca/variante/formato y elige. No aceptar URLs del modelo/cliente como imagen persistible ni sobrescribir códigos escaneados. La elección limpia la foto anterior y usa el guardado existente por código solo tras alta realmente nueva; sin coincidencias conserva la foto analizada/manual. Sin escrituras de catálogo/stock en la búsqueda, sin reintentos automáticos pagados y sin cambios a Amazon/Cloudflare.

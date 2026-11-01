@@ -11,6 +11,8 @@ import {
 import type { CatalogProductInput } from "./api";
 import { isBarcode } from "./barcodes";
 import { BarcodeScanner } from "./BarcodeScanner";
+import { ProductDiscovery } from "./ProductDiscovery";
+import { ProductRecognition } from "./ProductRecognition";
 import { PhotoPreview } from "./ProductPhotos";
 
 export function CreateProduct({
@@ -181,6 +183,17 @@ export function CreateProduct({
                 )
               }
             />
+            {!barcode.trim() && <ProductRecognition
+              barcode=""
+              onUseName={setName}
+              onPhotoReady={photo => setRecognitionPhoto(photo ? { code: "", file: photo } : null)}
+            />}
+            <ProductDiscovery name={name} barcode={barcode} onUse={candidate => {
+              // Choosing a catalog variant is explicit; manually scanned codes are never replaced.
+              if (barcode.trim() && barcode.trim() !== candidate.barcode) return;
+              setRecognitionPhoto(null);
+              setBarcode(candidate.barcode);
+            }} />
             <label className="variant-field">
               Unidad
               <select

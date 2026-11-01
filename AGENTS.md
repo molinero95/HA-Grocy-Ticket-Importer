@@ -2,7 +2,7 @@
 
 ## Current handoff — 2026-11-01
 
-Main has 1.14.0 (PR #27, merge 8a6de38). Current branch `feat/pantry-status-filters` prepares 1.15.0: native accessible filter icon beside the pantry camera, all / low-stock / shopping. Low stock reuses the same inclusive threshold and warning opt-out as amber badges; shopping requires finite positive shopping_amount. Combine with name/barcode search, refresh after shopping writes, and clear only status with X. Archives have no selector. Filtering never writes stock/shopping. Local validation: 105 Vitest tests with coverage, TypeScript/Vite build and both 360/768px Chromium filter scenarios passed; mobile screenshot reviewed. Observe final-head CI before merge and record results in the PR. Cloudflare/Amazon configuration remains deferred. Preserve all prior data and do not test against production or paid providers.
+Main has 1.15.0 (PR #28, merge f091ec0). Current branch `feat/ai-product-discovery` prepares 1.16.0. Explicit name-based OpenAI web search in creation; photo identification may start without a barcode, then the user can apply the recognized name and search. Search only the existing three public Open Facts catalogs; intersect cited product-page references with completed tool sources, require a valid GTIN checksum and exact-code API verification, maximum three unique lookups. Never fetch a model/browser supplied URL or allow arbitrary image hosts. Existing scanned codes constrain search and cannot change. User chooses code/image before separate creation; preserve duplicate photos and never replay creation on photo failure. Empty search preserves manual entry/analyzed photo; selection clears the old photo and uses the catalog photo-save path. Discard results after name/code edits or unmount. `POST /api/v1/photos/discover` uses consent/auth/CSRF and the existing AI lock; paid providers are always mocked in tests. Local validation: 359 Python, 110 Vitest with coverage, TypeScript/Vite and both targeted Chromium discovery/photo flows passed; mobile UI reviewed. Observe final-head CI and record results in the PR before merge. Cloudflare/Amazon configuration remains deferred; no installed data/options changes.
 
 Voice runs only when enabled, in its own process/listener on internal port 8100, with only POST /alexa/despensa; ordinary panel APIs stay on existing authenticated ingress. Verify SHA-256, system-trusted X.509 chain/SAN, timestamp, exact configured skill and user; never add an unsigned test mode to production. Read stock via GET and metadata through read-only SQLite. Recognition uses explicit CSRF-protected upload, full-frame resized/sanitized image, existing OpenAI credentials, store=false, no auto-retry or automatic catalog/stock/barcode/pack mutation. Ignore late UI responses and keep manual entry.
 
@@ -31,7 +31,7 @@ Read `DECISIONS.md`, `ROADMAP.md`, `docs/REACT_PARITY.md`, `README.md` and the a
 - Rename preserves description, photo and purchase configuration. Stock-unit edits require known zero stock and compatible purchase settings. Purchase edits affect future purchases only, verify unchanged stock and reject shopping references.
 - Manual catalog/shopping quantities max two decimals; weighed receipt quantities preserve up to three decimals; kg step 0.10, Piece step 1. Mutate shopping by verified row ID in list 1, preserving notes, completed rows and other lists.
 - Archive only known-zero-stock products with no active dependencies; restore changes only `active`. Retain stock history, barcode ownership and metadata when archiving. Guarded permanent deletion is explicitly authorized for unused archived products only. Native guarded consolidation is now user-authorized; no production merge should be performed by the agent.
-- Photo lookup is advisory and exact-code only. Validate trusted HTTPS hosts server-side; sanitize uploads. A missing image must not block catalog operations.
+- Public photo persistence requires exact-code catalog verification; name-based discovery is advisory and requires explicit candidate selection. Validate trusted HTTPS hosts server-side; sanitize uploads. A missing image must not block catalog operations.
 
 ## UX requirements
 
@@ -57,7 +57,7 @@ Frontend QA: 91 Vitest tests, 317 Python tests, 12 real Grocy contracts and 27 c
 
 ## Release maintenance
 
-A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Manifest, frontend package/lockfile and visible footer versions must match (1.15.0 for this minor release). Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
+A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Manifest, frontend package/lockfile and visible footer versions must match (1.16.0 for this minor release). Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
 
 Permanent deletion is enabled only for the audited Grocy 4.7.1 release; a different version stays archived until its cascades have been reviewed.
 

@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.15.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.16.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.15.0
+## Despensa 1.16.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.15.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.16.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -257,3 +257,12 @@ En 1.14.0, la foto nueva analizada con IA se guarda como imagen local al crear e
 
 
 En **Mi despensa**, el icono de filtro junto a la cámara permite elegir **Todos los productos**, **Falta de stock** o **En la lista de la compra**. Falta de stock respeta el umbral inclusivo y los avisos activados de cada producto; compra muestra cantidades pendientes mayores que cero. El filtro se combina con la búsqueda por nombre/código y se puede quitar con la X sin borrar la búsqueda. No modifica existencias ni compras.
+
+
+## Buscar imagen y código durante el alta (1.16.0)
+
+En **Nuevo producto**, escribe el nombre con marca y formato y pulsa **Buscar imagen y código con IA**. También puedes tomar y analizar una foto sin tener un código previo, aplicar su nombre sugerido y buscar a partir de él. La búsqueda envía solo el nombre y el código opcional a OpenAI; es una acción explícita, con coste de búsqueda/API en la cuenta configurada y sin reintentos automáticos.
+
+La IA busca páginas de Open Food Facts, Open Products Facts y Open Beauty Facts. Solo se ofrecen códigos GTIN de 8/12/13/14 dígitos con control válido, citados en fuentes realmente consultadas y confirmados después por la API del catálogo. La imagen se obtiene de esa consulta por código, nunca de una URL inventada por el modelo. El resultado puede corresponder a otra variante: revisa marca, tamaño y envase. Un código ya escrito o escaneado se mantiene como restricción y no se sustituye.
+
+**Usar código e imagen** incorpora el código al formulario; la imagen del catálogo se consulta y guarda al crear una ficha nueva. **Usar este código** aparece si no hay imagen pública. Elegir no crea productos ni existencias: aún debes pulsar **Guardar producto**. Si no encuentras una coincidencia, puedes continuar con tu foto analizada y un código manual u opcional. Los duplicados conservan su imagen y stock; un fallo de foto no repite el alta. Se ignoran respuestas tardías al cambiar nombre/código o cerrar.

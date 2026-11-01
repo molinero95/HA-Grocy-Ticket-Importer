@@ -36,7 +36,8 @@ def register_photo_routes(app, barcode_stock, lock):
         if not uploaded or not uploaded.filename:
             return jsonify({'error': 'Selecciona una fotografía completa del producto'}), 400
         try:
-            code = barcode_stock.validate_barcode(request.form.get('barcode'))
+            value = request.form.get('barcode', '').strip()
+            code = barcode_stock.validate_barcode(value) if value else ''
         except (barcode_stock.BarcodeError, ValueError):
             return jsonify({'error': 'Revisa el código de barras'}), 400
         if not IDENTIFY_LOCK.acquire(blocking=False):
@@ -51,6 +52,29 @@ def register_photo_routes(app, barcode_stock, lock):
         except Exception:
             # Do not log photo bytes, labels, paid-provider response bodies or keys.
             return jsonify({'error': 'No se pudo analizar la foto. Puedes completar el nombre manualmente.'}), 503
+        finally:
+            IDENTIFY_LOCK.release()
+
+    @app.post("/api/v1/photos/discover")
+    def api_v1_discover_product():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or payload.get("consent") is not True:
+            return jsonify({"error": "Confirma la búsqueda del nombre con OpenAI"}), 400
+        name, code = payload.get("name"), payload.get("barcode", "")
+        if not isinstance(name, str) or not 3 <= len(name.strip()) <= 200 or not isinstance(code, str):
+            return jsonify({"error": "Escribe un nombre de entre 3 y 200 caracteres"}), 400
+        try:
+            code = barcode_stock.validate_barcode(code) if code.strip() else ""
+        except (ValueError, barcode_stock.BarcodeError):
+            return jsonify({"error": "Revisa el código de barras"}), 400
+        if not IDENTIFY_LOCK.acquire(blocking=False):
+            return jsonify({"error": "Hay otra búsqueda o análisis de IA en curso"}), 409
+        try:
+            return jsonify(product_recognition.discover(name, code))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception:
+            return jsonify({"error": "No se pudo buscar con IA. Puedes continuar manualmente."}), 503
         finally:
             IDENTIFY_LOCK.release()
 
