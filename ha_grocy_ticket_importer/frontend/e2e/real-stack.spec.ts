@@ -268,7 +268,15 @@ test("purchase configuration, inline shopping and reversible archive preserve hi
     .click();
   await page.getByLabel("Unidad para comprar").selectOption({ label: "Pack" });
   await page.getByLabel("Piezas por pack", { exact: true }).fill("4");
+  const savedPurchase = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/v1/catalog/products/4/purchase") &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Guardar unidad de compra" }).click();
+  expect((await savedPurchase).ok()).toBe(true);
+  // The refreshed product remounts the editor after the verified save.
+  await expect(page.getByLabel("Piezas por pack", { exact: true })).toBeEnabled();
   await expect(page.getByLabel("Piezas por pack", { exact: true })).toHaveValue(
     "4",
   );
