@@ -88,6 +88,10 @@ describe("inventory interactions", () => {
   it("filters by typed barcode automatically without opening a product sheet", async () => {
     vi.mocked(api.lookupBarcode).mockResolvedValue(2);
     mount();
+    expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Abrir cámara para escanear" }),
+    ).toBeTruthy();
     const user = userEvent.setup();
     await screen.findByText("Leche");
     await user.type(

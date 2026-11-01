@@ -226,15 +226,14 @@ class ShoppingApiTests(unittest.TestCase):
         update.assert_called_once_with(7, True)
 
     def test_alexa_keep_original_does_not_choose_a_product(self):
-        with patch.object(web, "INGRESS_MODE", True), patch.object(web.shopping_match_queue, "keep_original") as keep, patch.object(web.shopping_match_queue, "choose") as choose:
+        with patch.object(web, "INGRESS_MODE", True), patch("shopping_choice_conversion.manual_choice", return_value={"ok": True, "item_id": 9}) as choice:
             token = self.client.get("/api/v1/session").json["csrf_token"]
             response = self.client.post("/api/v1/alexa/matches/arroz/choose", json={"product_id": 0}, headers={"X-CSRF-Token": token})
         self.assertEqual(response.status_code, 200)
-        keep.assert_called_once()
-        choose.assert_not_called()
+        self.assertEqual(choice.call_args.args[4], 0)
 
     def test_alexa_choice_rejects_stale_candidate(self):
-        with patch.object(web, "INGRESS_MODE", True), patch.object(web.shopping_match_queue, "choose", side_effect=ValueError("stale")) as choose:
+        with patch.object(web, "INGRESS_MODE", True), patch("shopping_choice_conversion.manual_choice", side_effect=ValueError("stale")) as choose:
             token = self.client.get("/api/v1/session").json["csrf_token"]
             response = self.client.post("/api/v1/alexa/matches/arroz/choose", json={"product_id": 42}, headers={"X-CSRF-Token": token})
         self.assertEqual(response.status_code, 409)

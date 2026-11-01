@@ -37,9 +37,8 @@ entity. The worker reads only its pending items and Grocy shopping list ID 1.
 `shopping_sync_enabled` defaults to `false`. Do not enable it before
 validating the Home Assistant and Grocy APIs on the installed versions.
 When the Alexa entity is configured, a read-only worker refreshes the
-**Coincidencias Alexa** queue even with sync disabled. This only writes local
-review metadata; no remote shopping-list or stock writes occur until sync is
-enabled explicitly.
+**Lista de la compra** suggestion queue even with sync disabled. This only writes local
+review metadata; the background worker does not write remote lists while sync is disabled. Explicit manual choices/removals are separate: they update Grocy immediately without enabling sync, and never directly call Alexa or change stock.
 
 ### Identity-aware v2 behavior
 
@@ -49,12 +48,11 @@ free-text shopping notes. Alexa summaries are never renamed by the matching
 process. The first v2 run performs a non-destructive union; later runs use
 verified checkpoints for deletion propagation.
 
-The review screen **Acciones → Coincidencias Alexa** persists explicit
+The inline review **Lista de la compra → Elegir producto** persists explicit
 selections in `/config/alexa-match-queue-<entity-hash>.sqlite3`. It never
-merges Grocy products. An explicit choice may associate its existing free-text
-row with that product during enabled sync, preserving row ID, amount and note.
+merges Grocy products. Saving immediately associates its existing free-text row with that product, preserving row ID, amount and note; without a note it reuses or creates one product row. The row can immediately be marked bought or removed.
 A collision with another canonical row or a concurrent edit fails closed.
-Keep-original dismissal leaves the remote note unchanged. Stale selections,
+Keep-original preserves or creates a manageable Grocy note and dismisses the suggestion. Remove is also available before choosing: durable removal intents prevent re-import, and only an enabled worker propagates them to Alexa. Manual decisions and worker writes share a process lock; a verified source disappearance permits a fresh same-name episode. Stale selections,
 duplicate identities, changed quantities and concurrent edits also stop
 mutations. A successful cycle re-reads both remote lists and atomically saves
 the checkpoint only after identity verification.
@@ -92,12 +90,20 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.0.0 — actualización desde 0.16.4
+## Despensa 1.1.0 — actualización desde 0.16.4 / 1.0.0
 
-La versión 1.0.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.1.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.0.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.1.0. Publicar el manifiesto no instala automáticamente la actualización.
+
+**Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
+
+La búsqueda de Mi despensa es automática por nombre o código, con campo de texto y cámara; no requiere botón Buscar.
+
+La ficha usa un único ajuste de **Existencias**: escribe la cantidad total que queda.
+Se ha retirado el formulario «Consumir producto». Por ejemplo, si tienes 3 y queda 1,
+indica 1 en Cantidad final. Ajustar existencias no añade artículos a la compra.
 
 No se requieren opciones nuevas ni reinicializar bases de datos. Conservar
 `/config` y `/data`: ledger de tickets, fotos, variantes, colas, checkpoints y

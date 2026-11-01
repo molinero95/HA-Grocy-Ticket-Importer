@@ -194,6 +194,13 @@ h3 {
   background: #fff0eb;
   color: #8e4333;
 }
+.shopping-feedback {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #e6f2e9;
+  color: #185a3e;
+  font-size: 14px;
+}
 footer {
   margin-top: 36px;
   text-align: center;
@@ -714,6 +721,10 @@ select:focus-visible {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 .action-grid button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
   padding: 20px;
   background: #fff;
   border: 1px solid #d2dfd5;
@@ -721,6 +732,60 @@ select:focus-visible {
   min-height: 80px;
   font-weight: 700;
   color: #176d4b;
+}
+.action-grid button > svg {
+  flex-shrink: 0;
+}
+.action-grid button small {
+  display: block;
+  margin-top: 6px;
+  color: #60756a;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.primary-button {
+  color: #fff;
+  background: #176d4b;
+  box-shadow: 0 3px 8px #176d4b20;
+}
+.secondary-button {
+  color: #176d4b;
+  background: #f0f6f1;
+  border-color: #d2dfd5;
+}
+.inventory-heading-actions {
+  align-items: center;
+}
+@media (hover: hover) {
+  .primary-button:hover {
+    background: #115839;
+  }
+  .secondary-button:hover,
+  .action-grid button:hover {
+    background: #e8f3eb;
+    border-color: #a9c8b4;
+  }
+}
+@media (max-width: 580px) {
+  .inventory-heading > .inventory-heading-actions:last-child {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 580px) {

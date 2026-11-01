@@ -52,7 +52,9 @@ test("catalog, variants, barcode ownership, stock and photos survive a Grocy res
   });
   await page.goto(base + "react/");
   await pantry(page);
-  await page.getByRole("button", { name: "+ Nuevo producto" }).click();
+  await page
+    .getByRole("button", { name: "Nuevo producto", exact: true })
+    .click();
   await page.getByLabel("Nombre", { exact: true }).fill("Producto E2E");
   await page
     .getByLabel("Unidad", { exact: true })
@@ -116,7 +118,7 @@ test("catalog, variants, barcode ownership, stock and photos survive a Grocy res
   ).toBeVisible();
 });
 
-test("receipt preview/commit converts packs and re-upload cannot duplicate consumed stock", async ({
+test("receipt preview/commit converts packs and re-upload cannot duplicate adjusted stock", async ({
   page,
 }) => {
   await page.goto(base + "react/");
@@ -146,12 +148,15 @@ test("receipt preview/commit converts packs and re-upload cannot duplicate consu
   await expect(
     page.getByText("Stock actual: 10 Piece.", { exact: false }),
   ).toBeVisible();
-  await page
-    .getByLabel("Añadir la misma cantidad a la lista de la compra")
-    .check();
-  await page.getByRole("button", { name: "Consumir", exact: true }).click();
   await expect(
-    page.getByText("Consumo registrado.", { exact: true }),
+    page.getByRole("heading", { name: "Consumir producto" }),
+  ).toHaveCount(0);
+  await page.getByLabel("Cantidad final").fill("9");
+  await page
+    .getByRole("button", { name: "Actualizar stock", exact: true })
+    .click();
+  await expect(
+    page.getByText("Stock actualizado correctamente", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Stock actual: 9 Piece.", { exact: false }),
@@ -177,20 +182,33 @@ test("receipt preview/commit converts packs and re-upload cannot duplicate consu
   ).toBeVisible();
 });
 
-test("explicit Alexa selection converts its existing note without duplicates and persists", async ({
+test("Alexa choices immediately create usable rows and removals survive sync and restart", async ({
   page,
 }) => {
   await page.goto(base + "react/");
-  expect((await command(page, "__test/sync")).ok()).toBe(true);
-  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Quitar Arroz", exact: true }),
+  ).toBeVisible();
   await page.getByText("Elegir producto para «Arroz»", { exact: true }).click();
   const details = page
     .locator("details")
     .filter({ hasText: "Elegir producto para «Arroz»" });
   await details.getByRole("combobox").selectOption({ label: "Arroz basmati" });
   await details.getByRole("button", { name: "Guardar elección" }).click();
-  expect((await command(page, "__test/sync")).ok()).toBe(true);
-  await page.reload();
+  const selectedRow = page
+    .locator("article")
+    .filter({
+      has: page.getByRole("button", { name: "Arroz basmati", exact: true }),
+    });
+  await expect(
+    selectedRow.getByRole("button", { name: "Quitar Arroz basmati" }),
+  ).toBeVisible();
+  await selectedRow
+    .getByRole("button", { name: "✓ Comprado", exact: true })
+    .click();
+  await selectedRow
+    .getByRole("button", { name: "↩ Pendiente", exact: true })
+    .click();
   await expect(
     page.getByText("Elegir producto para «Arroz»", { exact: true }),
   ).toHaveCount(0);
@@ -205,12 +223,28 @@ test("explicit Alexa selection converts its existing note without duplicates and
   expect(
     shopping.items.filter((item: { name: string }) => item.name === "Arroz"),
   ).toHaveLength(0);
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await selectedRow
+    .getByRole("button", { name: "Quitar Arroz basmati" })
+    .click();
+  await expect(selectedRow).toHaveCount(0);
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Arroz basmati", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Elegir producto para «Arroz»", { exact: true }),
+  ).toHaveCount(0);
   await page.getByText("Elegir producto para «Pasta»", { exact: true }).click();
   await page
     .locator("details")
     .filter({ hasText: "Elegir producto para «Pasta»" })
     .getByRole("button", { name: "Mantener original" })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Quitar Pasta", exact: true }),
+  ).toBeVisible();
   expect((await command(page, "__test/restart")).ok()).toBe(true);
   expect((await command(page, "__test/sync")).ok()).toBe(true);
   await page.reload();
@@ -274,8 +308,9 @@ test("purchase configuration, exact pack shopping amount and reversible archive 
   await expect(
     page.getByRole("button", { name: "Producto sin uso", exact: true }),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
   await page
-    .getByRole("button", { name: "Ver archivados", exact: true })
+    .getByRole("button", { name: "Productos archivados", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Producto sin uso", exact: true })
@@ -285,9 +320,7 @@ test("purchase configuration, exact pack shopping amount and reversible archive 
     .getByRole("button", { name: "Restaurar producto", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "Volver a Mi despensa", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Producto sin uso", exact: true }),
   ).toBeVisible();

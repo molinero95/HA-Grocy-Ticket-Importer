@@ -1,7 +1,7 @@
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, Search, ShoppingBasket } from "lucide-react";
+import { Minus, Plus, ShoppingBasket } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { ProductDetail } from "./ProductDetail";
 import { CreateProduct } from "./CreateProduct";
@@ -19,9 +19,8 @@ const normalize = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("es")
     .trim();
-export function Inventory() {
+export function Inventory({ archived = false }: { archived?: boolean }) {
   const client = useQueryClient();
-  const [archived, setArchived] = useState(false);
   const inventory = useQuery({
     queryKey: [archived ? "archived" : "inventory"],
     queryFn: archived ? getArchivedProducts : getInventory,
@@ -65,42 +64,37 @@ export function Inventory() {
   );
   return (
     <main>
-      <div className="heading">
+      <div className="heading inventory-heading">
         <div>
-          <span className="eyebrow">LO QUE TIENES EN CASA</span>
+          <span className="eyebrow">
+            {archived ? "CATÁLOGO GUARDADO" : "LO QUE TIENES EN CASA"}
+          </span>
           <h2>{archived ? "Productos archivados" : "Mi despensa"}</h2>
-          <p>Stock de Grocy y cantidades pendientes de compra.</p>
+          <p>
+            {archived
+              ? "Consulta o restaura los productos que has archivado."
+              : "Stock de Grocy y cantidades pendientes de compra."}
+          </p>
         </div>
-        <div>
+        <div className="inventory-heading-actions">
           <span className="count">{items.length} artículos</span>
-          <button
-            onClick={() => {
-              setArchived(!archived);
-              setQuery("");
-            }}
-          >
-            {archived ? "Volver a Mi despensa" : "Ver archivados"}
-          </button>
-          <button onClick={() => setCreating(true)}>+ Nuevo producto</button>
+          {!archived && (
+            <button
+              className="primary-button"
+              onClick={() => setCreating(true)}
+            >
+              <Plus size={18} aria-hidden="true" /> Nuevo producto
+            </button>
+          )}
         </div>
       </div>
       <div className="search-box">
-        <Search size={19} />
         <input
           aria-label="Buscar por nombre o código de barras"
           placeholder="Nombre o código de barras"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button
-          title="Buscar código de barras"
-          onClick={() => void barcode.refetch()}
-          disabled={
-            !isBarcode(code) || code !== lookupCode || barcode.isFetching
-          }
-        >
-          {barcode.isFetching ? "Buscando…" : "Buscar"}
-        </button>
         <BarcodeScanner onDetect={setQuery} />
       </div>
       {inventory.isLoading && <p role="status">Cargando inventario…</p>}
@@ -153,7 +147,10 @@ export function Inventory() {
               </div>
             </div>
             {archived ? (
-              <button onClick={() => setSelectedProductId(item.id)}>
+              <button
+                className="secondary-button"
+                onClick={() => setSelectedProductId(item.id)}
+              >
                 Ver y restaurar
               </button>
             ) : Number(item.shopping_amount) === 0 ? (

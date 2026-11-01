@@ -2,10 +2,149 @@ import { expect, test } from "@playwright/test";
 
 const ingress = "http://127.0.0.1:8766/api/hassio_ingress/browser-test/react/";
 
+test("a saved suggestion immediately offers bought/remove controls, including after marking bought", async ({
+  page,
+}) => {
+  let saved = false,
+    removed = false,
+    done = false;
+  const counts = { choose: 0, toggle: 0, remove: 0 };
+  await page.route("**/api/v1/shopping", (route) =>
+    route.fulfill({
+      json: {
+        items:
+          saved && !removed
+            ? [
+                {
+                  id: 71,
+                  product_id: 8,
+                  name: "Arroz basmati",
+                  amount: 1,
+                  unit: "Piece",
+                  done,
+                  image_url: null,
+                },
+              ]
+            : [],
+        pending_matches:
+          !saved && !removed
+            ? [
+                {
+                  key: "arroz",
+                  name: "Arroz",
+                  candidates: [{ id: 8, name: "Arroz basmati" }],
+                },
+              ]
+            : [],
+        shopping_error: false,
+        pending_matches_error: false,
+      },
+    }),
+  );
+  await page.route("**/api/v1/alexa/matches/arroz/choose", (route) => {
+    counts.choose++;
+    const body = route.request().postDataJSON();
+    expect(body.product_id).toBe(8);
+    expect(body.operation_id).toMatch(/^[a-f0-9-]{36}$/);
+    saved = true;
+    return route.fulfill({ json: { ok: true, item_id: 71 } });
+  });
+  await page.route("**/api/v1/shopping/71/toggle", (route) => {
+    counts.toggle++;
+    done = route.request().postDataJSON().done;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/api/v1/shopping/71", (route) => {
+    expect(route.request().method()).toBe("DELETE");
+    counts.remove++;
+    removed = true;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto(ingress);
+  await expect(
+    page.getByRole("button", { name: "Quitar Arroz", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("1 artículos", { exact: true })).toBeVisible();
+  await page.getByText("Elegir producto para «Arroz»", { exact: true }).click();
+  await page.getByLabel("Producto sugerido").selectOption("8");
+  await page
+    .getByRole("button", { name: "Guardar elección", exact: true })
+    .click();
+  await expect(page.getByText(/Artículo guardado en la lista/)).toBeVisible();
+  await page.getByRole("button", { name: "✓ Comprado", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "↩ Pendiente", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Quitar Arroz basmati", exact: true })
+    .click();
+  await expect(
+    page.getByText("Tu lista de la compra está vacía.", { exact: true }),
+  ).toBeVisible();
+  expect(counts).toEqual({ choose: 1, toggle: 1, remove: 1 });
+});
+
+test("archives live in Actions without a duplicate product-creation shortcut", async ({
+  page,
+}, testInfo) => {
+  await page.route("**/api/v1/catalog/archived", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            id: 99,
+            name: "Producto archivado de prueba",
+            amount: "0",
+            unit: "Piece",
+            image_url: null,
+            shopping_amount: "0",
+            shopping_step: "1",
+            shopping_unit: "Piece",
+            shopping_can_subtract: false,
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto(ingress);
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await expect(
+    page.getByRole("button", {
+      name: /Nuevo producto|Añadir.*producto|Gestionar productos/,
+    }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("actions-mobile.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Productos archivados", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Productos archivados" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Ver y restaurar" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Nuevo producto" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Añadir a compra/ }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Nuevo producto" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Producto archivado de prueba", { exact: true }),
+  ).toHaveCount(0);
+});
+
 for (const width of [360, 768, 1280]) {
   test(`shopping fits ${width}px with long names and stable action columns`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width, height: 850 });
     await page.goto(ingress);
     await expect(page.locator(".item-actions")).toHaveCount(2);
@@ -18,6 +157,28 @@ for (const width of [360, 768, 1280]) {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    await page
+      .getByRole("button", { name: "Mi despensa", exact: true })
+      .click();
+    const create = page.getByRole("button", {
+      name: "Nuevo producto",
+      exact: true,
+    });
+    await expect(create).toBeVisible();
+    const createBox = await create.boundingBox();
+    expect(createBox!.height).toBeGreaterThanOrEqual(44);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await expect(
+      page.getByRole("button", { name: "Ver archivados" }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath(`inventory-${width}.png`),
+      fullPage: true,
+    });
   });
 }
 
@@ -30,7 +191,7 @@ test("nested camera dialog traps keyboard focus, Escape restores focus and relea
   await page.goto(ingress);
   await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
   const trigger = page.getByRole("button", {
-    name: "+ Nuevo producto",
+    name: "Nuevo producto",
     exact: true,
   });
   await trigger.click();

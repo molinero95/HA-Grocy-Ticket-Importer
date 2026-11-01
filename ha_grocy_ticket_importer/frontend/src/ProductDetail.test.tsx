@@ -70,6 +70,22 @@ it("loads the real stock as the initial target and requires an intentional edit"
   expect(api.adjustCatalogStock).toHaveBeenCalledWith(7, "5", "3");
 });
 
+it("offers one stock control and sets the remaining total without a separate consumption form", async () => {
+  renderWithClient(<ProductDetail id={7} onClose={vi.fn()} />);
+  const input = await screen.findByLabelText("Cantidad final");
+  expect(
+    screen.queryByRole("heading", { name: "Consumir producto" }),
+  ).toBeNull();
+  expect(screen.queryByRole("button", { name: "Consumir" })).toBeNull();
+  expect(screen.queryByLabelText("Cantidad a consumir")).toBeNull();
+  await userEvent.clear(input);
+  await userEvent.type(input, "2");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Actualizar stock" }),
+  );
+  expect(api.adjustCatalogStock).toHaveBeenCalledExactlyOnceWith(7, "2", "3");
+});
+
 it("keeps the original expected stock when a background refresh changes the product", async () => {
   const { client } = renderWithClient(
     <ProductDetail id={7} onClose={vi.fn()} />,

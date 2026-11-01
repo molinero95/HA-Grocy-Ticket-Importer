@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.0.0:** migración React integrada desde PR #10. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.1.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía.
 
@@ -19,7 +19,7 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 - **Ficha de producto:** editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.
 - **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
 - **Alta de productos nuevos:** desde Acciones → Añadir producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
-- **Acciones separadas:** añadir un producto nuevo, consumir una cantidad elegida (con opción de añadir la misma cantidad a la lista de la compra) e importar un ticket. La asociación de códigos se realiza desde cada ficha de producto.
+- **Gestión de productos:** añadir un producto nuevo, ajustar la cantidad total que queda desde Existencias e importar un ticket. La ficha ya no muestra «Consumir producto». La asociación de códigos se realiza desde cada ficha de producto.
 - **Escáner de cámara:** lectura EAN/UPC desde un móvil compatible, con entrada manual alternativa.
 - **Tickets:** subir PDF/JPG/PNG, extraer líneas con OpenAI, revisar, simular y confirmar la importación.
 - **Historial de importaciones:** SQLite persistente para evitar registrar de nuevo líneas de tickets ya importadas.
@@ -93,9 +93,8 @@ predeterminada de Grocy (ID 1). Se excluyen los artículos completados de Alexa.
 Configura `alexa_shopping_list_entity` y habilita `shopping_sync_enabled`
 **solo después de validar el flujo real**. Por defecto sigue desactivado.
 Si configuras únicamente la entidad Alexa, el complemento ya actualiza la
-cola de **Acciones → Coincidencias Alexa** en modo de solo lectura, aunque la
-sincronización esté desactivada. Esto permite revisar sugerencias sin añadir,
-eliminar ni modificar artículos en Alexa o Grocy.
+cola de sugerencias de **Lista de la compra** en modo de solo lectura, aunque la
+sincronización esté desactivada. Consultar sugerencias no cambia listas. Las acciones manuales **Guardar elección**, **Mantener original** y **Quitar** sí actualizan Grocy de inmediato; no necesitan activar la sincronización ni escriben directamente en Alexa.
 El proceso combina eventos con comprobaciones periódicas (120 segundos por
 defecto). No modifica existencias ni productos del catálogo.
 
@@ -104,14 +103,13 @@ defecto). No modifica existencias ni productos del catálogo.
 - Los productos se identifican por su **ID canónico de Grocy**, no por su nombre.
   Las coincidencias exactas y únicas pueden asociarse a ese ID; los nombres
   desconocidos o ambiguos se mantienen como **notas de texto libre**.
-- En **Acciones → Coincidencias Alexa**, una elección manual permite asociar
+- En **Lista de la compra → Elegir producto**, una elección manual permite asociar
   un nombre ambiguo a un producto. El nombre original de Alexa no se renombra.
-  En el siguiente ciclo habilitado puede asociar su nota existente al producto
-  elegido, conservando ID de fila, cantidad y texto original.
-- **Mantener original** descarta la sugerencia sin modificar remotamente la nota.
+  Al guardar se asocia su nota existente al producto elegido, conservando ID de fila, cantidad y texto original. Si no hay nota, se reutiliza o crea una sola fila del producto. La lista se actualiza y permite marcar comprado o quitar sin esperar al worker.
+- **Mantener original** conserva o crea una nota real en Grocy y oculta la sugerencia. **Quitar** está disponible también antes de elegir producto. La retirada queda registrada para evitar que el worker la reintroduzca; solo se propaga a Alexa cuando sync está habilitado.
   Una colisión con otra fila del producto seleccionado o una edición concurrente
   detiene el ciclo; no se duplican ni fusionan artículos.
-- El primer ciclo del nuevo sincronizador une las listas sin borrar artículos.
+- El primer ciclo del nuevo sincronizador une las listas sin borrar artículos, salvo retiradas manuales explícitas registradas.
   Los siguientes propagan altas y eliminaciones por identidad tras un
   checkpoint confirmado. Antes de borrar una entrada de Grocy se vuelve a
   verificar su ID, cantidad y nota. Si cambian, se detiene la operación.
@@ -159,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.0.0
+## Despensa 1.1.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.0.0; Home Assistant ofrece actualizar desde 0.16.4 al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.1.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -177,8 +175,8 @@ El registro `stock-commands.sqlite3` reside junto al historial (configurable con
 `STOCK_COMMAND_DB`); nunca borrarlo para repetir un resultado incierto. Si el
 consumo se confirma y falla la reposición, añadir solo la compra pendiente.
 
-La ficha permite **Archivar** productos sin existencias ni dependencias y
-**Restaurar** desde Ver archivados. Conserva historial e identidad; no borra ni
+La búsqueda por nombre o código funciona al escribir; la barra solo tiene el campo de texto y la cámara. El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha permite **Archivar** productos sin existencias ni dependencias y
+**Restaurar** desde Acciones → Productos archivados. Conserva historial e identidad; no borra ni
 consume stock. Detectar duplicados sigue siendo una auditoría de solo lectura.
 No hay migración automática de stock Pack antiguo ni consolidación de productos.
 Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).

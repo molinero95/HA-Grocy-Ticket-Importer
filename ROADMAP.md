@@ -5,18 +5,18 @@ Estado de código: migración de PR #10 integrada en `main` (`a6cc354`). Publica
 ## Implementado y validado automáticamente
 
 - [x] React 19, TypeScript 7, Vite 7 y Vitest 4 con lockfile y compilación dentro del contenedor.
-- [x] Paridad de compra, despensa, producto, consumo, tickets, variantes, fotos, revisión Alexa y auditoría.
+- [x] Compra, despensa, ficha con ajuste total de existencias, tickets, variantes, fotos, revisión Alexa y auditoría. En 1.1.0 se retira el formulario separado de consumo por petición del usuario; su API protegida se conserva.
 - [x] Sesión/CSRF, ingress con prefijo, errores, CSP, cámara con entrada manual y UX móvil.
 - [x] Pack/Piece contra Grocy 4.7.1 real, sin convertir existencias existentes; edición de compra y cantidades personalizadas.
 - [x] Operaciones de compra por fila: preservar otras listas, notas y completados.
 - [x] Tickets importados una vez, comandos persistentes y verificación de estado esperado.
 - [x] Variantes, fotos y listas conservadas tras reiniciar Grocy aislado.
-- [x] Alexa: cola persistente, mantener original y asociación explícita sin duplicados, checkpoint tras verificación.
+- [x] Alexa 1.1.0: guardar elección o mantener original crea/asocia de inmediato una fila gestionable en Grocy; Quitar también funciona en sugerencias. Retiradas persistentes, bloqueo entre procesos, sin reintroducción en la primera unión y sin escrituras Alexa con sync desactivado. Checkpoint tras verificación.
 - [x] Archivado/restauración conservando historial, con stock y referencias protegidos.
 - [x] React como entrada de la candidata; retirar PAGE, scripts y formularios obsoletos; alternativa básica sin JavaScript.
 - [x] Fuentes Python duplicadas sincronizadas y manifiesto Docker completo.
 - [x] CI configurado para frontend, integración real aislada y contenedores AMD64/ARM64 con arranque.
-- [x] Refuerzo de frontend: 67 tests Vitest, informe de cobertura V8 en CI y 13 escenarios de navegador configurados; regresiones de sesión/caché, tickets, doble envío, errores parciales, validaciones, foco y tamaños de pantalla.
+- [x] Frontend 1.1.0: 66 tests Vitest y 15 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
 
 La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATION_V1.md); el resultado CI debe observarse para el SHA final, nunca inferirse de esta lista.
 

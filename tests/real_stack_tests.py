@@ -11,6 +11,32 @@ class RealStackTests(unittest.TestCase):
         self.token = self.client.get('/api/v1/auth/status').json['csrf_token']
         self.headers = {'X-CSRF-Token': self.token}
 
+    def test_manual_selection_is_immediate_and_removable_without_sync(self):
+        from unittest.mock import patch
+        import shopping_match_queue
+        products = self.instance.http('GET', 'objects/products')
+        chosen = next(p for p in products if p['name'] == 'Arroz basmati')
+        shopping_match_queue.refresh(shopping_match_queue.DEFAULT_PATH, ['Arroz', 'Pasta'], products)
+        note = self.instance.http('POST', 'objects/shopping_list',
+            {'shopping_list_id': 1, 'note': 'Arroz', 'amount': 2})['created_object_id']
+        with patch('shopping_sync_adapters.ha_service', side_effect=AssertionError('Manual choice must not call Alexa')):
+            body = {'product_id': int(chosen['id']), 'operation_id': str(uuid.uuid4())}
+            for _ in range(2):
+                response = self.client.post('/api/v1/alexa/matches/arroz/choose', json=body, headers=self.headers)
+                self.assertEqual(response.status_code, 200, response.json)
+                self.assertEqual(response.json['item_id'], int(note))
+            row = self.instance.http('GET', f'objects/shopping_list/{note}')
+            self.assertEqual(row['amount'], 2)
+            self.assertEqual(row['note'], 'Arroz')
+            self.assertEqual(int(row['product_id']), int(chosen['id']))
+            for done in (True, False):
+                self.assertEqual(self.client.post(f'/api/v1/shopping/{note}/toggle',
+                    json={'done': done}, headers=self.headers).status_code, 200)
+            self.assertEqual(self.client.delete(f'/api/v1/shopping/{note}', headers=self.headers).status_code, 200)
+            self.assertFalse(any(int(r['id']) == int(note) for r in self.instance.http('GET', 'objects/shopping_list')))
+            self.assertEqual(self.client.delete('/api/v1/alexa/matches/pasta', headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get('/api/v1/shopping').json['pending_matches'], [])
+
     def test_pack_stock_shopping_and_consumption(self):
         units = self.client.get('/api/v1/catalog/units').json['units']
         pack = next(u['id'] for u in units if u['name'] == 'Pack')

@@ -37,6 +37,12 @@ STATE_V2 = STATE.with_name(STATE.stem + "-identity-v2.json")
 
 
 def run_once(*, dry_run=True):
+    from shopping_match_queue import mutation_lock
+    with mutation_lock(MATCH_QUEUE):
+        return _run_once(dry_run=dry_run)
+
+
+def _run_once(*, dry_run=True):
     try:
         alexa = ha_todo_items()
     except Exception as exc:
@@ -51,11 +57,31 @@ def run_once(*, dry_run=True):
     from shopping_sync_adapters import _grocy_done
     products = [p for p in products if _grocy_done(p.get("active", True))]
     refresh_matches(MATCH_QUEUE, alexa, products)
+    removals = [row for row in pending_matches(MATCH_QUEUE) if row.get("removed")]
+    if removals:
+        # Explicit manual deletion wins even before the first union/checkpoint.
+        # In read-only mode it only suppresses re-import; no Alexa writes occur.
+        from shopping_choice_conversion import delete_verified
+        if not dry_run:
+            for entry in removals:
+                if entry.get("removal"):
+                    delete_verified(grocy, entry["removal"])
+                remove_alexa_identity({"name": entry["name"]})
+            observed = ha_todo_items()
+            if {normalize(name) for name in observed}.intersection(entry["key"] for entry in removals):
+                raise RuntimeError("Manual Alexa removal could not be verified")
+            grocy_rows = grocy_entries()
+            from shopping_match_queue import finish_removals
+            finish_removals(MATCH_QUEUE, [entry["key"] for entry in removals])
+        removed_names = {entry["key"] for entry in removals}
+        removed_ids = {int(entry["removal"]["id"]) for entry in removals if entry.get("removal")}
+        alexa = [name for name in alexa if normalize(name) not in removed_names]
+        grocy_rows = [(name, row) for name, row in grocy_rows if int(row["id"]) not in removed_ids]
     choices = resolved_choices(MATCH_QUEUE, alexa, products)
     # An old manual selection that is no longer a valid candidate must never
     # silently become free text and trigger a deletion via the old checkpoint.
     for row in pending_matches(MATCH_QUEUE):
-        if row["selected_product_id"] is not None and row["key"] not in choices:
+        if not row.get("removed") and row["selected_product_id"] is not None and row["key"] not in choices:
             raise IdentityConflict("An Alexa selection needs renewed review")
     previous = load_identity_state(STATE_V2)
     from shopping_choice_conversion import project_choices, apply_choices

@@ -7,7 +7,8 @@ import hashlib
 import json
 import os
 import sqlite3
-from contextlib import closing
+from contextlib import closing, contextmanager
+import fcntl
 from pathlib import Path
 
 from shopping_sync import normalize, suggest_catalog_matches
@@ -31,6 +32,19 @@ def scoped_path(base_path, entity):
 
 DEFAULT_PATH = scoped_path(BASE_PATH, os.environ.get("ALEXA_SHOPPING_LIST_ENTITY", ""))
 
+
+@contextmanager
+def mutation_lock(path, *, blocking=True):
+    """Serialize manual shopping decisions and the worker across processes."""
+    path = Path(str(path) + ".mutation.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
 def connect(path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +63,13 @@ def connect(path):
     columns = {row[1] for row in db.execute("PRAGMA table_info(pending_matches)")}
     if "dismissed" not in columns:
         db.execute("ALTER TABLE pending_matches ADD COLUMN dismissed INTEGER NOT NULL DEFAULT 0")
+    for name, definition in (
+            ("shopping_entry_id", "INTEGER"),
+            ("removed", "INTEGER NOT NULL DEFAULT 0"),
+            ("removal_json", "TEXT"),
+            ("generation", "INTEGER NOT NULL DEFAULT 1")):
+        if name not in columns:
+            db.execute(f"ALTER TABLE pending_matches ADD COLUMN {name} {definition}")
     db.commit()
     return db
 
@@ -72,6 +93,8 @@ def refresh(path, alexa_names, products):
                 raise ValueError("Duplicate normalized Alexa item")
             pending[key] = (str(name).strip(), json.dumps(candidates, ensure_ascii=False))
     with closing(connect(path)) as db, db:
+        old_active = {key: active for key, active in db.execute(
+            "SELECT normalized_name, active FROM pending_matches")}
         db.execute("UPDATE pending_matches SET active=0")
         for key, (original, candidates) in pending.items():
             db.execute(
@@ -80,19 +103,28 @@ def refresh(path, alexa_names, products):
                 "original_name=excluded.original_name, active=1, "
                 "candidates_json=excluded.candidates_json",
                 (key, original, candidates))
+            if key in old_active and not old_active[key]:
+                # A new source item with the same name starts a fresh review episode.
+                db.execute("UPDATE pending_matches SET selected_product_id=NULL, dismissed=0, "
+                           "shopping_entry_id=NULL, removed=0, removal_json=NULL, generation=generation+1 "
+                           "WHERE normalized_name=?", (key,))
 
 
 def pending(path):
     with closing(connect(path)) as db:
         rows = db.execute(
-            "SELECT normalized_name, original_name, candidates_json, selected_product_id, dismissed "
+            "SELECT normalized_name, original_name, candidates_json, selected_product_id, dismissed, "
+            "shopping_entry_id, removed, removal_json, generation "
             "FROM pending_matches WHERE active=1 ORDER BY original_name").fetchall()
     result = []
-    for key, original, candidates, selected, dismissed in rows:
+    for key, original, candidates, selected, dismissed, entry_id, removed, removal_json, generation in rows:
         options = json.loads(candidates)
         candidate_ids = {int(option["id"]) for option in options}
         result.append({"key": key, "name": original, "candidates": options,
                        "selected_product_id": selected, "dismissed": bool(dismissed),
+                       "shopping_entry_id": entry_id, "removed": bool(removed),
+                       "removal": json.loads(removal_json) if removal_json else None,
+                       "generation": generation,
                        "selection_stale": selected is not None and selected not in candidate_ids})
     return result
 
@@ -139,6 +171,8 @@ def resolved_choices(path, alexa_names, products):
     catalog = {int(product["id"]): product for product in products}
     result = {}
     for entry in pending(path):
+        if entry.get("removed"):
+            continue
         key = entry["key"]
         selected = entry["selected_product_id"]
         if key not in present or selected is None:
@@ -160,3 +194,37 @@ def acknowledge_choices(path, choices):
         for key, choice in choices.items():
             db.execute("UPDATE pending_matches SET dismissed=1 WHERE normalized_name=? AND selected_product_id=?",
                        (key, int(choice["product_id"])))
+
+
+def attach_entry(path, key, entry_id):
+    """Store only the identity of a verified Grocy row, never its shopping state."""
+    with closing(connect(path)) as db, db:
+        db.execute("UPDATE pending_matches SET shopping_entry_id=?, dismissed=1 WHERE normalized_name=? AND active=1",
+                   (int(entry_id), normalize(key)))
+
+
+def stage_removal(path, key, original=None):
+    """Keep an explicit removal intent until the source list observes it."""
+    with closing(connect(path)) as db, db:
+        cursor = db.execute(
+            "UPDATE pending_matches SET removed=1, dismissed=1, removal_json=? "
+            "WHERE normalized_name=? AND active=1",
+            (json.dumps(original) if original else None, normalize(key)))
+        if cursor.rowcount != 1:
+            raise ValueError("El artículo ya no está disponible; actualiza la lista")
+
+
+def stage_entry_removal(path, original):
+    """Bind deletion intent only to an exact known row or original free-text note."""
+    for entry in pending(path):
+        if (entry.get("shopping_entry_id") == int(original["id"])
+                or (not original.get("product_id") and entry["key"] == normalize(original.get("note") or ""))):
+            stage_removal(path, entry["key"], original)
+
+
+def finish_removals(path, keys):
+    """After verified source absence, allow a new same-name source episode."""
+    with closing(connect(path)) as db, db:
+        for key in keys:
+            db.execute("UPDATE pending_matches SET active=0 WHERE normalized_name=? AND removed=1",
+                       (normalize(key),))
