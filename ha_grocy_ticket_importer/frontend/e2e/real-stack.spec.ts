@@ -371,3 +371,32 @@ test("a newly created product becomes an Alexa suggestion without another worker
   const row = page.locator("article").filter({ has: page.getByRole("button", { name, exact: true }) });
   await expect(row).toContainText("1 Piece");
 });
+
+
+test("an unused archived product can be permanently removed through the reviewed sheet", async ({ page }) => {
+  await page.goto(base + "react/");
+  await pantry(page);
+  await page.getByRole("button", { name: "Nuevo producto", exact: true }).click();
+  await page.getByLabel("Nombre", { exact: true }).fill("Archive deletion E2E");
+  await page.getByLabel("Unidad", { exact: true }).selectOption({ label: "Piece" });
+  await page.getByRole("button", { name: "Guardar producto", exact: true }).click();
+  await page.getByRole("button", { name: "Abrir ficha del producto" }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Archivar producto", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Productos archivados", exact: true }).click();
+  await page.getByRole("button", { name: "Archive deletion E2E", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar eliminación", exact: true }).click();
+  const confirm = page.getByRole("button", { name: "Eliminar producto definitivamente", exact: true });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel("Escribe «Archive deletion E2E» para confirmar", { exact: true }).fill("Archive deletion E2E");
+  await confirm.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Archive deletion E2E", exact: true })).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Productos archivados", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Productos archivados", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Archive deletion E2E", exact: true })).toHaveCount(0);
+});

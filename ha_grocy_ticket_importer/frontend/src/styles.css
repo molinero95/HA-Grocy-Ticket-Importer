@@ -962,3 +962,34 @@ select:focus-visible {
 .alias-add-form { margin-top: 14px; }
 .alias-form-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .alias-form-actions button { flex: 1 1 120px; }
+
+.product-deletion {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #e6c9c3;
+  border-radius: 12px;
+  background: #fff8f6;
+}
+.danger-outline { color: #9f3429; border-color: #dcb9b2; background: #fff8f6; }
+.primary-button.danger-button { background: #a23227; }
+.primary-button.danger-button:hover { background: #82271e; }
+
+.inventory-item.out-of-stock {
+  background: #fff8e8;
+  border-color: #d5aa57;
+}
+.out-of-stock .item-icon { background: #ffedc2; color: #805313; }
+.stock-status {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #ffedc2;
+  color: #70450b;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.fullscreen-action > button { width: 100%; }
+.fullscreen-action > p { margin: 10px 0 0; font-size: .85rem; color: #60756a; }
+:fullscreen { overflow: auto; background: #f5f7fa; }

@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { NavigationContext, useAppNavigation } from "./navigation";
+import { FullscreenAction } from "./FullscreenAction";
 import { ProductDetail } from "./ProductDetail";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
@@ -89,15 +91,7 @@ function Suggestions({
 }
 function AuthenticatedApp() {
   const client = useQueryClient();
-  const [view, setView] = useState<
-    | "shopping"
-    | "inventory"
-    | "actions"
-    | "receipts"
-    | "duplicates"
-    | "aliases"
-    | "archived"
-  >("shopping");
+  const { view, setView, navigation } = useAppNavigation();
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
   );
@@ -160,6 +154,7 @@ function AuthenticatedApp() {
     );
   };
   return (
+    <NavigationContext.Provider value={navigation}>
     <div className="shell">
       <header className="top">
         <div className="brand">
@@ -208,6 +203,7 @@ function AuthenticatedApp() {
         <main>
           <h2>Acciones</h2>
           <div className="action-grid">
+            <FullscreenAction />
             <button
               aria-label="Escanear ticket"
               aria-describedby="receipt-action-description"
@@ -243,7 +239,7 @@ function AuthenticatedApp() {
               <span>
                 Productos archivados
                 <small id="archive-action-description">
-                  Consultar y restaurar productos
+                  Consultar, restaurar o eliminar productos
                 </small>
               </span>
             </button>
@@ -468,8 +464,9 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.7.0</footer>
+      <footer>Despensa 1.8.0</footer>
     </div>
+    </NavigationContext.Provider>
   );
 }
 

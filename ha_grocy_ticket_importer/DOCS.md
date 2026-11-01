@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.7.0 — actualización de la instalación existente
+## Despensa 1.8.0 — actualización de la instalación existente
 
-La versión 1.7.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.8.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.7.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.8.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -116,7 +116,7 @@ antes de añadir existencias. Cambiar la compra afecta al futuro, nunca conviert
 stock previo. Los controles rápidos de compra usan la unidad de stock.
 
 Archivar exige cero stock y ausencia de referencias activas; restaurar mantiene
-ID, historial, códigos y fotos. No hay borrado permanente ni consolidación.
+ID, historial, códigos y fotos. No hay consolidación automática.
 
 La suite prueba Grocy oficial 4.7.1 con datos temporales, importador real,
 worker Alexa, navegador móvil/ingress y reinicio. OpenAI, proveedor público de
@@ -149,3 +149,16 @@ The shopping view reports sanitized worker health and refreshes periodically. An
 Shopping reads refresh local advisory candidates from the active catalog; product creation, renames and archives appear without waiting for the worker. Choices are revalidated on save, preserving source episodes, explicit decisions, removal intents and row identity.
 
 Successful local list/catalog/alias edits and receipt commits signal the background worker through a scoped `.wake` marker checked every 250 ms. The marker contains no list data. Notification failures retain periodic polling; they never change an already committed HTTP result. HA event subscriptions and the configured 120-second default interval remain available. The UI refreshes every five seconds. Alexa-origin latency depends on the integration delivering the change to HA. Disabled sync remains read-only; no options are changed automatically.
+
+
+## Pantry, archived deletion and navigation (1.8.0)
+
+Active pantry products with zero or negative stock appear amber with “Sin existencias”; shopping quantities do not control this state. Archived rows stay neutral.
+
+Acciones → Productos archivados → product sheet → Revisar eliminación audits permanent removal. Require an archived product with known zero stock and no movement/ticket history, shopping/recipe/meal-plan/child references, variants, Alexa aliases, active choices/removals or sync checkpoint bindings. Fail closed on incomplete reads. Exact typed-name confirmation and a fresh snapshot are required; the server reaudits, journals one dispatch and verifies absence. Grocy cascades remove only the unused product's barcode/conversion/custom-field metadata; local photos, journals and metadata are retained. A lost response is never automatically retried. Check Grocy before reopening the sheet.
+
+The cascade audit is verified against Grocy 4.7.1. The app and worker share mutation locks; external Grocy writers cannot participate in that lock and the generic Grocy DELETE API has no atomic condition. Avoid concurrent external edits of the product during confirmation.
+
+Browser Back closes the top dialog (including camera) before returning through visited sections; the root exits normally to its host. Same-document history preserves ingress paths and host state. Fullscreen is an explicit action under Acciones and depends on the iframe/browser/Android WebView permissions. The host can reject it or exit fullscreen on the first Back. This does not reconfigure the Home Assistant menu or native Android navigation.
+
+Permanent deletion is enabled only for the audited Grocy 4.7.1 release; a different version stays archived until its cascades have been reviewed.

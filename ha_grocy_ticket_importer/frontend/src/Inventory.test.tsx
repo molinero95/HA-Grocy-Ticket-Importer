@@ -7,6 +7,7 @@ import * as api from "./api";
 vi.mock("./api", async (original) => ({
   ...(await original<typeof api>()),
   getInventory: vi.fn(),
+  getArchivedProducts: vi.fn(),
   lookupBarcode: vi.fn(),
   stepShopping: vi.fn(),
 }));
@@ -34,13 +35,13 @@ const rows = [
     shopping_can_subtract: true,
   },
 ];
-function mount() {
+function mount(archived = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <Inventory />
+      <Inventory archived={archived} />
     </QueryClientProvider>,
   );
 }
@@ -148,4 +149,27 @@ describe("inventory interactions", () => {
       }),
     ).toBeNull();
   });
+});
+
+
+it("marks zero stock even when it is already in the shopping list, and leaves stocked rows neutral", async () => {
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [{ ...rows[0], amount: "0.00", shopping_amount: "2" }, rows[1]] });
+  mount();
+  const empty = (await screen.findByText(rows[0].name)).closest("article")!;
+  expect(empty.classList.contains("out-of-stock")).toBe(true);
+  expect(empty.textContent).toContain("Sin existencias");
+  expect(screen.getByText("Leche").closest("article")!.classList.contains("out-of-stock")).toBe(false);
+});
+it("keeps archived rows neutral and does not label them as missing stock", async () => {
+  vi.mocked(api.getArchivedProducts).mockResolvedValue({ items: [{ ...rows[0], amount: "0" }] });
+  mount(true);
+  const row = (await screen.findByText(rows[0].name)).closest("article")!;
+  expect(row.classList.contains("out-of-stock")).toBe(false);
+  expect(screen.queryByText("Sin existencias")).toBeNull();
+});
+it("does not turn unknown stock into a zero-stock warning", async () => {
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [{ ...rows[0], amount: "?" }] });
+  mount();
+  await screen.findByText(rows[0].name);
+  expect(screen.queryByText("Sin existencias")).toBeNull();
 });

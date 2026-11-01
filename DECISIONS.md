@@ -10,15 +10,18 @@
 - Máximo dos decimales. Pasos de 0,10 kg y 1 pieza. La cantidad almacenada por Grocy está en unidades de stock; una compra de packs se convierte exactamente una vez.
 - Operaciones por ID de fila, solo lista 1; preservar notas, completados y listas independientes.
 
+Desde 1.8.0, Atrás usa el historial de las secciones y cierra primero los diálogos anidados; en el inicio conserva la salida normal al contenedor. Pantalla completa es opcional y depende de los permisos del navegador/HA/WebView. No se cambia la configuración de HA.
+
 ## Catálogo y existencias
 
+- Mi despensa resalta en ámbar los productos con existencias cero o negativas y añade «Sin existencias», independientemente de su cantidad en compra. Los archivados son neutros.
 - Añadir producto crea solo productos nuevos: comprobar nombre/código, enlazar la ficha existente ante duplicado, nunca incrementar su stock. Alta con código opcional y cero existencias permitido.
 - Ficha con edición de nombre, unidad, configuración de compra, existencias, foto, códigos y variantes. Desde 1.3.0 se retira el formulario de añadir a la compra: la ficha contiene información del producto y stock; los controles de compra permanecen en las listas. No existe una acción independiente «Asociar código».
 - **Pack compra / Piece stock y consumo**. Un pack de 5 añade 5 piezas. Las conversiones se verifican en Grocy antes de escribir stock; se descubren los IDs reales de unidades. Mostrar piezas por pack solo para Pack.
 - Cambiar compras afecta únicamente a compras futuras. Nunca reinterpretar automáticamente stock existente ni una fila de compra. Renombrar conserva descripción, fotos y configuración. Cambiar unidad de stock exige cero conocido y configuración compatible.
 - Ajustar stock requiere cantidad esperada y guarda directamente, sin pantalla de confirmación adicional.
 - Desde 1.1.0, la ficha muestra un único control de existencias: indicar la cantidad total que queda. Se retira «Consumir producto» por petición del usuario; tampoco se añade compra automáticamente al ajustar stock. La API de consumo y su registro persistente se conservan, sin repetición automática ni eliminación del historial.
-- **Ciclo seguro: archivar/restaurar**, conservando ID, historial y metadatos. Archivar exige cero stock conocido y ausencia de referencias activas; restaurar cambia únicamente `active`. La eliminación permanente con cascadas y la consolidación de productos no forman parte de esta migración.
+- **Ciclo seguro: archivar/restaurar**, conservando ID, historial y metadatos. Archivar exige cero stock conocido y ausencia de referencias activas; restaurar cambia únicamente `active`. Desde 1.8.0 el usuario autoriza eliminar archivados sin uso: sin stock, movimientos/tickets ni dependencias Grocy/locales/Alexa. Revisión, nombre exacto y revalidación antes del único envío; conservar registros y no repetir resultados inciertos. Solo puede desaparecer metadato propio de una ficha sin historia. La consolidación sigue fuera de alcance.
 - Auditoría y vista de duplicados son de solo lectura. Consolidar productos reales requiere un plan y autorización explícita distintos; no se inventa una migración automática para cerrar el desarrollo.
 
 ## Fotos, variantes y tickets

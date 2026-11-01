@@ -184,3 +184,47 @@ class RealStackTests(unittest.TestCase):
             self.assertEqual(result.status_code,200,result.json)
             self.assertEqual(self.client.get(f'/api/v1/catalog/products/{pid}').status_code,200)
         self.assertEqual(history,[row for row in self.instance.http('GET','objects/stock_log') if row['product_id']==pid])
+
+    def test_delete_unused_archive_only_and_preserve_unrelated_grocy_history(self):
+        import barcode_stock
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        before = {entity: self.instance.http('GET', 'objects/' + entity)
+                  for entity in ('stock', 'stock_log', 'shopping_list')}
+        pid = barcode_stock.create_catalog_product('Disposable archive', barcode='8419876543210',
+                unit_id=units['Pack'], initial_stock='0', pack_size='5')['product_id']
+        url = f'/api/v1/catalog/products/{pid}'
+        result = self.client.post(url + '/active', json={'expected_name': 'Disposable archive', 'active': False,
+                                  'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertEqual(result.status_code, 200, result.json)
+        preview = self.client.get(url + '/deletion')
+        self.assertEqual(preview.status_code, 200, preview.json)
+        self.assertTrue(preview.json['allowed'], preview.json)
+        self.assertEqual(preview.json['barcode_count'], 1)
+        self.assertGreater(preview.json['conversion_count'], 0)
+        payload = {'expected_name': 'Disposable archive', 'confirmation': 'Disposable archive',
+                   'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
+        for _ in range(2):
+            response = self.client.delete(url, json=payload, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+        for entity in ('products', 'product_barcodes', 'quantity_unit_conversions'):
+            field = 'id' if entity == 'products' else 'product_id'
+            self.assertFalse(any(str(row[field]) == str(pid) for row in self.instance.http('GET', 'objects/' + entity)))
+        for entity, original in before.items():
+            self.assertEqual(self.instance.http('GET', 'objects/' + entity), original)
+        # Even a zero-stock archived product with one old movement must survive.
+        pid = barcode_stock.create_catalog_product('Historical archive', unit_id=units['Piece'], initial_stock='1')['product_id']
+        barcode_stock.consume_product_quantity(pid, '1', '1', False)
+        url = f'/api/v1/catalog/products/{pid}'
+        response = self.client.post(url + '/active', json={'expected_name': 'Historical archive', 'active': False,
+                                    'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        history = self.instance.http('GET', 'objects/stock_log')
+        preview = self.client.get(url + '/deletion')
+        self.assertEqual(preview.status_code, 200, preview.json)
+        self.assertFalse(preview.json['allowed'])
+        self.assertIn('historial de movimientos', preview.json['blockers'])
+        response = self.client.delete(url, json={'expected_name': 'Historical archive', 'confirmation': 'Historical archive',
+                        'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertEqual(response.status_code, 409, response.json)
+        self.assertEqual(self.instance.http('GET', 'objects/stock_log'), history)
+        self.assertEqual(self.client.get(url).status_code, 200)
