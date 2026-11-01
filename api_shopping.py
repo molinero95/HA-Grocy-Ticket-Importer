@@ -159,6 +159,30 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         return jsonify({"removed": removed})
 
 
+    @app.get("/api/v1/shopping/sync-status")
+    def api_v1_shopping_sync_status():
+        """Expose safe sync configuration and last worker outcome."""
+        import json
+        import time
+        from pathlib import Path
+        entity = os.environ.get("ALEXA_SHOPPING_LIST_ENTITY", "").strip()
+        enabled = os.environ.get("SHOPPING_SYNC_ENABLED") == "1"
+        interval = int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120"))
+        status = {"configured": bool(entity), "enabled": enabled,
+                  "interval_seconds": interval, "worker": "unknown",
+                  "last_check": None, "error": None}
+        if entity:
+            try:
+                data = json.loads(Path("/data/shopping-sync-status.json").read_text(encoding="utf-8"))
+                if isinstance(data, dict) and isinstance(data.get("timestamp"), (int, float)):
+                    status["last_check"] = data["timestamp"]
+                    status["worker"] = ("stale" if time.time() - data["timestamp"] > max(180, interval * 3)
+                                        else data.get("state", "unknown"))
+                    status["error"] = data.get("error")
+            except (OSError, ValueError, TypeError):
+                pass
+        return jsonify(status)
+
     @app.get("/api/v1/shopping")
     def api_v1_shopping():
         """Read-only shopping snapshot for the v1 frontend; never expose Grocy secrets."""
