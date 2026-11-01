@@ -94,8 +94,8 @@ jobs:
       - name: Verify container entrypoint serves React without Grocy writes
         run: |
           docker run --detach --name despensa-smoke --publish 8768:8765 --env HA_INGRESS_MODE=1 --env WEB_SESSION_SECRET=disposable-container-test --entrypoint /venv/bin/gunicorn despensa:migration --chdir /app --bind 0.0.0.0:8765 web:app
-          trap 'docker rm --force despensa-smoke' EXIT
-          curl --retry 15 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8768/ --output /tmp/despensa-index.html
+          trap 'docker logs despensa-smoke; docker rm --force despensa-smoke' EXIT
+          curl --retry 15 --retry-all-errors --retry-delay 1 --retry-max-time 30 --max-time 3 --fail http://127.0.0.1:8768/ --output /tmp/despensa-index.html
           python -c "from pathlib import Path; page=Path('/tmp/despensa-index.html').read_text(); assert 'id=\"root\"' in page and 'assets/' in page"
 
       - name: Run unit tests without external API calls
