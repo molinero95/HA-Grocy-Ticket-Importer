@@ -74,7 +74,8 @@ class RealStackTests(unittest.TestCase):
         rid = int(self.instance.http('POST', 'objects/shopping_list',
             {'shopping_list_id': 1, 'note': name, 'amount': 3})['created_object_id'])
         first = self.client.get('/api/v1/shopping').json
-        self.assertFalse(any(row['name'] == name for row in first['pending_matches']))
+        unmatched = next(row for row in first['pending_matches'] if row['name'] == name)
+        self.assertEqual(unmatched['candidates'], [])
         units = self.client.get('/api/v1/catalog/units').json['units']
         piece = next(row['id'] for row in units if row['name'] == 'Piece')
         response = self.client.post('/api/v1/catalog/products', json={'name': name, 'unit_id': piece}, headers=self.headers)
@@ -82,6 +83,7 @@ class RealStackTests(unittest.TestCase):
         pid = response.json['product_id']
         second = self.client.get('/api/v1/shopping').json
         review = next(row for row in second['pending_matches'] if row['name'] == name)
+        self.assertEqual(review['generation'], unmatched['generation'])
         self.assertEqual([p['id'] for p in review['candidates']], [pid])
         chosen = self.client.post('/api/v1/alexa/matches/'+review['key']+'/choose', json={'product_id': pid, 'operation_id': str(uuid.uuid4())}, headers=self.headers)
         self.assertEqual(chosen.status_code, 200, chosen.json)
