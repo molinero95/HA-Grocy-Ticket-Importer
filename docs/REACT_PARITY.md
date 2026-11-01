@@ -37,3 +37,5 @@ Desde 1.10.0 se permite borrar el historial de movimientos de un archivado tras 
 Aviso de existencias 1.10.0: umbral por producto 0/enabled por defecto, desactivación individual, metadatos persistentes y lectura/cantidad/compra de Grocy idénticas tras editar avisos.
 
 Desde 1.11.0 la revisión de compra/Alexa ofrece creación contextual sin stock y asociación inmediata, incluso sin candidatos; conserva ID/cantidad/nota y permite recuperar resultados parciales sin repetir el alta. El alta general sigue en Mi despensa.
+
+Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al confirmar; cantidad final calculada de solo lectura y asociaciones por supermercado en el ledger existente. Simulación y preflight bloquean líneas pendientes; original monetario/hash y protección contra duplicados se conservan.

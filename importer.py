@@ -16,6 +16,7 @@ import urllib.request
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from purchase_units import purchase_factor, create_purchase_conversion
+from receipt_review import validate_review, remember, mappings, key
 
 DB_PATH = os.environ.get('GROCY_IMPORT_DB', str(Path(__file__).resolve().parent / 'grocy_imports.sqlite3'))
 
@@ -79,17 +80,16 @@ def validate(receipt):
     if not receipt.get('items'):
         raise ValueError('No items')
     total = Decimal('0')
+    new_names = [norm(item['name']) for item in receipt['items'] if item.get('product_mode') == 'new']
+    names = [norm(item['name']) for item in receipt['items']]
+    if any(names.count(name) > 1 for name in new_names):
+        raise ValueError('A new product name is repeated in this receipt; review the lines before import')
     for item in receipt['items']:
-        factor = dec(item.get('pieces_per_pack', 1))
-        purchased = dec(item.get('purchase_units', item['quantity']))
-        if (not factor.is_finite() or factor != factor.to_integral_value()
-                or not 1 <= factor <= 1000 or not purchased.is_finite()
-                or purchased != dec(item['quantity'])):
-            raise ValueError('Invalid pack conversion or purchase quantity')
+        validate_review(item)
         if not isinstance(item.get('name'), str) or not item['name'].strip():
             raise ValueError('Missing name')
         qty, price = dec(item['quantity']), dec(item['unit_price'])
-        if qty <= 0 or price < 0:
+        if not qty.is_finite() or not price.is_finite() or qty <= 0 or price < 0:
             raise ValueError('Invalid quantity or price')
         total += money(qty * price)
     if money(total) != money(receipt['total']):
@@ -119,6 +119,7 @@ def main():
     kg_id = stock_unit(('kg', 'kilogram', 'kilograms', 'kilogramo', 'kilogramos'))
     pack_ids = [uid for uid, label in units.items() if norm(label) in ('pack', 'paquete', 'envase')]
     pack_id = pack_ids[0] if len(pack_ids) == 1 else None
+    saved_mappings = mappings(DB_PATH, receipt.get('merchant', ''))
     catalog = {}
     for p in products:
         catalog.setdefault(norm(p['name']), []).append(p)
@@ -133,6 +134,8 @@ def main():
                 continue
             status, unit, reason = classify(item)
             unit = {2: piece_id, 4: kg_id}.get(unit, unit)
+            if item.get('stock_unit') and (item.get('product_mode', 'auto') != 'auto' or item.get('unit_confirmed')):
+                status, unit, reason = 'STOCK', {'piece': piece_id, 'kg': kg_id}[item['stock_unit']], ''
             if status == 'EXPENSE':
                 print(f'[{i+1}] {"WOULD RECORD EXPENSE" if args.dry_run else "RECORD EXPENSE"} {name}: {money(dec(item["quantity"]) * dec(item["unit_price"]))} EUR (no stock)')
                 if not args.dry_run:
@@ -140,6 +143,17 @@ def main():
                     conn.commit()
                 continue
             matches = catalog.get(norm(name), [])
+            mode = item.get('product_mode', 'auto')
+            if mode == 'auto' and key(item.get('original_name', name)) in saved_mappings:
+                status, reason = 'REVIEW', 'Select the remembered product explicitly before import'
+            if mode == 'existing':
+                matches = [p for p in products if int(p['id']) == item['product_id'] and str(p.get('active', 1)).lower() in ('1', 'true')]
+                if not matches:
+                    status, reason = 'REVIEW', 'Selected product is missing or archived'
+            elif mode == 'new' and matches:
+                status, reason = 'REVIEW', 'Product name already exists; select the existing product'
+            if any(str(p.get('active', 1)).lower() not in ('1', 'true') for p in matches):
+                status, reason = 'REVIEW', 'Matching product is archived'
             if len(matches) > 1:
                 status, reason = 'REVIEW', 'Multiple catalog matches'
             pieces = int(item.get('pieces_per_pack', 1))
@@ -158,14 +172,15 @@ def main():
                         existing_factor = purchase_factor(grocy, int(p['id']), purchase_id, unit)
                     except (ValueError, ArithmeticError):
                         existing_factor = None
-                    if purchase_id != (pack_id if pieces > 1 else unit) or existing_factor != pieces:
+                    if purchase_id not in (unit, pack_id) or (pieces > 1 and purchase_id != pack_id) or existing_factor != pieces:
                         status, reason = 'REVIEW', 'Saved purchase conversion differs; review product in Grocy'
             if status == 'REVIEW':
                 print(f'[{i+1}] REVIEW {name}: {reason}')
                 continue
             existing = len(matches) == 1
             stock_amount = purchased * pieces if unit == piece_id else purchased
-            print(f'[{i+1}] {"WOULD IMPORT" if args.dry_run else "IMPORT"} {name}: {stock_amount} {units[unit]} ({purchased} purchases × {pieces}) ({"existing" if existing else "NEW"})')
+            identity = f'existing id={matches[0]["id"]}' if existing else 'NEW'
+            print(f'[{i+1}] {"WOULD IMPORT" if args.dry_run else "IMPORT"} {name}: {stock_amount} {units[unit]} ({purchased} purchases × {pieces}) ({identity})')
             if args.dry_run:
                 continue
             if existing:
@@ -183,9 +198,11 @@ def main():
             conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest,i,pid,'pending','Stock write may have happened; verify before retry'))
             conn.commit()
             # Grocy timestamps the purchase on import; source date is preserved in note.
-            payload = {'amount': float(stock_amount), 'price': float(money(dec(item['quantity']) * dec(item['unit_price']) / stock_amount)), 'best_before_date': '2999-12-31', 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'note': f'Ticket {receipt["merchant"]} {receipt["receipt_date"]} | {digest[:12]} line {i+1}'}
+            payload = {'amount': float(stock_amount), 'price': float(money(dec(item['quantity']) * dec(item['unit_price'])) / stock_amount), 'best_before_date': '2999-12-31', 'location_id': int(os.getenv('GROCY_LOCATION_ID','2')), 'note': f'Ticket {receipt["merchant"]} {receipt["receipt_date"]} | {digest[:12]} line {i+1}'}
             grocy('POST', f'stock/products/{pid}/add', payload)
             conn.execute('UPDATE receipt_items SET state=?, detail=? WHERE receipt_hash=? AND line=?', ('imported','',digest,i))
+            conn.commit()  # Confirm stock independently of optional mapping persistence.
+            remember(conn, receipt['merchant'], item, pid)
             conn.commit()
     print('Done. Expenses are recorded locally, not in Grocy expense accounting. REVIEW lines were not imported; pending lines require manual reconciliation.')
 

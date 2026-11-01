@@ -53,3 +53,11 @@ React 19, TypeScript 7, Vite 7 y Vitest 4 en el mismo origen que Flask. Credenci
 La versión 1.0.0 sirve React en `/` y conserva `/react/` como alias; `/basic` mantiene compras sin JavaScript. Se ha eliminado el frontend completo duplicado después de comprobar paridad contra Grocy 4.7.1 aislado. Publicar la versión en el manifiesto permite detectar la actualización; no acredita una instalación en Home Assistant.
 
 Conservar todos los datos persistentes y módulos Python espejo. Validación automatizada y límites constan en `docs/VALIDATION_V1.md`. Las lecturas de Grocy instalado y la entidad HA/Alexa real ya responden correctamente sin cambios de seguridad. Actualización Supervisor, cámara física y escrituras Alexa reales siguen siendo aceptación de despliegue externa. Publicación 1.0.0 autorizada por el usuario sin dar por realizadas esas comprobaciones; mantener copia HA y sincronización desactivada hasta validar sus escrituras reales.
+
+
+## Revisión de tickets 1.12.0
+
+- Cantidad de compra editable separada de cantidad/precio monetarios originales: preservar coste por línea y total. Cantidad final de stock calculada, de solo lectura; piezas enteras y pesos con hasta tres decimales.
+- Selección explícita por ID canónico o alta al confirmar. La configuración actual del producto existente controla Pack/Piece; nunca se modifica desde el ticket. Simular no crea productos ni existencias.
+- Asociaciones por supermercado + texto original normalizado, en tabla aditiva del ledger existente, solo después de importar correctamente. No usar coincidencia difusa; múltiples textos pueden apuntar al mismo ID. Revisar targets ausentes/archivados y cambios de unidad/conversión.
+- Cambiar cualquier línea exige nueva simulación. REVIEW/pending bloquean confirmación y preflight, manteniendo bloqueo compartido con worker, marcadores contra repetición y deduplicación por hash original.

@@ -122,3 +122,10 @@ Umbrales 1.10.0: regresiones de decimal, valor esperado, opt-out persistente, co
 Siete regresiones Python nuevas cubren artículo sin candidatos, nombre canónico distinto, fila/cantidad/nota intactas, producto existente con aceptación, respuesta perdida en alta/asociación, episodio nuevo, CSRF y barras en nombres. La asociación parcial se completa después de leer el estado; si el PUT ya se aplicó no se repite. La cola conserva una intención canónica seleccionada antes de una asociación incierta, para que el worker no reimporte una nota duplicada.
 
 El contrato real cubre Alexa sin fila Grocy y con nota/cantidad existentes, crea stock cero, repite el mismo comando sin duplicar y compara stock/historial completos. Componentes y Chromium verifican nombre rellenado/editable, ausencia de stock inicial, confirmación de existente y controles comprado/quitar después de crear. Localmente pasan 19 escenarios y se omiten explícitamente 8; CI ejecuta los 27.
+
+
+## Receipt review 1.12.0 — local verification, 2026-11-01
+
+330 Python regressions, 96 Vitest tests with V8 coverage, TypeScript/Vite build and all 27 Chromium scenarios passed locally. All 13 contracts passed against the unmodified Grocy 4.7.1 distribution using the PHP 8.5 FrankenPHP runtime and disposable data. The new contract verifies existing-ID selection despite a different receipt name, corrected quantity and preserved six-euro stock cost, mapping persistence across restart, merchant isolation and repeated-source deduplication. The mobile flow verifies read-only live totals, invalidated confirmation, explicit new-product mode, remembered selection and no horizontal overflow; the captured form was visually reviewed.
+
+The final-head CI result is recorded in the PR. No production installation, configuration, receipt, catalog, stock or Alexa data was changed.
