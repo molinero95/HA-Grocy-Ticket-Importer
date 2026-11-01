@@ -70,3 +70,30 @@ class AlexaMatchQueueTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class KeepOriginalTests(unittest.TestCase):
+    def test_keep_original_survives_refresh_without_recreating_suggestion(self):
+        from shopping_match_queue import keep_original
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'queue.sqlite3'
+            products = [{"id": 1, "name": "Arroz redondo"}, {"id": 2, "name": "Arroz basmati"}]
+            refresh(path, ['Arroz'], products)
+            keep_original(path, 'arroz')
+            refresh(path, ['Arroz'], products)
+            row = pending(path)[0]
+            self.assertTrue(row['dismissed'])
+            self.assertIsNone(row['selected_product_id'])
+            self.assertEqual(resolved_choices(path, ['Arroz'], products), {})
+            choose(path, 'arroz', 2)
+            self.assertFalse(pending(path)[0]['dismissed'])
+
+    def test_additive_queue_migration_preserves_old_choices(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'legacy.sqlite3'
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE pending_matches (normalized_name TEXT PRIMARY KEY, original_name TEXT, candidates_json TEXT, selected_product_id INTEGER, active INTEGER)')
+                db.execute('INSERT INTO pending_matches VALUES (?,?,?,?,?)', ('arroz', 'Arroz', '[{"id":2,"name":"Arroz basmati"}]', 2, 1))
+            row = pending(path)[0]
+            self.assertFalse(row['dismissed'])
+            self.assertEqual(row['selected_product_id'], 2)

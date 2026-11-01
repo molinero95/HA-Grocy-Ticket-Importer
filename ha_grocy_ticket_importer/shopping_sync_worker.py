@@ -48,6 +48,8 @@ def run_once(*, dry_run=True):
     products = grocy("GET", "objects/products")
     if not isinstance(products, list):
         raise RuntimeError("Grocy catalog unavailable for Alexa review")
+    from shopping_sync_adapters import _grocy_done
+    products = [p for p in products if _grocy_done(p.get("active", True))]
     refresh_matches(MATCH_QUEUE, alexa, products)
     choices = resolved_choices(MATCH_QUEUE, alexa, products)
     # An old manual selection that is no longer a valid candidate must never
@@ -56,6 +58,16 @@ def run_once(*, dry_run=True):
         if row["selected_product_id"] is not None and row["key"] not in choices:
             raise IdentityConflict("An Alexa selection needs renewed review")
     previous = load_identity_state(STATE_V2)
+    from shopping_choice_conversion import project_choices, apply_choices
+    projected, conversions = project_choices(grocy_rows, products, choices)
+    # Validate the entire projected graph before the first association write.
+    if conversions:
+        reconcile_identity(alexa, projected, products, previous, choices, dry_run=True)
+    if conversions and not dry_run:
+        apply_choices(grocy, conversions)
+        grocy_rows = grocy_entries()
+    elif dry_run:
+        grocy_rows = projected
     result = reconcile_identity(
         alexa, grocy_rows, products, previous, choices, dry_run=dry_run,
         add_alexa=lambda row: add_alexa(row["name"]),
@@ -68,7 +80,7 @@ def run_once(*, dry_run=True):
         # Re-reading also catches concurrent edits and changed shopping amounts.
         final_alexa = ha_todo_items()
         final_grocy = grocy_entries()
-        final_products = grocy("GET", "objects/products")
+        final_products = [p for p in grocy("GET", "objects/products") if _grocy_done(p.get("active", True))]
         final_a, final_g = verify_bindings(
             final_alexa, final_grocy, final_products, choices, previous)
         expected = set(result["next_baseline"])
@@ -76,6 +88,8 @@ def run_once(*, dry_run=True):
             raise RuntimeError("Shopping identity sync verification failed")
         save_identity_state(STATE_V2, result["next_baseline"],
                             current_bindings(final_a))
+        from shopping_match_queue import acknowledge_choices
+        acknowledge_choices(MATCH_QUEUE, choices)
     return result
 
 def main():

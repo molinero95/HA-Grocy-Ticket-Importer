@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Despensa 1.0 candidate (2026-11-01)
+
+- React 19, TypeScript 7, Vite 7 and Vitest 4; mobile shopping, inventory, product sheets, receipt review/import, variants, photos and Alexa review. Candidate root now serves React; script-free basic shopping remains. Removed the previous full inline frontend and obsolete routes.
+- Trusted exact-barcode photo discovery, sanitized uploads, versioned shared images, standalone session/CSRF and ingress-prefixed APIs/assets.
+- Durable at-most-once consumption commands and receipt submission guards; report uncertain/partial results without repeating stock changes.
+- Verified Grocy Pack/Piece conversions, future-purchase editing, precise shopping quantities and row-ID mutations preserving notes, completed rows and other lists. No automatic conversion of existing stock.
+- Explicit Alexa note association preserves row/amount/text; keep-original dismissal persists. Conflict checks and verified checkpoints remain mandatory; sync stays disabled by default.
+- Reversible archive/restore preserves history and metadata; permanent deletion and automatic consolidation remain unavailable.
+- Real unmodified Grocy 4.7.1 contracts and full mobile browser workflows with disposable data; CI builds/starts AMD64 and ARM64 containers. Python mirrors remain synchronized.
+- No manifest bump, release, merge or production deployment. Read-only installed Grocy 4.7.1/schema and configured HA/Alexa entity checks succeeded with existing credentials/listeners. Physical camera, real Alexa writes and Supervisor upgrade acceptance remain external deployment checks.
+
 ## [0.16.4] — 2026-10-31
 
 ### Fixed

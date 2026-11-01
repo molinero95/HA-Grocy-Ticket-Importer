@@ -6,9 +6,9 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Estado:** versión de desarrollo en GitHub; el complemento ya ha sido detectado por Home Assistant, pero cada actualización y cambio de Grocy requiere validación. No considerar el pipeline verde sin comprobar una ejecución concreta.
+> **Estado:** candidata Despensa 1.0 en PR #10, sin publicar. React es la entrada de esta rama; `main` y la instalación existente siguen en 0.16.4. Validación automatizada contra Grocy 4.7.1 aislado; aceptación de despliegue HA/Android pendiente.
 
-> **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. No se suben archivos de imagen a Grocy y puede haber productos sin fotografía.
+> **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía.
 
 > **Controles rápidos:** los productos fuera de la lista muestran un botón `🛒 Añadir`; al pulsarlo se convierte en `− cantidad +`. Cuando la cantidad vuelve a cero, reaparece el carrito. Todo se actualiza sin recargar la página ni cambiar la posición de desplazamiento. Los cambios se envían a Grocy y se reflejan en la misma fila; si fallan, se muestra un error sin falsear la cantidad.
 
@@ -26,7 +26,7 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 
 > Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; la edición avanzada puede usar otras unidades si tienen una conversión válida. Añadir a la lista no registra entrada de existencias.
 
-> **Pack y Piece:** Pack es unidad de compra; Piece es unidad de stock y consumo. Un pack de 5 debe registrar 5 piezas al comprarlo, no 1 pack como stock. **No se convierte automáticamente el stock existente** al cambiar configuraciones. Las fotos encontradas por código se guardan como referencias en la descripción del producto y la conversión Pack/Piece sigue pendiente de validación integral en Grocy. Consulta DECISIONS.md y ROADMAP.md.
+> **Pack y Piece:** Pack es unidad de compra; Piece es unidad de stock y consumo. Un pack de 5 debe registrar 5 piezas al comprarlo, no 1 pack como stock. **No se convierte automáticamente el stock existente** al cambiar configuraciones. Las fotos encontradas por código se guardan como referencias en la descripción del producto y la conversión Pack/Piece se comprueba contra Grocy 4.7.1 aislado. Consulta DECISIONS.md y ROADMAP.md.
 
 ## Instalar desde Home Assistant (repositorio comunitario)
 
@@ -69,13 +69,7 @@ Abre el complemento **Despensa** en la aplicación móvil de Home Assistant. La 
 
 ## Desarrollo y pruebas
 
-Código Python para la integración de Grocy y la interfaz Flask; archivos empaquetados en `ha_grocy_ticket_importer/`. GitHub Actions prueba el código con Python 3.11 y 3.13, valida los scripts JavaScript, comprueba que el código fuente y el empaquetado coincidan y construye la imagen del complemento.
-
-```bash
-python -m unittest discover -v -p 'test_*.py'
-```
-
-No ejecuta llamadas reales a Grocy ni a OpenAI en los tests automatizados.
+React/TypeScript y API Flask; los módulos Python raíz y del paquete permanecen idénticos. CI ejecuta pruebas Python, Vitest, compilación, contratos con Grocy 4.7.1 real aislado, Chromium móvil/ingress y construcción/arranque de contenedores AMD64 y ARM64. Las pruebas nunca usan datos reales. Reproducción y límites: [VALIDATION_V1.md](docs/VALIDATION_V1.md).
 
 ## Licencia
 
@@ -91,7 +85,7 @@ Este proyecto se distribuye bajo la **licencia MIT**. Consulta el archivo [LICEN
 Documentación específica del complemento: [ha_grocy_ticket_importer/DOCS.md](ha_grocy_ticket_importer/DOCS.md).
 
 
-## Sincronización Alexa ↔ Grocy (experimental, PR #5)
+## Sincronización Alexa ↔ Grocy (opcional)
 
 La integración **Alexa Devices** de Home Assistant necesita una entidad `todo.*`
 para la lista elegida. Despensa sincroniza exclusivamente esa lista y la lista
@@ -112,11 +106,11 @@ defecto). No modifica existencias ni productos del catálogo.
   desconocidos o ambiguos se mantienen como **notas de texto libre**.
 - En **Acciones → Coincidencias Alexa**, una elección manual permite asociar
   un nombre ambiguo a un producto. El nombre original de Alexa no se renombra.
-  La selección puede emplearse en el siguiente ciclo de sincronización, pero
-  **nunca elimina ni convierte una nota de Grocy**.
-- Si una nota existente coincide con el nombre original o canónico de un
-  producto seleccionado, se detiene la operación para revisión; no se crean
-  duplicados ni se fusionan artículos automáticamente.
+  En el siguiente ciclo habilitado puede asociar su nota existente al producto
+  elegido, conservando ID de fila, cantidad y texto original.
+- **Mantener original** descarta la sugerencia sin modificar remotamente la nota.
+  Una colisión con otra fila del producto seleccionado o una edición concurrente
+  detiene el ciclo; no se duplican ni fusionan artículos.
 - El primer ciclo del nuevo sincronizador une las listas sin borrar artículos.
   Los siguientes propagan altas y eliminaciones por identidad tras un
   checkpoint confirmado. Antes de borrar una entrada de Grocy se vuelve a
@@ -140,11 +134,12 @@ manuales de la cola antigua deberán revisarse de nuevo, evitando asignarlas
 accidentalmente a otra lista Alexa. Incluye ambos directorios en la copia de
 seguridad de Home Assistant.
 
-**Pendiente para publicar:** validar respuestas de Home Assistant, endpoints de
-Grocy 4.7.1, persistencia tras actualización y pruebas de extremo a extremo con
-artículos descartables. No habilitar el sincronizador únicamente porque pase CI.
+**Antes del despliegue:** comprobar las escrituras de la entidad Home Assistant/Alexa
+y la actualización con copia de seguridad. Sus lecturas y el esquema de Grocy
+instalado ya responden correctamente. Grocy 4.7.1, reinicio y flujos de extremo
+a extremo ya se validan con datos desechables; no equivalen a esa instalación.
 
-## Productos genéricos y variantes (desarrollo, PR #5)
+## Productos genéricos y variantes
 
 Un artículo de Grocy es el **producto genérico** (por ejemplo, «Leche entera»).
 En su ficha pueden registrarse variantes por supermercado con nombre, marca,
@@ -161,5 +156,29 @@ de consolidar productos existentes. No subas exportaciones reales a GitHub.
 
 **Limitación:** las unidades por compra de cada variante son informativas;
 no modifican todavía la conversión de Grocy ni la importación de tickets.
-No se migran existencias automáticamente. El editor y la persistencia deben
-validarse en la instalación real antes de publicar la versión.
+No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
+la actualización de la instalación real antes de publicar.
+
+## Desarrollo de Despensa 1.0 (PR #10, sin publicar)
+
+React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
+`ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
+compila y sirve React en `/`, con alias `/react/` y compras básicas sin
+JavaScript en `/basic`. El frontend HTML/JS anterior está retirado en esta rama.
+No se cambia la versión 0.16.4 ni se despliega automáticamente.
+
+Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
+Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
+La [guía de validación](docs/VALIDATION_V1.md) incluye la suite completa contra
+Grocy oficial con datos temporales y los límites de cámara/HA/Alexa reales.
+
+Se preservan fotos, historial de tickets, variantes, colas y checkpoints Alexa.
+El registro `stock-commands.sqlite3` reside junto al historial (configurable con
+`STOCK_COMMAND_DB`); nunca borrarlo para repetir un resultado incierto. Si el
+consumo se confirma y falla la reposición, añadir solo la compra pendiente.
+
+La ficha permite **Archivar** productos sin existencias ni dependencias y
+**Restaurar** desde Ver archivados. Conserva historial e identidad; no borra ni
+consume stock. Detectar duplicados sigue siendo una auditoría de solo lectura.
+No hay migración automática de stock Pack antiguo ni consolidación de productos.
+Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).
