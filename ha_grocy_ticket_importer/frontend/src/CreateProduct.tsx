@@ -175,7 +175,9 @@ export function CreateProduct({
                 Boolean(barcode && !isBarcode(barcode)) ||
                 !(Number(initialStock) >= 0) ||
                 (isPack &&
-                  (!Number.isInteger(Number(packSize)) || Number(packSize) < 1))
+                  (!Number.isInteger(Number(packSize)) ||
+                    Number(packSize) < 1 ||
+                    Number(packSize) > 1000))
               }
             >
               Guardar producto

@@ -12,6 +12,56 @@ const ok = (data: object, status = 200) =>
   });
 afterEach(() => vi.unstubAllGlobals());
 describe("same-origin API session and CSRF", () => {
+  it.each(["consume", "receipt", "purchase"])(
+    "never retries %s when its response is lost",
+    async (operation) => {
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          ok({ authenticated: true, csrf_token: "fixture" }),
+        )
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      vi.stubGlobal("fetch", fetch);
+      const client = await api();
+      const call =
+        operation === "consume"
+          ? client.consumeCatalogProduct(
+              7,
+              "0.25",
+              "3",
+              true,
+              "operation-fixture",
+            )
+          : operation === "receipt"
+            ? client.commitReceipt("ticket-fixture")
+            : client.addShoppingAmount(7, "2", 9, "operation-fixture");
+      await expect(call).rejects.toThrow("Failed to fetch");
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch.mock.calls[1][1]).toMatchObject({
+        method: "POST",
+        credentials: "same-origin",
+      });
+    },
+  );
+
+  it("expires the UI session after an unauthorized write without replaying it", async () => {
+    const expired = vi.fn();
+    window.addEventListener("despensa:session-expired", expired);
+    try {
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          ok({ authenticated: true, csrf_token: "fixture" }),
+        )
+        .mockResolvedValueOnce(ok({}, 401));
+      vi.stubGlobal("fetch", fetch);
+      await expect((await api()).removeShopping(12)).rejects.toThrow();
+      expect(expired).toHaveBeenCalledOnce();
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener("despensa:session-expired", expired);
+    }
+  });
   it("bootstraps anonymous login with the public auth status token", async () => {
     const fetch = vi
       .fn()

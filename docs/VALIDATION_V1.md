@@ -5,10 +5,20 @@ Fecha: 2026-11-01. Candidata en PR #10; estable 0.16.4 sin publicación ni despl
 ## Evidencia local
 
 - Python: 200 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
-- Vitest 4: 14 pruebas de interacciones React y cliente API.
+- Vitest 4: 67 pruebas de interacciones React y cliente API (53 añadidas en el refuerzo de QA).
 - TypeScript 7: aplicación y e2e; Vite 7: compilación de producción.
 - Grocy real: 5 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial).
-- Chromium: 7 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar.
+- Chromium: 13 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
+
+## Refuerzo de QA del frontend
+
+Las pruebas de componentes cubren consumo preciso, reposición parcial, doble pulsación, escrituras inciertas sin reintento, compras en unidades verificadas, configuración Pack/Piece y sus estados esperados, validación de factores, errores conservando formularios, propiedad de códigos/variantes, fotos tardías y permisos/limpieza de cámara. Tickets: invalidar simulación tras editar, cancelación de confirmación, bloqueo durante/después del envío y respeto de `ready_to_commit`. Sesión: retirada de datos privados, cancelación de lecturas tardías y regreso inmediato al login. Auditoría: consultas de solo lectura y recuperación tras fallo.
+
+Estas regresiones detectaron y corrigieron tres defectos: borrar una consulta de autenticación observada podía dejar la vista anterior y recrear caché privada; el frontend ignoraba `ready_to_commit: false`; el botón de alta no aplicaba el máximo de 1000 piezas por pack (el campo HTML y el servidor ya lo limitaban).
+
+`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **74,83 % líneas, 74,76 % sentencias, 76,93 % ramas y 62,45 % funciones**. Consumo, compras, configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
+
+La ejecución local de navegador sin PHP/Grocy pasó los 9 escenarios disponibles y omitió explícitamente los 4 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 13; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
 
 Las pruebas antiguas que solo verificaban el HTML retirado o autorizaban eliminación permanente se sustituyen por comprobaciones del comportamiento actual. El total de tests no mide por sí solo la paridad.
 
@@ -37,6 +47,7 @@ python tests/real_stack_server.py --check
 cd frontend
 npm ci
 npm test
+npm run test:coverage
 npm run build
 npx playwright install --with-deps chromium
 npm run test:e2e

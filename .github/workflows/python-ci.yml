@@ -24,9 +24,17 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
         working-directory: frontend
-      - name: Test React frontend
-        run: npm test
+      - name: Test React frontend with coverage
+        run: npm run test:coverage
         working-directory: frontend
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: ha_grocy_ticket_importer/frontend/coverage/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Typecheck and build React frontend
         run: npm run build
         working-directory: frontend
@@ -109,7 +117,7 @@ jobs:
           app = Path("ha_grocy_ticket_importer")
           with ZipFile("ha-grocy-local-addon.zip", "w", ZIP_DEFLATED) as package:
               for path in sorted(app.rglob("*")):
-                  if path.is_file() and not {"__pycache__", "node_modules", "dist", "test-results", "playwright-report"}.intersection(path.parts):
+                  if path.is_file() and not {"__pycache__", "node_modules", "dist", "test-results", "playwright-report", "coverage"}.intersection(path.parts):
                       package.write(path, path.as_posix())
           PY
       - name: Upload local installation package

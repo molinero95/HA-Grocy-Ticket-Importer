@@ -16,6 +16,7 @@ Estado de código: candidata implementada en PR #10, rama `feature/despensa-v1-r
 - [x] React como entrada de la candidata; retirar PAGE, scripts y formularios obsoletos; alternativa básica sin JavaScript.
 - [x] Fuentes Python duplicadas sincronizadas y manifiesto Docker completo.
 - [x] CI configurado para frontend, integración real aislada y contenedores AMD64/ARM64 con arranque.
+- [x] Refuerzo de frontend: 67 tests Vitest, informe de cobertura V8 en CI y 13 escenarios de navegador configurados; regresiones de sesión/caché, tickets, doble envío, errores parciales, validaciones, foco y tamaños de pantalla.
 
 La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATION_V1.md); el resultado CI debe observarse para el SHA final, nunca inferirse de esta lista.
 

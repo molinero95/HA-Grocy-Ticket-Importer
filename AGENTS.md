@@ -49,6 +49,8 @@ CI also runs the unmodified, SHA-verified Grocy 4.7.1 release with disposable lo
 
 Check final-head GitHub Actions: frontend, AMD64 and ARM64 container build/start, mirror checks and Python regressions. An empty combined status is not CI success. Physical Android camera and installed HA/Alexa upgrade smoke are deployment acceptance, distinct from automated isolated validation.
 
+Frontend QA reinforcement: 67 Vitest tests and 13 configured Chromium scenarios. `npm run test:coverage` produces V8 HTML/LCOV/JSON reports and CI uploads `frontend-coverage`; reports are excluded from Git, Docker context and install archives. New regressions cover uncertain/duplicate writes, partial consumption, receipts/preview readiness, session expiry/late reads, pack factors, variants/photos, camera cleanup and keyboard/responsive layouts. Local browser runs without `GROCY_TEST_DIST` execute 9 and explicitly skip 4. Keep the auth query observed when expiring/logging out; remove private caches after the authenticated view unmounts to prevent recreating active reads.
+
 ## Future release
 
 A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Do not publish a release during this task. Keep the previous installation and Home Assistant backup until a future deployment is accepted.

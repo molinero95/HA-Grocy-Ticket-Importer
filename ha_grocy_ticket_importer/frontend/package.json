@@ -8,6 +8,7 @@
     "build": "tsc -b && tsc -p tsconfig.e2e.json && vite build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "@vitest/coverage-v8": "4.1.12",
     "jsdom": "^30.1.3",
     "typescript": "~7.0.2",
     "vite": "^7.2.0",

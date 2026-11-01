@@ -13,6 +13,7 @@ export function Receipts() {
   const [receipt, setReceipt] = useState<ReceiptUpload | null>(null);
   const [items, setItems] = useState<EditableItem[]>([]);
   const [preview, setPreview] = useState("");
+  const [readyToCommit, setReadyToCommit] = useState(false);
   const [committed, setCommitted] = useState(false);
   const [commitStarted, setCommitStarted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,11 +23,13 @@ export function Receipts() {
       previous.map((item, i) => (i === index ? { ...item, ...patch } : item)),
     );
     setPreview("");
+    setReadyToCommit(false);
   };
   async function upload(file: File) {
     setBusy(true);
     setError("");
     setPreview("");
+    setReadyToCommit(false);
     setReceipt(null);
     setCommitted(false);
     setCommitStarted(false);
@@ -51,9 +54,11 @@ export function Receipts() {
     setBusy(true);
     setError("");
     setPreview("");
+    setReadyToCommit(false);
     try {
       const result = await previewReceipt(receipt.receipt_id, items);
       setPreview(result.preview);
+      setReadyToCommit(result.ready_to_commit === true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -64,6 +69,7 @@ export function Receipts() {
     if (
       !receipt ||
       !preview ||
+      !readyToCommit ||
       commitStarted ||
       !window.confirm(
         "¿Confirmas importar este ticket a Grocy? Esta operación modifica el stock y no se puede repetir.",
@@ -197,12 +203,14 @@ export function Receipts() {
                     La simulación no modifica el inventario. Confirma solo
                     después de revisar los datos.
                   </p>
-                  <button
-                    disabled={busy || commitStarted}
-                    onClick={() => void confirm()}
-                  >
-                    Confirmar e importar a Grocy
-                  </button>
+                  {readyToCommit && (
+                    <button
+                      disabled={busy || commitStarted}
+                      onClick={() => void confirm()}
+                    >
+                      Confirmar e importar a Grocy
+                    </button>
+                  )}
                 </>
               )}
               {committed && (

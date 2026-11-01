@@ -338,14 +338,19 @@ function AuthenticatedApp() {
 
 export function App() {
   const client = useQueryClient();
+  const clearSession = () => {
+    // Keep the observed auth query attached so the login screen updates immediately.
+    // Cancel reads first: a late response must not restore the previous user's data.
+    void client.cancelQueries();
+    client.setQueryData(["auth-status"], {
+      authenticated: false,
+      ingress: false,
+      csrf_token: "",
+    });
+  };
   useEffect(() => {
     const expire = () => {
-      client.clear();
-      client.setQueryData(["auth-status"], {
-        authenticated: false,
-        ingress: false,
-        csrf_token: "",
-      });
+      clearSession();
     };
     window.addEventListener("despensa:session-expired", expire);
     return () => window.removeEventListener("despensa:session-expired", expire);
@@ -355,6 +360,19 @@ export function App() {
     queryFn: getAuthStatus,
     retry: false,
   });
+  useEffect(() => {
+    if (auth.data?.authenticated === false) {
+      // Run after the private view unmounts; removing observed queries sooner
+      // can recreate them during that view's final render and start new reads.
+      void client.cancelQueries({
+        predicate: (query) => query.queryKey[0] !== "auth-status",
+      });
+      client.removeQueries({
+        predicate: (query) => query.queryKey[0] !== "auth-status",
+      });
+      client.getMutationCache().clear();
+    }
+  }, [auth.data?.authenticated, client]);
   const [password, setPassword] = useState("");
   const login = useMutation({
     mutationFn: () => loginStandalone(password),
@@ -366,8 +384,7 @@ export function App() {
   const logout = useMutation({
     mutationFn: logoutStandalone,
     onSuccess: () => {
-      client.clear();
-      void client.invalidateQueries({ queryKey: ["auth-status"] });
+      clearSession();
     },
   });
   if (auth.isPending)

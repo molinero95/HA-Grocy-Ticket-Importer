@@ -10,3 +10,4 @@ runtime
 *.db
 frontend/test-results
 frontend/playwright-report
+frontend/coverage

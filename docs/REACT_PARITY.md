@@ -19,6 +19,8 @@ La candidata sirve React en `/`, alias `/react/`, con compras sin JavaScript en 
 | Acceso sin JavaScript | Página básica autenticada con controles de compra y CSRF | Python y Chromium con JavaScript desactivado |
 | Empaquetado | React compilado, runtime completo, espejos Python | CI AMD64/ARM64: build y arranque de contenedor |
 
+Refuerzo del frontend: 67 pruebas Vitest y 13 escenarios Chromium configurados. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
+
 La antigua eliminación permanente podía borrar historia mediante cascadas de Grocy: se sustituye por archivado reversible. La consolidación sigue en auditoría, igual que la función estable protegida; no existe autorización para fusionar productos de usuario.
 
 ## Retirada del código anterior
