@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0] — 2026-11-01
+
+### Changed
+- Manage Alexa aliases by selecting a pantry product first, showing all its existing aliases and offering an explicit add-new action.
+- Keep alias creation and removal scoped to the selected product, with responsive forms and empty/loading states.
+
+
 ## [1.4.1] — 2026-11-01
 
 ### Fixed
