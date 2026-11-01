@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CreateProduct } from "./CreateProduct";
 import * as api from "./api";
 import { deferred } from "./test/helpers";
@@ -11,15 +11,21 @@ vi.mock("./api", async (original) => ({
   createCatalogProduct: vi.fn(),
   saveDiscoveredPhoto: vi.fn(),
   lookupPhoto: vi.fn(),
+  identifyProductPhoto: vi.fn(),
+  uploadCatalogPhoto: vi.fn(),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:product-photo-test");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
   vi.mocked(api.getCatalogUnits).mockResolvedValue([
     { id: 2, name: "Piece" },
     { id: 3, name: "Pack" },
   ]);
   vi.mocked(api.lookupPhoto).mockResolvedValue({ photo: null });
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 it.each([
   { label: "Código de barras (opcional)", value: "123" },
@@ -124,14 +130,121 @@ it("links to an existing product without attaching a photo or permitting resubmi
 
 it("refreshes shopping suggestions immediately after creation before photo lookup completes", async () => {
   const photo = deferred<Awaited<ReturnType<typeof api.saveDiscoveredPhoto>>>();
-  vi.mocked(api.createCatalogProduct).mockResolvedValue({ created: true, product_id: 7 });
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({
+    created: true,
+    product_id: 7,
+  });
   vi.mocked(api.saveDiscoveredPhoto).mockReturnValue(photo.promise);
   const client = mount();
   const invalidate = vi.spyOn(client, "invalidateQueries");
   await userEvent.type(screen.getByLabelText("Nombre"), "Leche");
-  await userEvent.type(screen.getByLabelText("Código de barras (opcional)"), "8412345678901");
+  await userEvent.type(
+    screen.getByLabelText("Código de barras (opcional)"),
+    "8412345678901",
+  );
   await userEvent.selectOptions(screen.getByLabelText("Unidad"), "2");
-  await userEvent.click(screen.getByRole("button", { name: "Guardar producto" }));
-  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["shopping"] }));
+  await userEvent.click(
+    screen.getByRole("button", { name: "Guardar producto" }),
+  );
+  await waitFor(() =>
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["shopping"] }),
+  );
   await act(async () => photo.resolve({ saved: true, image_url: null }));
+});
+
+async function analyzedProductPhoto() {
+  vi.mocked(api.identifyProductPhoto).mockResolvedValue({
+    suggestion: {
+      name: "Yogur natural",
+      brand: "Example",
+      size_text: "125 g",
+      confidence: "medium",
+      visible_barcode: "",
+      barcode: "8412345678901",
+      advisory: true,
+    },
+  });
+  await userEvent.type(
+    screen.getByLabelText("Código de barras (opcional)"),
+    "8412345678901",
+  );
+  await screen.findByRole("button", {
+    name: "Tomar otra foto para buscar con IA",
+  });
+  const file = new File(["fresh front-label photograph"], "front.jpg", {
+    type: "image/jpeg",
+  });
+  await userEvent.upload(
+    screen.getByLabelText("Tomar foto del frontal o etiqueta del producto"),
+    file,
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Analizar foto con OpenAI" }),
+  );
+  await screen.findByRole("button", { name: "Usar nombre sugerido" });
+  await userEvent.click(
+    screen.getByRole("button", { name: "Usar nombre sugerido" }),
+  );
+  await userEvent.selectOptions(screen.getByLabelText("Unidad"), "2");
+  return file;
+}
+
+it("saves the analyzed front photo only after a new product is created", async () => {
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({
+    created: true,
+    product_id: 71,
+  });
+  vi.mocked(api.uploadCatalogPhoto).mockResolvedValue({ saved: true });
+  mount();
+  const file = await analyzedProductPhoto();
+  expect(api.uploadCatalogPhoto).not.toHaveBeenCalled();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Guardar producto" }),
+  );
+  await screen.findByText("Producto creado correctamente");
+  expect(api.uploadCatalogPhoto).toHaveBeenCalledExactlyOnceWith(71, file);
+  expect(api.saveDiscoveredPhoto).not.toHaveBeenCalled();
+  expect(api.createCatalogProduct).toHaveBeenCalledExactlyOnceWith({
+    name: "Yogur natural",
+    barcode: "8412345678901",
+    unit_id: 2,
+    initial_stock: "0",
+    pack_size: "1",
+  });
+});
+
+it("keeps an existing duplicate's photo when recognition finds its name", async () => {
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({
+    created: false,
+    product_id: 7,
+  });
+  mount();
+  await analyzedProductPhoto();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Guardar producto" }),
+  );
+  await screen.findByText(/Este producto ya existía/);
+  expect(api.uploadCatalogPhoto).not.toHaveBeenCalled();
+  expect(api.saveDiscoveredPhoto).not.toHaveBeenCalled();
+});
+
+it("keeps the created product and never replays creation after a photo-save failure", async () => {
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({
+    created: true,
+    product_id: 71,
+  });
+  vi.mocked(api.uploadCatalogPhoto).mockRejectedValue(
+    new Error("Lost photo response"),
+  );
+  mount();
+  await analyzedProductPhoto();
+  await userEvent.dblClick(
+    screen.getByRole("button", { name: "Guardar producto" }),
+  );
+  await screen.findByText(
+    /El producto está creado. No se pudo guardar su foto/,
+  );
+  expect(api.createCatalogProduct).toHaveBeenCalledTimes(1);
+  expect(api.uploadCatalogPhoto).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("button", { name: "Guardar producto" })).toBeNull();
 });

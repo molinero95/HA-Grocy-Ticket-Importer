@@ -8,11 +8,11 @@ import { lookupPhoto } from "./api";
 export function PhotoPreview({
   barcode,
   onUseName,
-  capturedFrame,
+  onRecognitionPhoto,
 }: {
   barcode: string;
   onUseName?: (name: string) => void;
-  capturedFrame?: Blob;
+  onRecognitionPhoto?: (photo: File | null) => void;
 }) {
   const code = barcode.trim();
   const lookupCode = useDebouncedValue(code);
@@ -61,7 +61,7 @@ export function PhotoPreview({
         </>
       )}
       {onUseName && (photo.isError || (photo.data && !photo.data.photo?.name)) && (
-        <ProductRecognition key={code} barcode={code} capturedFrame={capturedFrame} onUseName={onUseName} />
+        <ProductRecognition key={code} barcode={code} onUseName={onUseName} onPhotoReady={onRecognitionPhoto} />
       )}
       {photo.data?.photo && (
         <a

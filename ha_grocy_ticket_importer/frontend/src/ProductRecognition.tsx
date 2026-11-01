@@ -5,18 +5,21 @@ import type { ProductSuggestion } from "./api";
 /** Complete photo stays in browser memory until the explicit OpenAI action. */
 export function ProductRecognition({
   barcode,
-  capturedFrame,
   onUseName,
+  onPhotoReady,
 }: {
   barcode: string;
-  capturedFrame?: Blob;
   onUseName: (name: string) => void;
+  onPhotoReady?: (photo: File | null) => void;
 }) {
-  const [photo, setPhoto] = useState<Blob | null>(capturedFrame ?? null);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [suggestion, setSuggestion] = useState<ProductSuggestion | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const onPhotoReadyRef = useRef(onPhotoReady);
+  onPhotoReadyRef.current = onPhotoReady;
+  const cameraInput = useRef<HTMLInputElement>(null);
   const generation = useRef(0);
   const pending = useRef(false);
   const attempted = useRef(false);
@@ -33,10 +36,11 @@ export function ProductRecognition({
     generation.current++;
     attempted.current = false;
     setSubmitted(false);
-    setPhoto(capturedFrame ?? null);
+    setPhoto(null);
+    onPhotoReadyRef.current?.(null);
     setSuggestion(null);
     setError("");
-  }, [barcode, capturedFrame]);
+  }, [barcode]);
   useEffect(() => {
     if (!photo || !URL.createObjectURL) {
       setPreview("");
@@ -57,8 +61,10 @@ export function ProductRecognition({
     const episode = generation.current;
     try {
       const result = await identifyProductPhoto(barcode, photo);
-      if (mounted.current && episode === generation.current)
+      if (mounted.current && episode === generation.current) {
         setSuggestion(result.suggestion);
+        onPhotoReadyRef.current?.(photo);
+      }
     } catch (e) {
       if (mounted.current && episode === generation.current)
         setError((e as Error).message);
@@ -71,8 +77,8 @@ export function ProductRecognition({
     <section className="product-recognition">
       <h3>Identificar con una foto</h3>
       <p>
-        Fotografía el producto completo y su etiqueta. Al pulsar Analizar se
-        enviará la foto completa a OpenAI para sugerir su nombre.
+        Fotografía el frontal o la etiqueta con el nombre visible. Al crear el producto,
+        guardaremos la foto analizada en su ficha.
       </p>
       {preview && (
         <img
@@ -81,28 +87,45 @@ export function ProductRecognition({
           className="recognition-preview"
         />
       )}
-      <label className="variant-field">
-        Fotografía completa del producto
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          capture="environment"
-          disabled={busy}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            generation.current++;
-            attempted.current = false;
-            setSubmitted(false);
-            event.target.value = "";
-            setSuggestion(null);
-            setError("");
-            if (file && file.size > 8 * 1024 * 1024) {
-              setPhoto(null);
-              setError("La imagen supera 8 MiB");
-            } else setPhoto(file ?? null);
-          }}
-        />
-      </label>
+      <button
+        className="secondary-button"
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          generation.current++;
+          attempted.current = false;
+          setSubmitted(false);
+          setPhoto(null);
+          setSuggestion(null);
+          setError("");
+          onPhotoReadyRef.current?.(null);
+          cameraInput.current?.click();
+        }}
+      >
+        Tomar otra foto para buscar con IA
+      </button>
+      <input
+        ref={cameraInput}
+        hidden
+        aria-label="Tomar foto del frontal o etiqueta del producto"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="environment"
+        disabled={busy}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          generation.current++;
+          attempted.current = false;
+          setSubmitted(false);
+          event.target.value = "";
+          setSuggestion(null);
+          setError("");
+          if (file && file.size > 8 * 1024 * 1024) {
+            setPhoto(null);
+            setError("La imagen supera 8 MiB");
+          } else setPhoto(file ?? null);
+        }}
+      />
       <button
         className="secondary-button"
         type="button"

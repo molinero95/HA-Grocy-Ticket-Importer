@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.14.0] — 2026-11-01
+
+### Added
+- Save the freshly analyzed product photo as the new product's local image after successful creation. Reuse the sanitized photo-upload endpoint, prioritize the user's front/label photo and retain existing duplicate-product images. Snapshot the photo with the creation request; image-save failures preserve the created product and show recovery guidance.
+
+### Fixed
+- Replace the product-recognition file-upload control with “Tomar otra foto para buscar con IA”, requesting a new rear-camera photo of the package front or label. Preview that new photo before explicit analysis.
+- Stop capturing or forwarding barcode-scanner frames into AI recognition. A fresh product photo is required; the scanned code remains unchanged. Retain manual entry, explicit name acceptance, late-response guards and one-shot analysis.
+
 ## [1.13.0] — 2026-11-01
 
 ### Added

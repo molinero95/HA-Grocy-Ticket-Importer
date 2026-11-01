@@ -69,3 +69,7 @@ Conservar todos los datos persistentes y módulos Python espejo. Validación aut
 - Consultar stock real por ID/alias; aclarar ambigüedades, conservar unidades Piece/kg y respetar umbrales/opt-out. Error de consulta no equivale a cero. No efectuar escrituras Grocy/Alexa desde voz.
 - Búsqueda pública por código primero. Si no hay nombre o el servicio falla, ofrecer análisis explícito de fotografía completa; conservar encuadre, sanear EXIF y memoria acotada. La sugerencia visual no es búsqueda web ni verifica identidad/EAN. Aplicar nombre manualmente; no alterar código, stock ni conversiones.
 - Usar clave OpenAI existente, `store=false`, sin reintentos automáticos y sin persistir fotografías del reconocimiento. Los catálogos, fotos locales e historiales previos permanecen.
+
+En 1.14.0 el usuario solicita una toma nueva del frontal/etiqueta mediante «Tomar otra foto para buscar con IA». El escáner solo devuelve el código y no captura fotos para el reconocimiento. La nueva foto se previsualiza antes del envío explícito.
+
+Por indicación del usuario, guardar la foto nueva analizada como imagen local al crear una ficha nueva. Sanear con el endpoint existente, preservar las fotos de duplicados y no repetir el alta si falla el guardado de imagen.
