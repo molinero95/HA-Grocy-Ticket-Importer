@@ -331,7 +331,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.0 · Versión en desarrollo</footer>
+      <footer>Despensa 1.0.0</footer>
     </div>
   );
 }

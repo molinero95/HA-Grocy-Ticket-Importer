@@ -1,6 +1,6 @@
 # Despensa 1.0 — validación reproducible
 
-Fecha: 2026-11-01. Candidata en PR #10; estable 0.16.4 sin publicación ni despliegue.
+Fecha: 2026-11-01. Migración de PR #10 integrada en `main`; publicación 1.0.0 autorizada para actualizar desde 0.16.4. No se acredita instalación ni aceptación física por publicar el manifiesto.
 
 ## Evidencia local
 

@@ -1,6 +1,6 @@
 # Despensa — decisiones vigentes
 
-Última revisión: 2026-11-01. Consolida las decisiones del producto y sustituye los estados históricos de implementación de PR #2/#5. La migración se desarrolla en PR #10; no autoriza fusionar, publicar ni cambiar `main`.
+Última revisión: 2026-11-01. Consolida las decisiones del producto y sustituye los estados históricos de implementación de PR #2/#5. PR #10 integrada en `main` por petición del usuario; posteriormente autoriza publicar 1.0.0 para que Home Assistant ofrezca la actualización. La instalación real y su aceptación se verifican por separado.
 
 ## Navegación y compras
 
@@ -41,6 +41,6 @@
 
 React 19, TypeScript 7, Vite 7 y Vitest 4 en el mismo origen que Flask. Credenciales solo en servidor, ingress HA o sesión standalone, CSRF en todas las mutaciones, CSP y errores en español. No exponer puertos ni relajar autenticación para probar.
 
-La candidata de la rama sirve React en `/` y conserva `/react/` como alias; `/basic` mantiene compras sin JavaScript. Se ha eliminado el frontend completo duplicado después de comprobar paridad contra Grocy 4.7.1 aislado. Esto NO despliega nada en Home Assistant.
+La versión 1.0.0 sirve React en `/` y conserva `/react/` como alias; `/basic` mantiene compras sin JavaScript. Se ha eliminado el frontend completo duplicado después de comprobar paridad contra Grocy 4.7.1 aislado. Publicar la versión en el manifiesto permite detectar la actualización; no acredita una instalación en Home Assistant.
 
-Conservar todos los datos persistentes y módulos Python espejo. Validación automatizada y límites constan en `docs/VALIDATION_V1.md`. Las lecturas de Grocy instalado y la entidad HA/Alexa real ya responden correctamente sin cambios de seguridad. Actualización Supervisor, cámara física y escrituras Alexa reales siguen siendo aceptación de despliegue externa. No afirmar que se han realizado ni publicar antes de completarlas.
+Conservar todos los datos persistentes y módulos Python espejo. Validación automatizada y límites constan en `docs/VALIDATION_V1.md`. Las lecturas de Grocy instalado y la entidad HA/Alexa real ya responden correctamente sin cambios de seguridad. Actualización Supervisor, cámara física y escrituras Alexa reales siguen siendo aceptación de despliegue externa. Publicación 1.0.0 autorizada por el usuario sin dar por realizadas esas comprobaciones; mantener copia HA y sincronización desactivada hasta validar sus escrituras reales.

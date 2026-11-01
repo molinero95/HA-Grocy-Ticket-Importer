@@ -1,6 +1,6 @@
 # Despensa 1.0 — cierre de migración
 
-Estado de código: candidata implementada en PR #10, rama `feature/despensa-v1-react`. Sin versión nueva, fusión ni despliegue. `main` sigue en 0.16.4.
+Estado de código: migración de PR #10 integrada en `main` (`a6cc354`). Publicación de versión 1.0.0 autorizada por el usuario, con manifiesto, frontend y notas alineados en la PR de release. La actualización de la instalación real se realiza por separado.
 
 ## Implementado y validado automáticamente
 
@@ -25,7 +25,7 @@ La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATI
 - [x] Lecturas de Grocy instalado 4.7.1 y esquema de unidades/conversiones/lista/referencias, usando su acceso interno y clave existentes. Entidad HA/Alexa: pendientes con uid/summary/status válidos; sin escrituras ni cambios de seguridad.
 - [ ] Copia HA y actualización de prueba conservando ledger, fotos, variantes, comandos, colas y checkpoints de esa instalación. Reiniciar Grocy aislado ya está probado; no equivale a actualizar Supervisor.
 - [ ] Cámara física y permisos de Android/HA; escrituras Alexa reales de la entidad elegida. El navegador automatizado simula el dispositivo de cámara y la respuesta HA.
-- [ ] Solo tras esas comprobaciones: decisión separada sobre fusión, versión y publicación. No autorizadas durante esta ejecución.
+- [x] Usuario autoriza fusionar la migración y publicar 1.0.0 para habilitar la actualización en Home Assistant. Esta autorización no acredita la aceptación física ni instala automáticamente el complemento.
 
 ## Fuera del alcance de la migración
 

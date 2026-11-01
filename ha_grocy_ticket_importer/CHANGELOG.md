@@ -1,15 +1,24 @@
 # Changelog
 
-## Unreleased — Despensa 1.0 candidate (2026-11-01)
+## [1.0.0] — 2026-11-01
 
-- React 19, TypeScript 7, Vite 7 and Vitest 4; mobile shopping, inventory, product sheets, receipt review/import, variants, photos and Alexa review. Candidate root now serves React; script-free basic shopping remains. Removed the previous full inline frontend and obsolete routes.
+### Changed
+
+- React 19, TypeScript 7, Vite 7 and Vitest 4; mobile shopping, inventory, product sheets, receipt review/import, variants, photos and Alexa review. The root now serves React; script-free basic shopping remains. Removed the previous full inline frontend and obsolete routes.
 - Trusted exact-barcode photo discovery, sanitized uploads, versioned shared images, standalone session/CSRF and ingress-prefixed APIs/assets.
 - Durable at-most-once consumption commands and receipt submission guards; report uncertain/partial results without repeating stock changes.
 - Verified Grocy Pack/Piece conversions, future-purchase editing, precise shopping quantities and row-ID mutations preserving notes, completed rows and other lists. No automatic conversion of existing stock.
 - Explicit Alexa note association preserves row/amount/text; keep-original dismissal persists. Conflict checks and verified checkpoints remain mandatory; sync stays disabled by default.
 - Reversible archive/restore preserves history and metadata; permanent deletion and automatic consolidation remain unavailable.
 - Real unmodified Grocy 4.7.1 contracts and full mobile browser workflows with disposable data; CI builds/starts AMD64 and ARM64 containers. Python mirrors remain synchronized.
-- No manifest bump, release, merge or production deployment. Read-only installed Grocy 4.7.1/schema and configured HA/Alexa entity checks succeeded with existing credentials/listeners. Physical camera, real Alexa writes and Supervisor upgrade acceptance remain external deployment checks.
+- Frontend QA: 67 Vitest tests, 13 Chromium scenarios, 200 Python tests and 5 real Grocy contracts; V8 coverage reports in CI. Fix session expiry/private-cache cleanup, ticket preview readiness and pack-factor validation.
+
+### Updating from 0.16.4
+
+- Home Assistant detects 1.0.0 from the add-on manifest. Refresh the add-on store and update the existing installation; do not uninstall it. Create a Home Assistant backup first and retain `/config` and `/data` (receipt ledger, photos, variants, command journal, Alexa queues and checkpoints).
+- No new options or automatic stock conversion/consolidation. Pack is the purchase unit; Piece remains stock/consumption. Variant factors remain descriptive. Existing data is preserved.
+- Permanent product deletion is replaced by reversible archive/restore. Legacy full HTML routes are removed; use React at `/` or basic shopping at `/basic`.
+- Read-only installed Grocy 4.7.1/schema and configured HA/Alexa entity checks succeeded with existing credentials/listeners. Physical Android camera, real Alexa writes and the Supervisor upgrade still need validation on the installed system; publishing this version does not imply those checks or an installation have occurred. Keep Alexa sync disabled until its real write behavior has been checked.
 
 ## [0.16.4] — 2026-10-31
 

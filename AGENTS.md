@@ -2,7 +2,7 @@
 
 ## Current handoff — 2026-11-01
 
-Work only in PR #10, `feature/despensa-v1-react`. The user explicitly asks to finish the migration autonomously and permits commits, pushes and CI fixes. Never modify `main`, merge, bump `config.yaml` or publish in this task. Stable main/installed add-on remain 0.16.4; this branch is an unpublished candidate.
+PR #10 was merged into main at `a6cc354` after successful CI. The user subsequently explicitly authorized publishing the 1.0.0 major update so Home Assistant can offer it. Prepare version/changelog/documentation changes in `release/despensa-1.0.0`, verify CI, then merge the release PR into main. This authorization supersedes the earlier migration-only restriction on merging and bumping the manifest. It does not request installing/restarting the production add-on or enabling Alexa sync. Never claim installed acceptance without observing it.
 
 Read `DECISIONS.md`, `ROADMAP.md`, `docs/REACT_PARITY.md`, `README.md` and the add-on `DOCS.md`. Verify actual GitHub branch/checks before work. Never describe a deployment or CI success without observing it. Installed Grocy read-only checks now pass using its existing internal service port 80 and existing API key; ingress proxy alone returned 403. Grocy 4.7.1 / PHP 8.5.12 matches isolated validation. Do not change security/options or use production stock for exploratory tests. The configured HA todo entity also returned valid pending uid/summary/status records.
 
@@ -51,6 +51,6 @@ Check final-head GitHub Actions: frontend, AMD64 and ARM64 container build/start
 
 Frontend QA reinforcement: 67 Vitest tests and 13 configured Chromium scenarios. `npm run test:coverage` produces V8 HTML/LCOV/JSON reports and CI uploads `frontend-coverage`; reports are excluded from Git, Docker context and install archives. New regressions cover uncertain/duplicate writes, partial consumption, receipts/preview readiness, session expiry/late reads, pack factors, variants/photos, camera cleanup and keyboard/responsive layouts. Local browser runs without `GROCY_TEST_DIST` execute 9 and explicitly skip 4. Keep the auth query observed when expiring/logging out; remove private caches after the authenticated view unmounts to prevent recreating active reads.
 
-## Future release
+## Release maintenance
 
-A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Do not publish a release during this task. Keep the previous installation and Home Assistant backup until a future deployment is accepted.
+A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. The 1.0.0 manifest and frontend package/lockfile versions must match. Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
