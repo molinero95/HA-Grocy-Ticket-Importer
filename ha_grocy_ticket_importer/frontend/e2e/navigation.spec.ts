@@ -100,3 +100,31 @@ test("different duplicate pairs stay hidden after reload and can be restored", a
   await page.getByRole("button", {name: "Deshacer diferencia", exact: true}).click();
   await expect(page.getByRole("button", {name: "Revisar combinación", exact: true})).toBeVisible();
 });
+
+test("an Alexa arrival without candidates can create and automatically associate a product", async ({ page }) => {
+  let associated = false, writes = 0;
+  const source = "Gel Alexa nuevo";
+  await page.route("**/api/v1/shopping", route => route.fulfill({json: {items: associated ? [{id: 10, name: "Jabon neutro nuevo", amount: 2.5, unit: "Piece", done: false, product_id: 8, image_url: null}] : [], pending_matches: associated ? [] : [{key: "gel alexa nuevo", name: source, candidates: []}], shopping_error: false, pending_matches_error: false}}));
+  await page.route("**/api/v1/alexa/matches/*/create-context", route => route.fulfill({json: {key: "gel alexa nuevo", name: source, generation: 1, can_create: true, product_id: null, product_name: null, associated: false, can_associate: false}}));
+  await page.route("**/api/v1/catalog/units", route => route.fulfill({json: {units: [{id: 2, name: "Piece"}]}}));
+  await page.route("**/api/v1/alexa/matches/*/create-product", async route => {
+    writes++; const payload = route.request().postDataJSON();
+    expect(payload.product.initial_stock).toBe("0");
+    expect(payload.product.name).toBe("Jabon neutro nuevo");
+    associated = true;
+    await route.fulfill({status: 201, json: {created: true, product_id: 8, associated: true}});
+  });
+  await page.goto(ingress);
+  await page.getByRole("button", {name: `Crear producto para «${source}»`, exact: true}).click();
+  await expect(page.getByLabel("Nombre", {exact: true})).toHaveValue(source);
+  await expect(page.getByLabel("Stock inicial")).toHaveCount(0);
+  await page.getByLabel("Nombre", {exact: true}).fill("Jabon neutro nuevo");
+  await page.getByLabel("Unidad", {exact: true}).selectOption("2");
+  await page.getByRole("button", {name: "Guardar producto", exact: true}).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const row = page.locator("article").filter({hasText: "Jabon neutro nuevo"});
+  await expect(row).toContainText("2.5 Piece");
+  await expect(row.getByRole("button", {name: "✓ Comprado", exact: true})).toBeVisible();
+  await expect(row.getByRole("button", {name: "Quitar Jabon neutro nuevo", exact: true})).toBeVisible();
+  expect(writes).toBe(1);
+});

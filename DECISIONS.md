@@ -4,7 +4,7 @@
 
 ## Navegación y compras
 
-- Inicio: **Lista de la compra**; otras pestañas: **Mi despensa** y **Acciones**. Desde 1.1.0, **Nuevo producto** solo está en Mi despensa, con botón principal. La búsqueda por nombre/código es automática: barra con input y cámara, sin botón Buscar. **Productos archivados** se abre desde Acciones; no ocupa espacio en el inventario habitual ni duplica el alta.
+- Inicio: **Lista de la compra**; otras pestañas: **Mi despensa** y **Acciones**. Desde 1.1.0, **Nuevo producto** solo está en Mi despensa, con botón principal. Desde 1.11.0, las entradas de compra/Alexa permiten crear un producto contextual sin stock y asociarlo conservando fila/cantidad/nota, incluso sin candidatos. Un duplicado existente requiere aceptación explícita. La búsqueda por nombre/código es automática: barra con input y cámara, sin botón Buscar. **Productos archivados** se abre desde Acciones; no ocupa espacio en el inventario habitual ni duplica el alta.
 - La lista predeterminada de Grocy es la única lista de compra del producto. Marcar comprado o retirar no altera existencias.
 - Carrito «Añadir» para productos ausentes, después «− cantidad +», y carrito otra vez al llegar a cero. Actualización sin recarga ni salto de scroll; errores visibles, columnas estables en móvil y alternativa HTML sin JavaScript.
 - Máximo dos decimales. Pasos de 0,10 kg y 1 pieza. La cantidad almacenada por Grocy está en unidades de stock; una compra de packs se convierte exactamente una vez.

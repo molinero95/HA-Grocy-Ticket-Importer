@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.10.0 — actualización de la instalación existente
+## Despensa 1.11.0 — actualización de la instalación existente
 
-La versión 1.10.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.11.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.10.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.11.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -185,3 +185,12 @@ Successful status notices are green. The fullscreen button/component has been re
 Product sheets expose a threshold (default 0) and “No avisar de stock bajo”. Enabled warnings use amount <= threshold; positive amounts display Stock bajo and zero/negative amounts Sin existencias. Opting out suppresses both color and badges while retaining the threshold. Archived rows remain neutral.
 
 Persist display-only metadata in the existing generic catalog SQLite file with an additive, serialized schema migration. Reads return zero/enabled defaults; writes compare expected amount and enabled state. Grocy min_stock_amount is deliberately unchanged because its API can auto-add shopping rows. Neither stock nor shopping is mutated. Settings and duplicate decisions survive upgrades in the existing catalog volume.
+
+
+## Create from unknown shopping/Alexa entries (1.11.0)
+
+Unknown arrivals remain reviewable with no candidates. Contextual creation prefills the editable source name, forces zero initial stock and automatically associates a newly created product while preserving shopping row ID/quantity/note. It never calls Alexa or stock mutations. An existing name/barcode match requires explicit reuse confirmation.
+
+A server-prepared created_product_id is scoped to the active source generation; it validates the edited canonical product name by ID and survives advisory reranking without weakening ordinary candidate guards. New source episodes clear the proof; inactive/missing products cannot be chosen. Existing attached rows cannot be rebound. Active prepared products block deletion/native merge. Names containing slashes use path-safe routes.
+
+Creation is journaled once. Known partial outcomes retain the product ID; a fresh context read and explicit choose finish the association, detecting a row already converted without rewriting it. Uncertain creation cannot be resent with the same command. Native product creation still checks duplicate names/barcodes and never adds stock to existing products.

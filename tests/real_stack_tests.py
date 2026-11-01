@@ -74,7 +74,8 @@ class RealStackTests(unittest.TestCase):
         rid = int(self.instance.http('POST', 'objects/shopping_list',
             {'shopping_list_id': 1, 'note': name, 'amount': 3})['created_object_id'])
         first = self.client.get('/api/v1/shopping').json
-        self.assertFalse(any(row['name'] == name for row in first['pending_matches']))
+        unmatched = next(row for row in first['pending_matches'] if row['name'] == name)
+        self.assertEqual(unmatched['candidates'], [])
         units = self.client.get('/api/v1/catalog/units').json['units']
         piece = next(row['id'] for row in units if row['name'] == 'Piece')
         response = self.client.post('/api/v1/catalog/products', json={'name': name, 'unit_id': piece}, headers=self.headers)
@@ -82,6 +83,7 @@ class RealStackTests(unittest.TestCase):
         pid = response.json['product_id']
         second = self.client.get('/api/v1/shopping').json
         review = next(row for row in second['pending_matches'] if row['name'] == name)
+        self.assertEqual(review['generation'], unmatched['generation'])
         self.assertEqual([p['id'] for p in review['candidates']], [pid])
         chosen = self.client.post('/api/v1/alexa/matches/'+review['key']+'/choose', json={'product_id': pid, 'operation_id': str(uuid.uuid4())}, headers=self.headers)
         self.assertEqual(chosen.status_code, 200, chosen.json)
@@ -283,3 +285,37 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(product['stock_threshold'], '2')
         self.assertFalse(product['stock_warning_enabled'])
         for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
+
+    def test_create_from_unknown_alexa_preserves_real_note_and_stock_without_duplicates(self):
+        import shopping_match_queue as queue
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        for has_note in (True, False):
+            name = 'Alexa unknown source ' + str(has_note)
+            original = None
+            if has_note:
+                rid = self.instance.http('POST', 'objects/shopping_list', {'shopping_list_id': 1, 'note': name, 'amount': 2.5})['created_object_id']
+                original = self.instance.http('GET', f'objects/shopping_list/{rid}')
+            products = self.instance.http('GET', 'objects/products')
+            queue.refresh(queue.DEFAULT_PATH, [name], products)
+            row = next(row for row in queue.pending(queue.DEFAULT_PATH) if row['name'] == name)
+            self.assertEqual(row['candidates'], [])
+            before = {entity: self.instance.http('GET', 'objects/' + entity) for entity in ('stock', 'stock_log')}
+            base = '/api/v1/alexa/matches/' + name + '/'
+            context = self.client.get(base + 'create-context')
+            self.assertEqual(context.status_code, 200, context.json)
+            payload = {'expected_name': name, 'generation': context.json['generation'], 'operation_id': str(uuid.uuid4()),
+                       'product': {'name': 'Jabon canonico creado ' + str(has_note), 'unit_id': units['Piece'], 'initial_stock': '0'}}
+            for _ in range(2):
+                result = self.client.post(base + 'create-product', json=payload, headers=self.headers)
+                self.assertEqual(result.status_code, 201, result.json)
+                self.assertTrue(result.json['associated'])
+            pid = result.json['product_id']
+            saved = self.instance.http('GET', f"objects/shopping_list/{result.json['item_id']}")
+            self.assertEqual(saved['product_id'], pid)
+            self.assertEqual(saved['note'], name)
+            self.assertEqual(float(saved['amount']), 2.5 if has_note else 1)
+            if original: self.assertEqual(saved['id'], original['id'])
+            self.assertEqual(float(self.instance.http('GET', f'stock/products/{pid}')['stock_amount']), 0)
+            for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
+            self.assertEqual(queue.resolved_choices(queue.DEFAULT_PATH, [name], self.instance.http('GET', 'objects/products'))[name.lower()]['product_id'], pid)
+            self.instance.http('DELETE', f"objects/shopping_list/{saved['id']}")

@@ -34,7 +34,7 @@ class CatalogSuggestionTests(unittest.TestCase):
         self.products[0]['name']='Pasta'
         self.assertEqual([p['id'] for p in self.candidates()[0]['candidates']],[2])
         self.products[1]['active']='0'
-        self.assertEqual(self.candidates(),[])
+        self.assertEqual(self.candidates()[0]['candidates'],[])
         self.assertEqual(self.grocy.call_count,4)
         for call in self.grocy.call_args_list:
             self.assertEqual(call.args,('GET','objects/products'))

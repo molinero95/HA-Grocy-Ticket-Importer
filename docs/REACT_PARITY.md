@@ -20,7 +20,7 @@ La versión 1.0.0 sirve React en `/`, alias `/react/`, con compras sin JavaScrip
 | Acceso sin JavaScript | Página básica autenticada con controles de compra y CSRF | Python y Chromium con JavaScript desactivado |
 | Empaquetado | React compilado, runtime completo, espejos Python | CI AMD64/ARM64: build y arranque de contenedor |
 
-Frontend 1.10.0: 87 pruebas Vitest y 25 escenarios Chromium configurados. Alta solo en Mi despensa; archivados en Acciones, sin acceso de alta duplicado. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
+Frontend 1.11.0: 91 pruebas Vitest y 27 escenarios Chromium configurados. Alta solo en Mi despensa; archivados en Acciones, sin acceso de alta duplicado. Incluye regresiones de sesión/caché tardía, tickets no listos para importar, escrituras únicas ante doble pulsación/respuesta perdida, factores Pack, conflictos de variantes y navegación por teclado. Cobertura y alcance exacto en [VALIDATION_V1.md](VALIDATION_V1.md).
 
 La antigua eliminación permanente podía borrar historia mediante cascadas de Grocy. El archivado reversible sigue siendo la opción para productos con historial; desde 1.8.0 solo se permite eliminar una ficha archivada sin stock, historia ni dependencias tras auditar las cascadas. Desde 1.9.0 el usuario autoriza implementar combinación explícita compatible mediante la transacción nativa de Grocy; no se autoriza al agente a combinar datos de producción.
 
@@ -35,3 +35,5 @@ Véase [VALIDATION_V1.md](VALIDATION_V1.md). Grocy es el release oficial 4.7.1 s
 Desde 1.10.0 se permite borrar el historial de movimientos de un archivado tras aceptación expresa; se mantienen las protecciones de stock/dependencias/importaciones inciertas y el ledger local de tickets completados. Se retira pantalla completa y se corrige el color de éxito.
 
 Aviso de existencias 1.10.0: umbral por producto 0/enabled por defecto, desactivación individual, metadatos persistentes y lectura/cantidad/compra de Grocy idénticas tras editar avisos.
+
+Desde 1.11.0 la revisión de compra/Alexa ofrece creación contextual sin stock y asociación inmediata, incluso sin candidatos; conserva ID/cantidad/nota y permite recuperar resultados parciales sin repetir el alta. El alta general sigue en Mi despensa.
