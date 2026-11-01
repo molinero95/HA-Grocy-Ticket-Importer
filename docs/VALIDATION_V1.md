@@ -4,11 +4,11 @@ Fecha: 2026-11-01. Migración de PR #10 integrada en `main`; publicación 1.0.0 
 
 ## Evidencia local
 
-- Python: 200 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
-- Vitest 4: 62 pruebas de interacciones React y cliente API en 1.0.1. Se retiran 7 tests del componente de consumo eliminado y se añaden 2 regresiones de stock/navegación respecto a los 67 de 1.0.0.
+- Python: 222 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
+- Vitest 4: 66 pruebas de interacciones React y cliente API en 1.1.0. Se retiran 7 tests del componente de consumo eliminado y se añaden 6 regresiones de stock/navegación/elección y retirada manual respecto a los 67 de 1.0.0.
 - TypeScript 7: aplicación y e2e; Vite 7: compilación de producción.
-- Grocy real: 5 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial).
-- Chromium: 14 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
+- Grocy real: 6 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
+- Chromium: 15 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
 
 ## Refuerzo de QA del frontend
 
@@ -16,9 +16,9 @@ Las pruebas de componentes cubren ajuste del total restante sin formulario de co
 
 Estas regresiones detectaron y corrigieron tres defectos: borrar una consulta de autenticación observada podía dejar la vista anterior y recrear caché privada; el frontend ignoraba `ready_to_commit: false`; el botón de alta no aplicaba el máximo de 1000 piezas por pack (el campo HTML y el servidor ya lo limitaban).
 
-`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **75 % líneas, 74,87 % sentencias, 78,5 % ramas y 62,84 % funciones**. Compras, configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
+`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,07 % líneas, 75,89 % sentencias, 79,35 % ramas y 64,75 % funciones**. Compras, configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
 
-La ejecución local de navegador sin PHP/Grocy ejecuta 10 escenarios disponibles y omitió explícitamente los 4 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 14; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
+La ejecución local de navegador sin PHP/Grocy ejecuta 11 escenarios disponibles y omitió explícitamente los 4 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 15; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
 
 Las pruebas antiguas que solo verificaban el HTML retirado o autorizaban eliminación permanente se sustituyen por comprobaciones del comportamiento actual. El total de tests no mide por sí solo la paridad.
 

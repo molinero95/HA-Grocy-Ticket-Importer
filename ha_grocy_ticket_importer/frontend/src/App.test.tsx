@@ -12,6 +12,7 @@ vi.mock("./api", async (original) => ({
   getShopping: vi.fn(),
   toggleShopping: vi.fn(),
   removeShopping: vi.fn(),
+  removeAlexaMatch: vi.fn(),
   chooseAlexaMatch: vi.fn(),
   logoutStandalone: vi.fn(),
   getInventory: vi.fn(),
@@ -149,7 +150,129 @@ it("keeps an ambiguous Alexa suggestion visible after a stale choice is rejected
     "value",
     "7",
   );
-  expect(api.chooseAlexaMatch).toHaveBeenCalledExactlyOnceWith("leche", 7);
+  expect(api.chooseAlexaMatch).toHaveBeenCalledExactlyOnceWith(
+    "leche",
+    7,
+    expect.any(String),
+  );
+});
+
+it.each([7, 0])(
+  "saving suggestion %i immediately yields a row with bought/remove controls",
+  async (productId) => {
+    let saved = false;
+    vi.mocked(api.getShopping).mockImplementation(async () =>
+      saved
+        ? {
+            ...shopping,
+            items: [
+              {
+                ...shopping.items[0],
+                name: productId ? "Leche entera" : "Leche",
+              },
+            ],
+            pending_matches: [],
+          }
+        : {
+            ...shopping,
+            items: [],
+            pending_matches: [
+              {
+                key: "leche",
+                name: "Leche",
+                candidates: [{ id: 7, name: "Leche entera" }],
+              },
+            ],
+          },
+    );
+    vi.mocked(api.chooseAlexaMatch).mockImplementation(async () => {
+      saved = true;
+      return { ok: true, item_id: 12 };
+    });
+    renderWithClient(<App />);
+    expect(
+      await screen.findByRole("button", { name: "Quitar Leche" }),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByText("Elegir producto para «Leche»"));
+    if (productId)
+      await userEvent.selectOptions(
+        screen.getByLabelText("Producto sugerido"),
+        "7",
+      );
+    await userEvent.dblClick(
+      screen.getByRole("button", {
+        name: productId ? "Guardar elección" : "Mantener original",
+      }),
+    );
+    await screen.findByRole("button", { name: "✓ Comprado" });
+    await screen.findByRole("button", {
+      name: productId ? "Quitar Leche entera" : "Quitar Leche",
+    });
+    expect(await screen.findByRole("status")).toHaveProperty(
+      "textContent",
+      expect.stringContaining("Artículo guardado en la lista"),
+    );
+    expect(api.chooseAlexaMatch).toHaveBeenCalledExactlyOnceWith(
+      "leche",
+      productId,
+      expect.any(String),
+    );
+  },
+);
+
+it("can remove an unresolved suggestion without opening it or choosing a product", async () => {
+  let removed = false;
+  vi.mocked(api.getShopping).mockImplementation(async () => ({
+    ...shopping,
+    items: [],
+    pending_matches: removed
+      ? []
+      : [
+          {
+            key: "leche",
+            name: "Leche",
+            candidates: [{ id: 7, name: "Leche entera" }],
+          },
+        ],
+  }));
+  vi.mocked(api.removeAlexaMatch).mockImplementation(async () => {
+    removed = true;
+    return { ok: true };
+  });
+  renderWithClient(<App />);
+  await userEvent.dblClick(
+    await screen.findByRole("button", { name: "Quitar Leche" }),
+  );
+  await screen.findByText("Tu lista de la compra está vacía.");
+  expect(api.removeAlexaMatch).toHaveBeenCalledExactlyOnceWith("leche");
+  expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
+});
+
+it("retains unresolved items and their remove action when saving or removal fails", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({
+    ...shopping,
+    items: [],
+    pending_matches: [
+      {
+        key: "leche",
+        name: "Leche",
+        candidates: [{ id: 7, name: "Leche entera" }],
+      },
+    ],
+  });
+  vi.mocked(api.removeAlexaMatch).mockRejectedValue(
+    new Error("No se pudo confirmar la eliminación"),
+  );
+  renderWithClient(<App />);
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Quitar Leche" }),
+  );
+  await screen.findByRole("alert");
+  expect(screen.getByRole("button", { name: "Quitar Leche" })).toHaveProperty(
+    "disabled",
+    false,
+  );
+  expect(screen.getByText("Elegir producto para «Leche»")).toBeTruthy();
 });
 
 it("shows login and clears private queries immediately after logout", async () => {

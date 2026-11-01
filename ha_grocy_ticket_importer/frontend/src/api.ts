@@ -101,10 +101,17 @@ export const clearCompletedShopping = () =>
   request<{ removed: number }>("shopping/clear-completed", "POST");
 export const removeShopping = (id: number) =>
   request("shopping/" + id, "DELETE");
-export const chooseAlexaMatch = (key: string, productId: number) =>
+export const chooseAlexaMatch = (
+  key: string,
+  productId: number,
+  operationId: string,
+) =>
   request("alexa/matches/" + encodeURIComponent(key) + "/choose", "POST", {
     product_id: productId,
+    operation_id: operationId,
   });
+export const removeAlexaMatch = (key: string) =>
+  request("alexa/matches/" + encodeURIComponent(key), "DELETE");
 export const getInventory = () => request<InventoryResponse>("inventory");
 export async function lookupBarcode(code: string): Promise<number | null> {
   return (

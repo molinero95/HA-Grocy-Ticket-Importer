@@ -194,6 +194,13 @@ h3 {
   background: #fff0eb;
   color: #8e4333;
 }
+.shopping-feedback {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #e6f2e9;
+  color: #185a3e;
+  font-size: 14px;
+}
 footer {
   margin-top: 36px;
   text-align: center;

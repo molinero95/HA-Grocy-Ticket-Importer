@@ -1,7 +1,7 @@
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, Search, ShoppingBasket } from "lucide-react";
+import { Minus, Plus, ShoppingBasket } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { ProductDetail } from "./ProductDetail";
 import { CreateProduct } from "./CreateProduct";
@@ -89,22 +89,12 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
         </div>
       </div>
       <div className="search-box">
-        <Search size={19} />
         <input
           aria-label="Buscar por nombre o código de barras"
           placeholder="Nombre o código de barras"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button
-          title="Buscar código de barras"
-          onClick={() => void barcode.refetch()}
-          disabled={
-            !isBarcode(code) || code !== lookupCode || barcode.isFetching
-          }
-        >
-          {barcode.isFetching ? "Buscando…" : "Buscar"}
-        </button>
         <BarcodeScanner onDetect={setQuery} />
       </div>
       {inventory.isLoading && <p role="status">Cargando inventario…</p>}

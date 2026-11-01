@@ -2,6 +2,88 @@ import { expect, test } from "@playwright/test";
 
 const ingress = "http://127.0.0.1:8766/api/hassio_ingress/browser-test/react/";
 
+test("a saved suggestion immediately offers bought/remove controls, including after marking bought", async ({
+  page,
+}) => {
+  let saved = false,
+    removed = false,
+    done = false;
+  const counts = { choose: 0, toggle: 0, remove: 0 };
+  await page.route("**/api/v1/shopping", (route) =>
+    route.fulfill({
+      json: {
+        items:
+          saved && !removed
+            ? [
+                {
+                  id: 71,
+                  product_id: 8,
+                  name: "Arroz basmati",
+                  amount: 1,
+                  unit: "Piece",
+                  done,
+                  image_url: null,
+                },
+              ]
+            : [],
+        pending_matches:
+          !saved && !removed
+            ? [
+                {
+                  key: "arroz",
+                  name: "Arroz",
+                  candidates: [{ id: 8, name: "Arroz basmati" }],
+                },
+              ]
+            : [],
+        shopping_error: false,
+        pending_matches_error: false,
+      },
+    }),
+  );
+  await page.route("**/api/v1/alexa/matches/arroz/choose", (route) => {
+    counts.choose++;
+    const body = route.request().postDataJSON();
+    expect(body.product_id).toBe(8);
+    expect(body.operation_id).toMatch(/^[a-f0-9-]{36}$/);
+    saved = true;
+    return route.fulfill({ json: { ok: true, item_id: 71 } });
+  });
+  await page.route("**/api/v1/shopping/71/toggle", (route) => {
+    counts.toggle++;
+    done = route.request().postDataJSON().done;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/api/v1/shopping/71", (route) => {
+    expect(route.request().method()).toBe("DELETE");
+    counts.remove++;
+    removed = true;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto(ingress);
+  await expect(
+    page.getByRole("button", { name: "Quitar Arroz", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("1 artículos", { exact: true })).toBeVisible();
+  await page.getByText("Elegir producto para «Arroz»", { exact: true }).click();
+  await page.getByLabel("Producto sugerido").selectOption("8");
+  await page
+    .getByRole("button", { name: "Guardar elección", exact: true })
+    .click();
+  await expect(page.getByText(/Artículo guardado en la lista/)).toBeVisible();
+  await page.getByRole("button", { name: "✓ Comprado", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "↩ Pendiente", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Quitar Arroz basmati", exact: true })
+    .click();
+  await expect(
+    page.getByText("Tu lista de la compra está vacía.", { exact: true }),
+  ).toBeVisible();
+  expect(counts).toEqual({ choose: 1, toggle: 1, remove: 1 });
+});
+
 test("archives live in Actions without a duplicate product-creation shortcut", async ({
   page,
 }, testInfo) => {

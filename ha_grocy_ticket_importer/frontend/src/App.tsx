@@ -20,18 +20,33 @@ import {
   loginStandalone,
   logoutStandalone,
   removeShopping,
+  removeAlexaMatch,
   toggleShopping,
 } from "./api";
 import type { AlexaMatch } from "./types";
 
-function Suggestions({ match }: { match: AlexaMatch }) {
+function Suggestions({
+  match,
+  onSaved,
+}: {
+  match: AlexaMatch;
+  onSaved: () => void;
+}) {
   const client = useQueryClient();
   const [selected, setSelected] = useState(
     String(match.selected_product_id ?? ""),
   );
+  const [operationId] = useState(() => crypto.randomUUID());
   const mutation = useMutation({
-    mutationFn: (id: number) => chooseAlexaMatch(match.key, id),
-    onSuccess: () => void client.invalidateQueries({ queryKey: ["shopping"] }),
+    mutationFn: (id: number) => chooseAlexaMatch(match.key, id, operationId),
+    retry: false,
+    onSuccess: async () => {
+      onSaved();
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["shopping"] }),
+        client.invalidateQueries({ queryKey: ["inventory"] }),
+      ]);
+    },
   });
   return (
     <details className="suggestions">
@@ -41,6 +56,7 @@ function Suggestions({ match }: { match: AlexaMatch }) {
         <select
           id={"choice-" + match.key}
           value={selected}
+          disabled={mutation.isPending || mutation.isSuccess}
           onChange={(event) => setSelected(event.target.value)}
         >
           <option value="">Mantener artículo original</option>
@@ -51,7 +67,7 @@ function Suggestions({ match }: { match: AlexaMatch }) {
           ))}
         </select>
         <button
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || mutation.isSuccess}
           onClick={() => mutation.mutate(selected ? Number(selected) : 0)}
         >
           {selected ? "Guardar elección" : "Mantener original"}
@@ -75,6 +91,7 @@ function AuthenticatedApp() {
     null,
   );
   const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [busyItemId, setBusyItemId] = useState<number | null>(null);
   const toggle = useMutation({
     mutationFn: ({ id, done }: { id: number; done: boolean }) =>
@@ -96,6 +113,15 @@ function AuthenticatedApp() {
     onSuccess: () => void client.invalidateQueries({ queryKey: ["shopping"] }),
     onError: (error: Error) => setActionError(error.message),
   });
+  const removePending = useMutation({
+    mutationFn: (key: string) => removeAlexaMatch(key),
+    retry: false,
+    onSuccess: async () => {
+      setActionMessage("Artículo quitado de la lista.");
+      await client.invalidateQueries({ queryKey: ["shopping"] });
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["shopping"],
     queryFn: getShopping,
@@ -103,7 +129,24 @@ function AuthenticatedApp() {
   const matches = new Map(
     (data?.pending_matches ?? []).map((match) => [match.key, match]),
   );
-  const assigned = new Set<string>();
+  const normalizeName = (name: string) =>
+    name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  const assigned = new Set(
+    (data?.items ?? []).map((item) => normalizeName(item.name)),
+  );
+  const unassigned = (data?.pending_matches ?? []).filter(
+    (match) => !assigned.has(match.key),
+  );
+  const choiceSaved = () => {
+    setActionError("");
+    setActionMessage(
+      "Artículo guardado en la lista. Ya puedes marcarlo como comprado o quitarlo.",
+    );
+  };
   return (
     <div className="shell">
       <header className="top">
@@ -211,7 +254,9 @@ function AuthenticatedApp() {
               </p>
             </div>
             <div>
-              <span className="count">{data?.items.length ?? 0} artículos</span>
+              <span className="count">
+                {(data?.items.length ?? 0) + unassigned.length} artículos
+              </span>
               {data?.items.some((item) => item.done) && (
                 <button
                   disabled={
@@ -248,6 +293,11 @@ function AuthenticatedApp() {
               {actionError}
             </p>
           )}
+          {actionMessage && (
+            <p role="status" className="shopping-feedback">
+              {actionMessage}
+            </p>
+          )}
           {data?.pending_matches_error && (
             <p role="alert" className="notice">
               No se pudieron cargar las sugerencias de Alexa. Actualiza para
@@ -261,13 +311,8 @@ function AuthenticatedApp() {
           )}
           <div className="items">
             {data?.items.map((item) => {
-              const key = item.name
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .toLowerCase()
-                .trim();
+              const key = normalizeName(item.name);
               const match = matches.get(key);
-              if (match) assigned.add(key);
               return (
                 <article className="item" key={item.id}>
                   <div className="item-main">
@@ -340,26 +385,43 @@ function AuthenticatedApp() {
                       Quitar
                     </button>
                   </div>
-                  {match && <Suggestions match={match} />}
+                  {match && <Suggestions match={match} onSaved={choiceSaved} />}
                 </article>
               );
             })}
-            {data?.pending_matches
-              .filter((match) => !assigned.has(match.key))
-              .map((match) => (
-                <article className="item" key={match.key}>
-                  <div className="item-main">
-                    <span className="item-icon">
-                      <ShoppingBasket size={19} />
-                    </span>
-                    <div>
-                      <strong>{match.name}</strong>
-                      <small>Pendiente de revisar desde Alexa</small>
-                    </div>
+            {unassigned.map((match) => (
+              <article className="item" key={match.key}>
+                <div className="item-main">
+                  <span className="item-icon">
+                    <ShoppingBasket size={19} />
+                  </span>
+                  <div>
+                    <strong>{match.name}</strong>
+                    <small>Pendiente de revisar desde Alexa</small>
                   </div>
-                  <Suggestions match={match} />
-                </article>
-              ))}
+                </div>
+                <div className="item-actions">
+                  <button
+                    className="remove-button"
+                    aria-label={"Quitar " + match.name}
+                    disabled={
+                      removePending.isPending ||
+                      remove.isPending ||
+                      toggle.isPending ||
+                      clearCompleted.isPending
+                    }
+                    onClick={() => {
+                      setActionError("");
+                      setActionMessage("");
+                      removePending.mutate(match.key);
+                    }}
+                  >
+                    Quitar
+                  </button>
+                </div>
+                <Suggestions match={match} onSaved={choiceSaved} />
+              </article>
+            ))}
           </div>
           {data && !data.items.length && !data.pending_matches.length && (
             <div className="empty">
@@ -377,7 +439,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.0.1</footer>
+      <footer>Despensa 1.1.0</footer>
     </div>
   );
 }
