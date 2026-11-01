@@ -16,7 +16,7 @@ Estado de código: migración de PR #10 integrada en `main` (`a6cc354`). Publica
 - [x] React como entrada de la candidata; retirar PAGE, scripts y formularios obsoletos; alternativa básica sin JavaScript.
 - [x] Fuentes Python duplicadas sincronizadas y manifiesto Docker completo.
 - [x] CI configurado para frontend, integración real aislada y contenedores AMD64/ARM64 con arranque.
-- [x] Frontend 1.1.0: 67 tests Vitest y 17 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
+- [x] Frontend 1.3.0: 64 tests Vitest y 17 escenarios de navegador, con cobertura V8 en CI. Incluye ajuste de existencias sin formulario de consumo, alta solo en Mi despensa y archivados desde Acciones, además de sesión/caché, tickets, validaciones y foco móvil.
 
 La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATION_V1.md); el resultado CI debe observarse para el SHA final, nunca inferirse de esta lista.
 
@@ -24,6 +24,11 @@ La evidencia y comandos reproducibles están en [VALIDATION_V1.md](docs/VALIDATI
 
 - [x] Estilos comunes de alta, cámara, duplicados y archivos; revisar disposición móvil.
 - [x] Open Beauty Facts adicional, manteniendo Food/Products; nombres propuestos sin autoescritura y ausencia de producto separada de caída de servicio.
+
+## Mejoras 1.3.0
+
+- [x] Ficha sin formulario de añadir a la compra; conservar información y stock, con compras desde las listas.
+- [x] Consulta universal v3 con redirecciones confiables, atribución correcta y respaldo directo Food/Products/Beauty.
 
 ## Aceptación de un despliegue futuro
 

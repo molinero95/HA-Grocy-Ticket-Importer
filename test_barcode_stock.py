@@ -469,7 +469,7 @@ class PhotoTests(unittest.TestCase):
         self.assertIsNone(product_images.safe_image_url("https://evil.example/x.jpg"))
         self.assertIsNone(product_images.safe_image_url("https://images.openfoodfacts.org.evil.example/x.jpg"))
 
-    @patch("product_images.urllib.request.urlopen")
+    @patch("product_images.urllib.request.build_opener")
     def test_exact_barcode_image_lookup(self, open_url):
         response = Mock()
         response.__enter__ = Mock(return_value=response)
@@ -477,18 +477,20 @@ class PhotoTests(unittest.TestCase):
         response.read.return_value = json.dumps({"status": 1, "product": {
             "code": "1234567890123", "product_name": "Leche",
             "image_front_small_url": "https://images.openfoodfacts.org/images/x.jpg"}}).encode()
-        open_url.return_value = response
+        response.geturl.return_value = "https://world.openfoodfacts.org/api/v3/product/1234567890123"
+        open_url.return_value.open.return_value = response
         result = product_images.lookup_image("1234567890123")
         self.assertEqual(result["name"], "Leche")
 
-    @patch("product_images.urllib.request.urlopen")
+    @patch("product_images.urllib.request.build_opener")
     def test_barcode_mismatch_returns_none(self, open_url):
         response = Mock()
         response.__enter__ = Mock(return_value=response)
         response.__exit__ = Mock(return_value=False)
         response.read.return_value = json.dumps({"status": 1, "product": {
             "code": "0000000000000", "image_front_url": "https://images.openfoodfacts.org/x.jpg"}}).encode()
-        open_url.return_value = response
+        response.geturl.return_value = "https://world.openfoodfacts.org/api/v3/product/1234567890123"
+        open_url.return_value.open.return_value = response
         self.assertIsNone(product_images.lookup_image("1234567890123"))
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@
 ## Catálogo y existencias
 
 - Añadir producto crea solo productos nuevos: comprobar nombre/código, enlazar la ficha existente ante duplicado, nunca incrementar su stock. Alta con código opcional y cero existencias permitido.
-- Ficha con edición de nombre, unidad, configuración de compra, cantidades, foto, códigos y variantes. No existe una acción independiente «Asociar código».
+- Ficha con edición de nombre, unidad, configuración de compra, existencias, foto, códigos y variantes. Desde 1.3.0 se retira el formulario de añadir a la compra: la ficha contiene información del producto y stock; los controles de compra permanecen en las listas. No existe una acción independiente «Asociar código».
 - **Pack compra / Piece stock y consumo**. Un pack de 5 añade 5 piezas. Las conversiones se verifican en Grocy antes de escribir stock; se descubren los IDs reales de unidades. Mostrar piezas por pack solo para Pack.
 - Cambiar compras afecta únicamente a compras futuras. Nunca reinterpretar automáticamente stock existente ni una fila de compra. Renombrar conserva descripción, fotos y configuración. Cambiar unidad de stock exige cero conocido y configuración compatible.
 - Ajustar stock requiere cantidad esperada y guarda directamente, sin pantalla de confirmación adicional.
@@ -23,7 +23,7 @@
 
 ## Fotos, variantes y tickets
 
-- Buscar foto por código exacto al escanear/escribir en Open Food Facts, Open Products Facts y Open Beauty Facts; guardar solo URL validada por servidor y host HTTPS permitido. No consultar por producto en cada carga. Foto inexistente/servicio caído no bloquea el alta o asociación; conservar foto personalizada existente.
+- Desde 1.3.0 buscar foto por código exacto primero mediante la consulta universal v3 de Open Facts; restringir redirecciones HTTPS a Food, Products y Beauty y atribuir el catálogo final. Ante errores o datos incompletos, conservar consultas directas a esos tres catálogos; un 404 universal termina la búsqueda. No habilitar Pet Food. Siempre guardar solo URL validada por servidor y host HTTPS permitido. No consultar por producto en cada carga. Foto inexistente/servicio caído no bloquea el alta o asociación; conservar foto personalizada existente.
 - Desde 1.2.0, mostrar el nombre devuelto por el catálogo y permitir aplicarlo explícitamente durante el alta, sin sobrescribir el nombre escrito. Los catálogos pueden ser incompletos. Botones de formularios, revisión de duplicados y selectores nativos de archivo usan estilos comunes y objetivos táctiles de 44px.
 - Subida local saneada y sin metadatos privados; URL versionada compartida por compra, despensa y ficha. Persistir fotos en el almacenamiento existente.
 - Un genérico es un ID canónico de Grocy y posee todo su stock. Variantes añaden nombre, supermercado, marca, EAN y factor descriptivo. Comprobar propiedad del código en ambos registros; editar variante no cambia su EAN ni crea otro producto inadvertidamente. El factor canónico de compra controla las conversiones; el factor de variante no migra stock.

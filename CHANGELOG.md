@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0] — 2026-11-01
+
+### Changed
+- Keep product sheets focused on product information and stock. Remove the shopping-quantity form and unused frontend component/client methods; shopping remains available through the pantry cart and shopping list.
+- Use the Open Facts universal v3 exact-barcode endpoint first, following only trusted Food, Products and Beauty HTTPS redirects and attributing the final catalog. Retain direct lookups for outages or incomplete metadata, and preserve name-only suggestions while looking for a photo. A universal 404 ends the lookup without redundant requests.
+
+### Tests
+- Cover universal response statuses, cross-catalog attribution, direct fallbacks, missing products, malformed responses, exact-code checks and redirect/image trust boundaries. Adapt the real Grocy browser flow to add shopping quantities from the pantry while verifying stock remains unchanged and archiving preserves history.
+
 ## [1.2.0] — 2026-11-01
 
 ### Changed

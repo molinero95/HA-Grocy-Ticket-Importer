@@ -1,4 +1,3 @@
-import { ProductShopping } from "./ProductShopping";
 import { ProductPurchase } from "./ProductPurchase";
 import { useModal } from "./useModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -56,7 +55,6 @@ export function ProductDetail({
   const refreshProduct = async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["product", id] }),
-      client.invalidateQueries({ queryKey: ["shopping-options", id] }),
       client.invalidateQueries({ queryKey: ["inventory"] }),
       client.invalidateQueries({ queryKey: ["shopping"] }),
     ]);
@@ -417,7 +415,6 @@ export function ProductDetail({
                 <p role="alert">{saveBarcode.error.message}</p>
               )}
             </form>
-            {product.data?.active !== false && <ProductShopping id={id} />}
             <h3>Existencias</h3>
             {product.isError && (
               <p role="alert">

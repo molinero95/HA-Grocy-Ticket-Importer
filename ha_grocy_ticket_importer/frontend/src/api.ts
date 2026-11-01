@@ -387,22 +387,3 @@ export const savePurchaseConfiguration = (
     expected,
     operation_id: operationId,
   });
-
-export type ShoppingOptions = {
-  id: number;
-  name: string;
-  units: { id: number; name: string; factor: string }[];
-};
-export const getShoppingOptions = (id: number) =>
-  request<ShoppingOptions>("shopping/products/" + id + "/options");
-export const addShoppingAmount = (
-  id: number,
-  amount: string,
-  unitId: number,
-  operationId: string,
-) =>
-  request("shopping/products/" + id + "/add", "POST", {
-    amount,
-    unit_id: unitId,
-    operation_id: operationId,
-  });
