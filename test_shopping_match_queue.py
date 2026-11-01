@@ -48,6 +48,56 @@ class AlexaMatchQueueTests(unittest.TestCase):
             self.assertEqual(resolved_choices(path, ["Arroz"], products[:1]), {})
             self.assertEqual(pending(path)[0]["selected_product_id"], 2)
 
+    def test_catalog_refresh_discovers_new_product_for_an_unmatched_note(self):
+        from shopping_match_queue import refresh_catalog
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'queue.sqlite3'
+            refresh_catalog(path, [], ['Crema Nivea'])
+            self.assertEqual(pending(path), [])
+            refresh_catalog(path, [{'id': 9, 'name': 'Crema Nivea'}], ['Crema Nivea'])
+            row = pending(path)[0]
+            self.assertEqual([p['id'] for p in row['candidates']], [9])
+            self.assertTrue(row['requires_product'])
+            self.assertIsNone(row['selected_product_id'])
+
+    def test_catalog_changes_update_candidates_without_replacing_saved_choices(self):
+        from shopping_match_queue import refresh_catalog, attach_entry
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'queue.sqlite3'
+            original = [{'id': 1, 'name': 'Arroz redondo'}, {'id': 2, 'name': 'Arroz basmati'}]
+            refresh(path, ['Arroz'], original)
+            choose(path, 'arroz', 2)
+            attach_entry(path, 'arroz', 70)
+            changed = [{'id': 1, 'name': 'Arroz integral'}, {'id': 3, 'name': 'Arroz largo'}]
+            refresh_catalog(path, changed)
+            row = pending(path)[0]
+            self.assertEqual({p['id'] for p in row['candidates']}, {1, 3})
+            self.assertEqual(row['selected_product_id'], 2)
+            self.assertEqual(row['shopping_entry_id'], 70)
+            self.assertEqual(row['generation'], 1)
+            self.assertTrue(row['selection_stale'])
+            self.assertTrue(row['dismissed'])
+            refresh(path, ['Arroz'], [{'id': 4, 'name': 'Arroz'}])
+            self.assertEqual(pending(path)[0]['selected_product_id'], 2)
+            self.assertTrue(pending(path)[0]['selection_stale'])
+            self.assertEqual(resolved_choices(path, ['Arroz'], [{'id': 4, 'name': 'Arroz'}]), {})
+            refresh(path, ['Arroz'], [])
+            self.assertEqual(pending(path)[0]['selected_product_id'], 2)
+
+    def test_catalog_refresh_never_reopens_removals_or_keep_original_decisions(self):
+        from shopping_match_queue import refresh_catalog, keep_original, stage_removal
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'queue.sqlite3'
+            products = [{'id': 1, 'name': 'Arroz redondo'}]
+            refresh(path, ['Arroz'], products)
+            keep_original(path, 'arroz')
+            refresh_catalog(path, products + [{'id': 2, 'name': 'Arroz largo'}])
+            self.assertTrue(pending(path)[0]['dismissed'])
+            stage_removal(path, 'arroz', {'id': 4, 'note': 'Arroz'})
+            before = pending(path)[0]
+            refresh_catalog(path, [], ['Arroz'])
+            self.assertEqual(pending(path)[0], before)
+
     def test_exact_and_unmatched_items_are_not_queued(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "queue.sqlite3"

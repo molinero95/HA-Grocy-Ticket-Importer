@@ -66,6 +66,33 @@ class ManualShoppingChoiceTests(unittest.TestCase):
     def choose(self, product_id=8, operation=None):
         return manual_choice(self.grocy, queue, self.path, "arroz", product_id, operation or self.operation)
 
+    def test_new_candidate_can_be_selected_without_waiting_for_worker_refresh(self):
+        self.products.append({'id': 9, 'name': 'Arroz integral', 'qu_id_stock': 2})
+        self.assertNotIn(9, [p['id'] for p in queue.pending(self.path)[0]['candidates']])
+        self.note(amount=3)
+        self.choose(9)
+        self.assertEqual(self.rows[0]['product_id'], 9)
+        self.assertEqual(self.rows[0]['amount'], 3)
+        self.assertEqual([write[0] for write in self.writes], ['PUT'])
+
+    def test_changed_candidates_cannot_create_a_second_row_for_an_already_associated_item(self):
+        self.choose(8)
+        self.products[1]['name'] = 'Pan'
+        self.products.append({'id': 9, 'name': 'Arroz integral', 'qu_id_stock': 2})
+        before = list(self.writes)
+        with self.assertRaisesRegex(ValueError, 'ya está asociado'):
+            self.choose(9, str(uuid.uuid4()))
+        self.assertEqual(self.writes, before)
+        self.assertEqual(len(self.rows), 1)
+        self.assertEqual(self.rows[0]['product_id'], 8)
+
+    def test_archived_candidate_is_rejected_before_any_write(self):
+        self.products[1]['active'] = '0'
+        with self.assertRaises(ValueError):
+            self.choose(8)
+        self.assertEqual(self.writes, [])
+        self.assertNotIn(8, [p['id'] for p in queue.pending(self.path)[0]['candidates']])
+
     def test_choice_creates_a_manageable_row_without_waiting_for_worker(self):
         result = self.choose()
         self.assertEqual(result["item_id"], self.rows[0]["id"])

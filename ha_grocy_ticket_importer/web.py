@@ -84,6 +84,12 @@ def http_error(error):
 
 @app.after_request
 def security_headers(response):
+    if (request.endpoint == "basic_shopping_step" and response.status_code == 303) or (
+            request.method in ("POST", "PATCH", "PUT", "DELETE") and 200 <= response.status_code < 300
+            and (request.path.startswith(("/api/v1/shopping", "/api/v1/alexa/", "/api/v1/catalog/products", "/api/v1/products/"))
+                 or (request.path.startswith("/api/v1/receipts/") and request.path.endswith("/commit")))):
+        from shopping_sync_events import notify_local
+        notify_local(shopping_match_queue.DEFAULT_PATH)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
@@ -168,7 +174,8 @@ def basic_shopping_step(product_id):
     if not LOCK.acquire(blocking=False):
         abort(409)
     try:
-        barcode_stock.change_shopping_quantity(product_id, request.form.get("direction"))
+        with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+            barcode_stock.change_shopping_quantity(product_id, request.form.get("direction"))
     except Exception:
         return "No se pudo actualizar la lista. Comprueba Grocy antes de reintentar.", 409
     finally:

@@ -83,6 +83,9 @@ def refresh(path, alexa_names, products, grocy_rows=()):
     Stale selections remain for explicit conflict detection; they cannot be
     silently reset while a verified checkpoint may still reference them.
     """
+    with closing(connect(path)) as db:
+        selected = {key for key, pid in db.execute(
+            "SELECT normalized_name, selected_product_id FROM pending_matches WHERE active=1") if pid is not None}
     # Exact catalog names stored as free-text notes need explicit association,
     # too. Never silently convert or discard their row, quantity or note.
     note_names = {normalize(name): name for name, row in grocy_rows if not row.get("product_id")}
@@ -95,8 +98,8 @@ def refresh(path, alexa_names, products, grocy_rows=()):
         if not key:
             continue
         decision, candidates = suggest_catalog_matches(name, products)
-        exact_note = decision == "exact" and key in note_names
-        if decision == "review" or exact_note:
+        exact_note = decision == "exact" and (key in note_names or key in selected)
+        if decision == "review" or exact_note or key in selected:
             if key in pending:
                 raise ValueError("Duplicate normalized Alexa item")
             pending[key] = (str(name).strip(), json.dumps(candidates, ensure_ascii=False), exact_note)
@@ -118,6 +121,34 @@ def refresh(path, alexa_names, products, grocy_rows=()):
                 db.execute("UPDATE pending_matches SET selected_product_id=NULL, dismissed=0, "
                            "shopping_entry_id=NULL, removed=0, removal_json=NULL, generation=generation+1 "
                            "WHERE normalized_name=?", (key,))
+
+
+def refresh_catalog(path, products, note_names=()):
+    """Re-rank local review metadata under mutation_lock, never remote lists.
+
+    Preserve source episodes, explicit choices/dismissals, removals and journals.
+    Only the worker establishes source presence/absence. A shopping read may also
+    discover candidates for current Grocy notes that were previously unmatched.
+    """
+    existing = {row["key"]: row for row in pending(path)}
+    names = {key: row["name"] for key, row in existing.items() if not row.get("removed")}
+    names.update({normalize(name): name for name in note_names if normalize(name)})
+    with closing(connect(path)) as db, db:
+        for key, name in names.items():
+            row = existing.get(key)
+            if row and row.get("removed"):
+                continue
+            decision, candidates = suggest_catalog_matches(name, products)
+            if row is None and not candidates:
+                continue
+            encoded = json.dumps(candidates, ensure_ascii=False)
+            exact_note = int(decision == "exact")
+            if row is None:
+                db.execute("INSERT INTO pending_matches(normalized_name,original_name,candidates_json,requires_product) VALUES (?,?,?,?)",
+                           (key, str(name).strip(), encoded, exact_note))
+            elif row["candidates"] != candidates or row["requires_product"] != bool(exact_note):
+                db.execute("UPDATE pending_matches SET candidates_json=?,requires_product=? WHERE normalized_name=? AND active=1",
+                           (encoded, exact_note, key))
 
 
 def pending(path):

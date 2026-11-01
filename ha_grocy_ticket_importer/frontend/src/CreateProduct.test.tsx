@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { CreateProduct } from "./CreateProduct";
@@ -91,6 +91,7 @@ function mount(onOpenProduct = vi.fn()) {
       <CreateProduct onClose={vi.fn()} onOpenProduct={onOpenProduct} />
     </QueryClientProvider>,
   );
+  return client;
 }
 it("only displays the pack factor for a Pack purchase unit", async () => {
   mount();
@@ -119,4 +120,18 @@ it("links to an existing product without attaching a photo or permitting resubmi
   expect(open).toHaveBeenCalledWith(7);
   expect(api.saveDiscoveredPhoto).not.toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "Guardar producto" })).toBeNull();
+});
+
+it("refreshes shopping suggestions immediately after creation before photo lookup completes", async () => {
+  const photo = deferred<Awaited<ReturnType<typeof api.saveDiscoveredPhoto>>>();
+  vi.mocked(api.createCatalogProduct).mockResolvedValue({ created: true, product_id: 7 });
+  vi.mocked(api.saveDiscoveredPhoto).mockReturnValue(photo.promise);
+  const client = mount();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  await userEvent.type(screen.getByLabelText("Nombre"), "Leche");
+  await userEvent.type(screen.getByLabelText("Código de barras (opcional)"), "8412345678901");
+  await userEvent.selectOptions(screen.getByLabelText("Unidad"), "2");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar producto" }));
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["shopping"] }));
+  await act(async () => photo.resolve({ saved: true, image_url: null }));
 });

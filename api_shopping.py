@@ -175,8 +175,20 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
             return jsonify({"items": [], "pending_matches": [], "shopping_error": True,
                             "pending_matches_error": False}), 503
         try:
+            # The catalog may change independently of Alexa's next worker event.
+            # Refresh only advisory local candidates; never invoke remote sync.
+            with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+                notes = [item["name"] for item in items if not item.get("product_id") and not item.get("done")]
+                if notes or shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH):
+                    products = barcode_stock.grocy("GET", "objects/products")
+                    if not isinstance(products, list):
+                        raise ValueError("Catalog unavailable for suggestions")
+                    from shopping_sync_adapters import _grocy_done
+                    products = [p for p in products if _grocy_done(p.get("active", True))]
+                    shopping_match_queue.refresh_catalog(shopping_match_queue.DEFAULT_PATH, products, notes)
             matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
-                       if not row.get("removed") and (not row.get("dismissed") or row.get("selection_stale"))]
+                       if not row.get("removed") and (row.get("candidates") or row.get("selection_stale"))
+                       and (not row.get("dismissed") or row.get("selection_stale"))]
             matches_error = False
         except Exception:
             app.logger.exception("api_v1_alexa_matches_failed")

@@ -3,9 +3,42 @@ import json
 import os
 import threading
 import time
+from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import websocket
+
+
+def notify_local(path):
+    """Signal a committed local change without calling either remote service."""
+    if not os.environ.get("ALEXA_SHOPPING_LIST_ENTITY"):
+        return False
+    try:
+        target = Path(str(path) + ".wake")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.touch()
+        return True
+    except OSError:
+        # The periodic cycle remains a fallback; never replay a saved mutation.
+        return False
+
+
+def _revision(path):
+    try:
+        return Path(str(path) + ".wake").stat().st_mtime_ns
+    except OSError:
+        return None
+
+
+def listen_local(wake, path, stop=None, *, poll_seconds=0.25):
+    """Bridge Flask/worker processes through a scoped advisory wake marker."""
+    stop = stop or threading.Event()
+    previous = _revision(path)
+    while not stop.wait(poll_seconds):
+        current = _revision(path)
+        if current != previous:
+            previous = current
+            wake.set()
 
 
 def websocket_url():

@@ -69,6 +69,29 @@ class RealStackTests(unittest.TestCase):
         self.instance.http('DELETE', f'objects/shopping_list/{rid}')
         shopping_match_queue.refresh(shopping_match_queue.DEFAULT_PATH, [], products)
 
+    def test_new_catalog_product_refreshes_unmatched_note_without_worker(self):
+        name = 'Jabon dinamico'
+        rid = int(self.instance.http('POST', 'objects/shopping_list',
+            {'shopping_list_id': 1, 'note': name, 'amount': 3})['created_object_id'])
+        first = self.client.get('/api/v1/shopping').json
+        self.assertFalse(any(row['name'] == name for row in first['pending_matches']))
+        units = self.client.get('/api/v1/catalog/units').json['units']
+        piece = next(row['id'] for row in units if row['name'] == 'Piece')
+        response = self.client.post('/api/v1/catalog/products', json={'name': name, 'unit_id': piece}, headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.json)
+        pid = response.json['product_id']
+        second = self.client.get('/api/v1/shopping').json
+        review = next(row for row in second['pending_matches'] if row['name'] == name)
+        self.assertEqual([p['id'] for p in review['candidates']], [pid])
+        chosen = self.client.post('/api/v1/alexa/matches/'+review['key']+'/choose', json={'product_id': pid, 'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertEqual(chosen.status_code, 200, chosen.json)
+        self.assertEqual(chosen.json['item_id'], rid)
+        row = self.instance.http('GET', f'objects/shopping_list/{rid}')
+        self.assertEqual(row['amount'], 3)
+        self.assertEqual(row['note'], name)
+        self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 0)
+        self.instance.http('DELETE', f'objects/shopping_list/{rid}')
+
     def test_pack_stock_shopping_and_consumption(self):
         units = self.client.get('/api/v1/catalog/units').json['units']
         pack = next(u['id'] for u in units if u['name'] == 'Pack')

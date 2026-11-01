@@ -6,7 +6,7 @@ import fcntl
 import os
 import time
 import threading
-from shopping_sync_events import listen
+from shopping_sync_events import listen, listen_local
 from pathlib import Path
 
 from shopping_sync import normalize
@@ -137,8 +137,11 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         wake = threading.Event()
         threading.Thread(target=listen, args=(wake,), daemon=True).start()
+        threading.Thread(target=listen_local, args=(wake, MATCH_QUEUE), daemon=True).start()
         trigger = "startup"
         while True:
+            # Events arriving during a cycle remain set for the following cycle.
+            wake.clear()
             try:
                 result = run_once(dry_run=os.environ.get("SHOPPING_SYNC_ENABLED") != "1")
                 print("Shopping sync checked (" + trigger + "): " +
@@ -151,7 +154,6 @@ def main():
                 reason = str(exc) if isinstance(exc, IdentityConflict) else type(exc).__name__
                 print("Shopping sync failed: " + reason, flush=True)
             triggered = wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
-            wake.clear()
             trigger = "event" if triggered else "polling"
 
 

@@ -4,11 +4,11 @@ Fecha: 2026-11-01. Migración de PR #10 integrada en `main`; publicación 1.0.0 
 
 ## Evidencia local
 
-- Python: 271 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
-- Vitest 4: 68 pruebas de interacciones React y cliente API en 1.6.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
+- Python: 284 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
+- Vitest 4: 70 pruebas de interacciones React y cliente API en 1.7.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
 - TypeScript 7: aplicación y e2e; Vite 7: compilación de producción.
-- Grocy real: 7 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
-- Chromium: 18 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
+- Grocy real: 8 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
+- Chromium: 19 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
 
 ## Refuerzo de QA del frontend
 
@@ -16,9 +16,9 @@ Las pruebas de componentes cubren ajuste del total restante sin formulario de co
 
 Estas regresiones detectaron y corrigieron tres defectos: borrar una consulta de autenticación observada podía dejar la vista anterior y recrear caché privada; el frontend ignoraba `ready_to_commit: false`; el botón de alta no aplicaba el máximo de 1000 piezas por pack (el campo HTML y el servidor ya lo limitaban).
 
-`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,11 % líneas, 75,78 % sentencias, 79,25 % ramas y 65,21 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
+`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,26 % líneas, 75,96 % sentencias, 79,60 % ramas y 65,46 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
 
-La ejecución local de navegador sin PHP/Grocy ejecuta 14 escenarios disponibles y omitió explícitamente los 4 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 18; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
+La ejecución local de navegador sin PHP/Grocy ejecuta 14 escenarios disponibles y omitió explícitamente los 5 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 19; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
 
 Las pruebas antiguas que solo verificaban el HTML retirado o autorizaban eliminación permanente se sustituyen por comprobaciones del comportamiento actual. El total de tests no mide por sí solo la paridad.
 
@@ -53,7 +53,7 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-Sin `GROCY_TEST_DIST`, los cuatro escenarios de Grocy real se marcan omitidos de forma explícita; CI lo configura y exige que corran. El comando `--check` requiere el release. Los servidores deben arrancarse desde el mismo entorno de red que el navegador.
+Sin `GROCY_TEST_DIST`, los cinco escenarios de Grocy real se marcan omitidos de forma explícita; CI lo configura y exige que corran. El comando `--check` requiere el release. Los servidores deben arrancarse desde el mismo entorno de red que el navegador.
 
 ## CI y límites
 
@@ -83,3 +83,9 @@ Se retiran ProductShopping y sus pruebas aisladas al eliminar el formulario de c
 La instalación 1.5.0 tiene sync habilitado y el listener conectado. Logs públicos del complemento muestran repetidamente el conflicto `A Grocy note conflicts with a canonical product`; una lectura privada confirma una nota exacta entre las filas activas. No se guardan nombres/contenido de esas filas en código, documentación o artefactos. No se modifica configuración, estado persistente o listas reales durante el diagnóstico. PR #18 figura cerrada sin integrar.
 
 Las nuevas regresiones reproducen el bloqueo, exigen resolución explícita y verifican conservación de ID/cantidad/nota antes de reanudar ambas direcciones. Se añade contrato Grocy real y escenario móvil de revisión, pruebas de API/CSRF y editor de alias. `tests/__init__.py` permite que unittest descubra las regresiones añadidas en Día 6; las pruebas de eventos pasan de funciones no descubiertas a unittest. CI comprueba también los espejos de alias/estado y su empaquetado. La versión instalada solo se considera recuperada después de la actualización y revisión por el usuario.
+
+## Catálogo dinámico y aviso local 1.7.0
+
+Las pruebas cambian productos después de crear la propuesta: altas, renombrados y archivados deben actualizar las opciones en la siguiente lectura, con estado previo conservado si falla el catálogo. Elegir un candidato nuevo revalida el catálogo sin esperar al worker; una fila ya asociada no puede producir una segunda fila al cambiar su elección. Un contrato y escenario de navegador con Grocy real crean primero una nota sin coincidencia, dan de alta su producto y guardan la asociación con la misma fila/cantidad, sin ejecutar otro ciclo del worker.
+
+Un test de hilo/archivo verifica que un marcador de otra entidad no despierta el listener y que el marcador correcto sí lo hace sin esperar el intervalo de 120 s. Las pruebas API comprueban que solo mutaciones confirmadas solicitan sincronización; lecturas, previews, errores y rechazos no lo hacen. La notificación no ejecuta llamadas remotas en la petición HTTP. La entrega de eventos de Alexa y su latencia real siguen requiriendo observación de la instalación actualizada.

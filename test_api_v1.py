@@ -162,11 +162,15 @@ class ShoppingApiTests(unittest.TestCase):
     def test_authenticated_snapshot_is_read_only(self):
         items = [{"id": 1, "name": "Arroz", "amount": 1, "unit": "unidad", "done": False, "product_id": None, "image_url": None}]
         matches = [{"key": "arroz", "name": "Arroz", "candidates": [{"id": 2, "name": "Arroz basmati"}, {"id": 3, "name": "Arroz integral"}]}]
-        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=items), patch.object(web.shopping_match_queue, "pending", return_value=matches):
+        with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "shopping_list_snapshot", return_value=items), patch.object(web.shopping_match_queue, "pending", return_value=matches), \
+             patch.object(web.barcode_stock, "grocy", return_value=[{"id": 2, "name": "Arroz basmati"}]) as grocy, \
+             patch.object(web.shopping_match_queue, "refresh_catalog") as refresh:
             response = self.client.get("/api/v1/shopping")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["items"], items)
         self.assertEqual(response.json["pending_matches"], matches)
+        grocy.assert_called_once_with("GET", "objects/products")
+        refresh.assert_called_once()
 
     def test_variant_write_requires_csrf(self):
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.variant_catalog, "save_variant") as save:
