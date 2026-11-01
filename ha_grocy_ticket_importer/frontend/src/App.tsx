@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavigationContext, useAppNavigation } from "./navigation";
+import { ShoppingProductCreation } from "./ShoppingProductCreation";
 import { ProductDetail } from "./ProductDetail";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
@@ -30,10 +31,11 @@ import type { AlexaMatch } from "./types";
 
 function Suggestions({
   match,
-  onSaved,
+  onSaved, onCreate,
 }: {
   match: AlexaMatch;
   onSaved: () => void;
+  onCreate: () => void;
 }) {
   const client = useQueryClient();
   const [selected, setSelected] = useState(
@@ -56,6 +58,7 @@ function Suggestions({
       setSelected("");
   }, [match.candidates, selected]);
   return (
+    <>
     <details className="suggestions">
       <summary>Elegir producto para «{match.name}»</summary>
       <div className="suggestion-options">
@@ -86,6 +89,8 @@ function Suggestions({
         {mutation.isError && <p role="alert">{mutation.error.message}</p>}
       </div>
     </details>
+    {!match.selected_product_id && <button className="secondary-button shopping-create-button" onClick={onCreate}>Crear producto para «{match.name}»</button>}
+    </>
   );
 }
 function AuthenticatedApp() {
@@ -94,6 +99,7 @@ function AuthenticatedApp() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
   );
+  const [creatingMatch, setCreatingMatch] = useState<{key: string; name: string} | null>(null);
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [busyItemId, setBusyItemId] = useState<number | null>(null);
@@ -408,7 +414,8 @@ function AuthenticatedApp() {
                       Quitar
                     </button>
                   </div>
-                  {match && <Suggestions match={match} onSaved={choiceSaved} />}
+                  {!match && !item.product_id && !item.done && <button className="secondary-button shopping-create-button" onClick={() => setCreatingMatch({key: normalizeName(item.name), name: item.name})}>Crear producto para «{item.name}»</button>}
+                  {match && <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />}
                 </article>
               );
             })}
@@ -442,7 +449,7 @@ function AuthenticatedApp() {
                     Quitar
                   </button>
                 </div>
-                <Suggestions match={match} onSaved={choiceSaved} />
+                <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />
               </article>
             ))}
           </div>
@@ -462,7 +469,8 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.10.0</footer>
+      {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
+      <footer>Despensa 1.11.0</footer>
     </div>
     </NavigationContext.Provider>
   );

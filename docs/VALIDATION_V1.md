@@ -4,11 +4,11 @@ Fecha: 2026-11-01. Migración de PR #10 integrada en `main`; publicación 1.0.0 
 
 ## Evidencia local
 
-- Python: 310 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
-- Vitest 4: 87 pruebas de interacciones React y cliente API en 1.10.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
+- Python: 317 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
+- Vitest 4: 91 pruebas de interacciones React y cliente API en 1.11.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
 - TypeScript 7: aplicación y e2e; Vite 7: compilación de producción.
-- Grocy real: 11 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
-- Chromium: 25 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
+- Grocy real: 12 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
+- Chromium: 27 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
 
 ## Refuerzo de QA del frontend
 
@@ -16,7 +16,7 @@ Las pruebas de componentes cubren ajuste del total restante sin formulario de co
 
 Estas regresiones detectaron y corrigieron tres defectos: borrar una consulta de autenticación observada podía dejar la vista anterior y recrear caché privada; el frontend ignoraba `ready_to_commit: false`; el botón de alta no aplicaba el máximo de 1000 piezas por pack (el campo HTML y el servidor ya lo limitaban).
 
-`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,62 % líneas, 75,66 % sentencias, 79,86 % ramas y 66,18 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
+`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,73 % líneas, 75,32 % sentencias, 79,77 % ramas y 64,85 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
 
 La ejecución local de navegador sin PHP/Grocy ejecuta 14 escenarios disponibles y omitió explícitamente los 5 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 19; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
 
@@ -115,3 +115,10 @@ El contrato Grocy comprueba que una petición sin aceptación conserva exactamen
 
 
 Umbrales 1.10.0: regresiones de decimal, valor esperado, opt-out persistente, comparación inclusiva/stock positivo y cero sin avisos. El contrato Grocy compara productos, stock, movimientos y compra completos antes/después de cambiar umbral/opt-out y reiniciar; no deben cambiar. El navegador verifica amarillo con stock positivo, guarda el opt-out, recarga y comprueba umbral conservado sin aviso.
+
+
+## Creación desde Alexa 1.11.0
+
+Siete regresiones Python nuevas cubren artículo sin candidatos, nombre canónico distinto, fila/cantidad/nota intactas, producto existente con aceptación, respuesta perdida en alta/asociación, episodio nuevo, CSRF y barras en nombres. La asociación parcial se completa después de leer el estado; si el PUT ya se aplicó no se repite. La cola conserva una intención canónica seleccionada antes de una asociación incierta, para que el worker no reimporte una nota duplicada.
+
+El contrato real cubre Alexa sin fila Grocy y con nota/cantidad existentes, crea stock cero, repite el mismo comando sin duplicar y compara stock/historial completos. Componentes y Chromium verifican nombre rellenado/editable, ausencia de stock inicial, confirmación de existente y controles comprado/quitar después de crear. Localmente pasan 19 escenarios y se omiten explícitamente 8; CI ejecuta los 27.

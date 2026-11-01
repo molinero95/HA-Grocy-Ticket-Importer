@@ -366,6 +366,7 @@ test("a newly created product becomes an Alexa suggestion without another worker
   await page.getByRole("button", { name: "Lista de la compra", exact: true }).click();
   await page.getByText(`Elegir producto para «${name}»`, { exact: true }).click();
   await expect(page.getByRole("option", { name, exact: true })).toHaveCount(1);
+  await page.getByText(`Elegir producto para «${name}»`, {exact: true}).locator("..").getByLabel("Producto sugerido").selectOption({label: name});
   await page.getByRole("button", { name: "Guardar elección", exact: true }).click();
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   const row = page.locator("article").filter({ has: page.getByRole("button", { name, exact: true }) });
@@ -459,4 +460,25 @@ test("duplicate review persists differences and combines through the native Groc
   await expect(page.getByRole("checkbox", {name: "No avisar de stock bajo"})).toBeChecked();
   await page.getByRole("button", {name: "Cerrar ficha", exact: true}).click();
   await expect(page.locator(".inventory-item").filter({hasText: name}).getByText("Stock bajo", {exact: true})).toHaveCount(0);
+});
+
+test("unknown Alexa arrival creates a zero-stock product and a manageable associated shopping row", async ({ page }) => {
+  const name = "Gel Alexa sin sugerencia";
+  await page.goto(base + "react/");
+  const added = await page.request.post(base + "api/services/todo/add_item", {headers: {Authorization: "Bearer disposable"}, data: {entity_id: "todo.disposable", item: name}});
+  expect(added.ok()).toBe(true);
+  expect((await command(page, "__test/sync")).ok()).toBe(true);
+  await page.getByRole("button", {name: "Actualizar", exact: true}).click();
+  await page.getByRole("button", {name: `Crear producto para «${name}»`, exact: true}).click();
+  await expect(page.getByLabel("Nombre", {exact: true})).toHaveValue(name);
+  await page.getByLabel("Nombre", {exact: true}).fill("Jabon canonico e2e");
+  await page.getByLabel("Unidad", {exact: true}).selectOption({label: "Piece"});
+  await page.getByRole("button", {name: "Guardar producto", exact: true}).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const row = page.locator("article").filter({has: page.getByRole("button", {name: "Jabon canonico e2e", exact: true})});
+  await expect(row).toContainText("1 Piece");
+  await row.getByRole("button", {name: "✓ Comprado", exact: true}).click();
+  await expect(row.getByRole("button", {name: "↩ Pendiente", exact: true})).toBeVisible();
+  await row.getByRole("button", {name: "Jabon canonico e2e", exact: true}).click();
+  await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("0");
 });

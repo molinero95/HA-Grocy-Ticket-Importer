@@ -40,9 +40,10 @@ def manual_choice(grocy, queue, path, key, product_id, operation_id=None):
     product = next((p for p in products if int(p["id"]) == product_id), None)
     if product_id:
         decision, candidates = suggest_catalog_matches(entry["name"], products)
-        if (product is None or (decision != "review" and not (decision == "exact" and entry.get("requires_product")))
-                or product_id not in {int(p["id"]) for p in entry["candidates"]}
-                or product_id not in {int(p["id"]) for p in candidates}):
+        created_choice = product_id == entry.get('created_product_id')
+        if (product is None or (not created_choice and ((decision != "review" and not (decision == "exact" and entry.get("requires_product")))
+                or product_id not in {int(p["id"]) for p in candidates}))
+                or product_id not in {int(p["id"]) for p in entry["candidates"]}):
             raise ValueError("La sugerencia ha cambiado; actualiza la lista")
     elif entry.get("requires_product"):
         raise ValueError("Asocia la nota a su producto o quita únicamente el artículo original de la lista")

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.11.0] — 2026-11-01
+
+### Added
+- Offer “Crear producto” directly on shopping/Alexa articles, including arrivals with no valid catalog candidates. Prefill the article name, allow product details, create with zero stock and automatically associate a genuinely new product to the original shopping row, preserving quantity and note.
+- Persist a server-prepared product identity within the current review generation. Support an edited canonical name without losing the Alexa binding on candidate refresh; reset it only for a new source episode. Existing duplicate products require explicit confirmation before association.
+- Journal creation once and retain known product IDs after partial association. Recover by reading the current state and completing association without recreating the product or rewriting a row already associated. Do not invoke Alexa or stock writes from manual creation.
+- Keep unknown free-text articles reviewable; allow manual-name and barcode fallbacks and names containing slashes. Keep remove/original controls and protect existing associated rows.
+
+### Tests
+- Cover empty suggestions, edited names, source generations, existing product confirmation, quantity/note/row preservation, lost creation/association responses, CSRF and no stock/Alexa mutations. Add real Grocy and mobile flows for automatic association and manageable bought/remove controls.
+
 ## [1.10.0] — 2026-11-01
 
 ### Added

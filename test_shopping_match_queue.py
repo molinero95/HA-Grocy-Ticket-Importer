@@ -53,7 +53,7 @@ class AlexaMatchQueueTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'queue.sqlite3'
             refresh_catalog(path, [], ['Crema Nivea'])
-            self.assertEqual(pending(path), [])
+            self.assertEqual(pending(path)[0]['candidates'], [])
             refresh_catalog(path, [{'id': 9, 'name': 'Crema Nivea'}], ['Crema Nivea'])
             row = pending(path)[0]
             self.assertEqual([p['id'] for p in row['candidates']], [9])
@@ -98,12 +98,13 @@ class AlexaMatchQueueTests(unittest.TestCase):
             refresh_catalog(path, [], ['Arroz'])
             self.assertEqual(pending(path)[0], before)
 
-    def test_exact_and_unmatched_items_are_not_queued(self):
+    def test_exact_catalog_items_skip_review_and_unmatched_alexa_items_allow_creation(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "queue.sqlite3"
             refresh(path, ["Leche entera", "Jabón desconocido"],
                     [{"id": 1, "name": "Leche entera"}])
-            self.assertEqual(pending(path), [])
+            self.assertEqual([row["name"] for row in pending(path)], ["Jabón desconocido"])
+            self.assertEqual(pending(path)[0]["candidates"], [])
 
     def test_changed_candidates_keep_stale_choice_but_never_resolve_it(self):
         with tempfile.TemporaryDirectory() as tmp:

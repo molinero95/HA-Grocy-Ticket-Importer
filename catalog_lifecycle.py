@@ -85,6 +85,8 @@ def _local_deletion_blockers(pid, *, allow_completed_receipts=False):
         if 'pending_matches' in tables:
             db.row_factory = sqlite3.Row
             for row in db.execute('SELECT * FROM pending_matches WHERE active=1'):
+                if 'created_product_id' in row.keys() and str(row['created_product_id']) == str(pid):
+                    blockers.append('un producto preparado para una compra')
                 if str(row['selected_product_id']) == str(pid):
                     blockers.append('una elección pendiente de Alexa')
                 if 'removal_json' in row.keys() and row['removal_json']:

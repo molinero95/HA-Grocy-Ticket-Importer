@@ -39,7 +39,36 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         return jsonify({"csrf_token": csrf_token()})
 
 
-    @app.post("/api/v1/alexa/matches/<key>/choose")
+    @app.get('/api/v1/alexa/matches/<path:key>/create-context')
+    def api_v1_shopping_creation_context(key):
+        from shopping_product_creation import creation_context
+        try:
+            with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+                return jsonify(creation_context(barcode_stock.grocy, shopping_match_queue, shopping_match_queue.DEFAULT_PATH, key))
+        except BlockingIOError: return jsonify({"error": "operation_in_progress"}), 409
+        except ValueError as exc: return jsonify({"error": str(exc)}), 409
+        except Exception: return jsonify({"error": "No se pudo revisar este artículo. Actualiza la lista."}), 503
+
+    @app.post('/api/v1/alexa/matches/<path:key>/create-product')
+    def api_v1_create_shopping_product(key):
+        from shopping_product_creation import create_for_shopping
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or not isinstance(payload.get('product'), dict)
+                or not isinstance(payload.get('expected_name'), str) or type(payload.get('generation')) is not int
+                or not isinstance(payload['product'].get('name'), str) or type(payload['product'].get('unit_id')) is not int
+                or str(payload['product'].get('initial_stock', '0')) not in ('0', '0.00')):
+            return jsonify({"error": "Revisa el producto. Desde la compra se crea sin existencias."}), 400
+        if not lock.acquire(blocking=False): return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+                result = create_for_shopping(barcode_stock.grocy, shopping_match_queue, shopping_match_queue.DEFAULT_PATH, key, payload)
+            return jsonify(result['body']), result['status']
+        except BlockingIOError: return jsonify({"error": "operation_in_progress"}), 409
+        except CommandConflict: return jsonify({"error": "No se ha reenviado el alta. Comprueba el catálogo y la lista antes de otra operación."}), 409
+        except Exception: return jsonify({"error": "No se pudo confirmar el alta. Comprueba el catálogo y la lista antes de intentarlo de nuevo."}), 502
+        finally: lock.release()
+
+    @app.post("/api/v1/alexa/matches/<path:key>/choose")
     def api_v1_choose_alexa_match(key):
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict) or type(payload.get("product_id")) is not int or payload["product_id"] < 0:
@@ -65,7 +94,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         return jsonify(result)
 
 
-    @app.delete("/api/v1/alexa/matches/<key>")
+    @app.delete("/api/v1/alexa/matches/<path:key>")
     def api_v1_remove_alexa_match(key):
         if not lock.acquire(blocking=False):
             return jsonify({"error": "operation_in_progress"}), 409
@@ -187,7 +216,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
                     products = [p for p in products if _grocy_done(p.get("active", True))]
                     shopping_match_queue.refresh_catalog(shopping_match_queue.DEFAULT_PATH, products, notes)
             matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
-                       if not row.get("removed") and (row.get("candidates") or row.get("selection_stale"))
+                       if not row.get("removed")
                        and (not row.get("dismissed") or row.get("selection_stale"))]
             matches_error = False
         except Exception:

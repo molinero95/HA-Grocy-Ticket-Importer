@@ -13,10 +13,14 @@ import { PhotoPreview } from "./ProductPhotos";
 
 export function CreateProduct({
   onClose,
-  onOpenProduct,
+  onOpenProduct, initialName = "", submitProduct = createCatalogProduct, zeroStockOnly = false, oneAttempt = false,
 }: {
   onClose: () => void;
   onOpenProduct?: (id: number) => void;
+  initialName?: string;
+  submitProduct?: typeof createCatalogProduct;
+  zeroStockOnly?: boolean;
+  oneAttempt?: boolean;
 }) {
   const dialog = useModal(onClose);
   const client = useQueryClient();
@@ -24,7 +28,8 @@ export function CreateProduct({
     queryKey: ["catalog-units"],
     queryFn: getCatalogUnits,
   });
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName);
+  const [attempted, setAttempted] = useState(false);
   const [barcode, setBarcode] = useState("");
   const [unit, setUnit] = useState("");
   const [initialStock, setInitialStock] = useState("0");
@@ -35,7 +40,7 @@ export function CreateProduct({
       value.id === Number(unit) && value.name.toLowerCase().includes("pack"),
   );
   const save = useMutation({
-    mutationFn: createCatalogProduct,
+    mutationFn: submitProduct,
     onSuccess: async (response, submitted) => {
       await client.invalidateQueries({ queryKey: ["shopping"] });
       // Never attach metadata to an existing duplicate as a side effect of creation.
@@ -109,6 +114,8 @@ export function CreateProduct({
             className="variant-form create-product-form"
             onSubmit={(event) => {
               event.preventDefault();
+              if (save.isPending || (oneAttempt && attempted)) return;
+              if (oneAttempt) setAttempted(true);
               save.mutate({
                 name: name.trim(),
                 barcode: barcode.trim(),
@@ -153,7 +160,7 @@ export function CreateProduct({
                 ))}
               </select>
             </label>
-            <label className="variant-field">
+            {zeroStockOnly ? <p>Se crea sin existencias. La cantidad y nota de la compra se conservan.</p> : <label className="variant-field">
               Stock inicial
               <input
                 type="number"
@@ -162,7 +169,7 @@ export function CreateProduct({
                 value={initialStock}
                 onChange={(event) => setInitialStock(event.target.value)}
               />
-            </label>
+            </label>}
             {isPack && (
               <>
                 <label className="variant-field">
@@ -185,13 +192,14 @@ export function CreateProduct({
             {save.isError && (
               <p role="alert" className="notice">
                 {save.error.message}
+                {oneAttempt && " Cierra el formulario y comprueba el catálogo y la lista antes de otra operación."}
               </p>
             )}
             <button
               className="primary-button create-product-submit"
               type="submit"
               disabled={
-                save.isPending ||
+                save.isPending || (oneAttempt && attempted) ||
                 !unit ||
                 !name.trim() ||
                 Boolean(barcode && !isBarcode(barcode)) ||

@@ -416,3 +416,8 @@ export const undoProductDifference = (left: number, right: number) => request("c
 export const mergeCatalogProducts = (preview: MergePreview, confirmation: string, operationId: string) => request("catalog/products/merge", "POST", { source_id: preview.source.id, target_id: preview.target.id, expected_source: preview.source.name, expected_target: preview.target.name, token: preview.token, confirmation, operation_id: operationId });
 
 export const saveStockThreshold = (id: number, amount: string, expected: string, warningEnabled = true, expectedWarningEnabled = true) => request<{stock_threshold: string; stock_warning_enabled: boolean}>("catalog/products/" + id + "/stock-threshold", "PUT", {amount, expected, warning_enabled: warningEnabled, expected_warning_enabled: expectedWarningEnabled});
+
+export type ShoppingCreationContext = { key: string; name: string; generation: number; can_create: boolean; product_id: number | null; product_name: string | null; can_associate: boolean; associated: boolean };
+export type ShoppingCreationResult = { product_id: number; created: boolean; associated: boolean; association_uncertain?: boolean };
+export const getShoppingCreationContext = (key: string) => request<ShoppingCreationContext>("alexa/matches/" + encodeURIComponent(key) + "/create-context");
+export const createShoppingProduct = (key: string, context: ShoppingCreationContext, product: CatalogProductInput, operationId: string) => request<ShoppingCreationResult>("alexa/matches/" + encodeURIComponent(key) + "/create-product", "POST", { expected_name: context.name, generation: context.generation, product: {...product, initial_stock: "0"}, operation_id: operationId });

@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.10.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.11.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.10.0
+## Despensa 1.11.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.10.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.11.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -225,3 +225,12 @@ En 1.10.0 las confirmaciones de «Son diferentes», deshacer y otras acciones co
 En la ficha, **Umbral de aviso de stock** permite indicar una cantidad mínima: por defecto **0**. Mi despensa muestra amarillo cuando la cantidad es igual o inferior al umbral, con **Stock bajo** si queda producto y **Sin existencias** al llegar a cero.
 
 Marca **No avisar de stock bajo** para desactivar el color y las etiquetas de ese producto, incluso sin existencias; el umbral se conserva por si reactivas los avisos. Guarda los cambios con **Guardar umbral**. Es solo un aviso visual: no modifica existencias ni añade compras automáticamente.
+
+
+## Crear productos desde Alexa o la compra (1.11.0)
+
+Cada artículo de texto ofrece **Crear producto para «…»**, aunque no haya ninguna sugerencia. Se abre el formulario con su nombre rellenado; puedes cambiarlo y elegir unidad/código/envase. Desde esta vía se crea **sin existencias** y queda asociado automáticamente al mismo artículo, conservando su cantidad y nota. Después puedes marcarlo comprado o quitarlo.
+
+Si el nombre/código ya pertenece a un producto, no se duplica ni cambia su stock: revisa el producto existente y pulsa **Asociar este producto**. Si el producto se creó pero no se pudo confirmar la asociación, se conserva y el formulario permite **Revisar estado** antes de completarla; no vuelve a crear el producto ni reescribe una fila ya asociada.
+
+El vínculo usa el ID del producto para esa aparición del artículo de Alexa, incluso con nombre canónico distinto, sin renombrar Alexa. Una nueva aparición tras desaparecer inicia otra revisión. Para nombres alternativos permanentes sigue disponible Acciones → Alias de Alexa.

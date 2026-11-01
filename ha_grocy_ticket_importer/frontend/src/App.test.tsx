@@ -323,3 +323,11 @@ it("updates candidate names and clears unavailable selections when catalog data 
   expect(screen.getByRole("button", { name: "Guardar elección" })).toHaveProperty("disabled", true);
   expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
 });
+
+it("offers creation for an Alexa arrival with no matching products", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({...shopping, items: [], pending_matches: [{key: "gel alexa", name: "Gel Alexa", candidates: []}]});
+  renderWithClient(<App />);
+  expect(await screen.findByRole("button", {name: "Crear producto para «Gel Alexa»"})).toBeTruthy();
+  expect(screen.getByRole("button", {name: "Quitar Gel Alexa"})).toBeTruthy();
+  expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
+});
