@@ -19,6 +19,7 @@ import {
   clearCompletedShopping,
   getAuthStatus,
   getShopping,
+  getShoppingSyncStatus,
   loginStandalone,
   logoutStandalone,
   removeShopping,
@@ -129,6 +130,7 @@ function AuthenticatedApp() {
     queryKey: ["shopping"],
     queryFn: getShopping,
   });
+  const sync = useQuery({ queryKey: ["shopping-sync-status"], queryFn: getShoppingSyncStatus, refetchInterval: 30000 });
   const matches = new Map(
     (data?.pending_matches ?? []).map((match) => [match.key, match]),
   );
@@ -318,6 +320,19 @@ function AuthenticatedApp() {
               Grocy no está disponible en este momento.
             </p>
           )}
+          {sync.data && (!sync.data.configured || !sync.data.enabled ||
+            sync.data.worker === "failed" || sync.data.worker === "stale" ||
+            sync.data.worker === "unknown") && (
+            <div className="notice" role="status">
+              {!sync.data.configured
+                ? "Alexa no está configurada: selecciona la entidad de lista de compras en las opciones del complemento."
+                : !sync.data.enabled
+                  ? "La sincronización con Alexa está desactivada. Activa shopping_sync_enabled en las opciones del complemento y reinícialo."
+                  : sync.data.worker === "failed"
+                    ? "La sincronización con Alexa ha fallado. Consulta los registros del complemento para revisar el error."
+                    : "No hay una comprobación reciente de Alexa. Revisa los registros y la configuración del complemento."}
+            </div>
+          )}
           <div className="items">
             {data?.items.map((item) => {
               const key = normalizeName(item.name);
@@ -448,7 +463,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.5.0</footer>
+      <footer>Despensa 1.5.1</footer>
     </div>
   );
 }
