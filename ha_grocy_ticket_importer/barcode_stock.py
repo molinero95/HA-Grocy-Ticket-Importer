@@ -38,11 +38,11 @@ def list_products():
         key=lambda p: (p["name"].casefold(), p["id"]),
     )
 
-PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://images\.(?:openfoodfacts|openproductsfacts)\.org/[^\]\s]+)\]\s*")
+PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://images\.(?:openfoodfacts|openproductsfacts|openbeautyfacts)\.org/[^\]\s]+)\]\s*")
 
 
 def saved_photo(product):
-    """Only show image URLs from the trusted Open Food Facts image host."""
+    """Only show image URLs from the trusted open-catalog image hosts."""
     from product_images import safe_image_url
     match = PHOTO_MARKER.search(str(product.get("description") or ""))
     return safe_image_url(match.group(1)) if match else None

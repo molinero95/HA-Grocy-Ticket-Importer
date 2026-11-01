@@ -2,6 +2,160 @@ import { expect, test } from "@playwright/test";
 
 const ingress = "http://127.0.0.1:8766/api/hassio_ingress/browser-test/react/";
 
+test("duplicate-review buttons and native file selection use consistent touch-friendly styles", async ({
+  page,
+}, testInfo) => {
+  await page.route("**/api/v1/catalog/duplicates", (route) =>
+    route.fulfill({
+      json: {
+        groups: [
+          {
+            reason: "Nombre similar",
+            items: [
+              { id: 1, name: "Leche", barcodes: [] },
+              { id: 2, name: "Leche entera", barcodes: [] },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/v1/catalog/audit", (route) =>
+    route.fulfill({
+      json: {
+        schema_version: 1,
+        source: "grocy",
+        products: [],
+        barcode_conflicts: [],
+        unlinked_shopping_entries: [],
+      },
+    }),
+  );
+  await page.goto(ingress);
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Revisar duplicados y auditoría",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Comparar los dos primeros" }),
+  ).toBeVisible();
+  for (const name of [
+    "Volver a analizar",
+    "Analizar catálogo",
+    "Comparar los dos primeros",
+  ]) {
+    const button = page.getByRole("button", { name, exact: true });
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect(
+      await button.evaluate((node) =>
+        parseFloat(getComputedStyle(node).borderRadius),
+      ),
+    ).toBeGreaterThan(0);
+  }
+  await page
+    .getByRole("button", { name: "Analizar catálogo", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Exportar auditoría JSON" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("duplicate-review-mobile.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Escanear ticket", exact: true })
+    .click();
+  const input = page.getByLabel("Foto o PDF del ticket");
+  const picker = await input.evaluate((node) => {
+    const style = getComputedStyle(node, "::file-selector-button");
+    return {
+      radius: parseFloat(style.borderRadius),
+      height: parseFloat(style.minHeight),
+    };
+  });
+  expect(picker.radius).toBeGreaterThan(0);
+  expect(picker.height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({
+    path: testInfo.outputPath("receipt-file-picker-mobile.png"),
+    fullPage: true,
+  });
+});
+
+test("create form buttons share accessible styling and a catalog name remains optional", async ({
+  page,
+}, testInfo) => {
+  await page.route("**/api/v1/catalog/units", (route) =>
+    route.fulfill({ json: { units: [{ id: 2, name: "Piece" }] } }),
+  );
+  await page.route("**/api/v1/photos/4006000082295", (route) =>
+    route.fulfill({
+      json: {
+        photo: {
+          barcode: "4006000082295",
+          name: "Nivea",
+          image_url: null,
+          source_url: "https://world.openbeautyfacts.org/product/4006000082295",
+          attribution: "Datos: Open Beauty Facts",
+        },
+      },
+    }),
+  );
+  await page.route("**/api/v1/catalog/products", (route) =>
+    route.fulfill({ json: { created: false, product_id: 7 } }),
+  );
+  await page.goto(ingress);
+  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Nuevo producto", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Crear producto" });
+  await dialog
+    .getByLabel("Nombre", { exact: true })
+    .fill("Mi nombre de producto");
+  await dialog.getByLabel("Código de barras (opcional)").fill("4006000082295");
+  await expect(
+    dialog.getByRole("button", { name: "Usar este nombre" }),
+  ).toBeVisible();
+  await expect(dialog.getByLabel("Nombre", { exact: true })).toHaveValue(
+    "Mi nombre de producto",
+  );
+  await dialog.getByRole("button", { name: "Usar este nombre" }).click();
+  await expect(dialog.getByLabel("Nombre", { exact: true })).toHaveValue(
+    "Nivea",
+  );
+  await dialog.getByLabel("Unidad", { exact: true }).selectOption("2");
+  for (const name of [
+    "Cerrar",
+    "Escanear código",
+    "Usar este nombre",
+    "Guardar producto",
+  ]) {
+    const button = dialog.getByRole("button", { name, exact: true });
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("create-product-form.png"),
+    fullPage: true,
+  });
+  await dialog.getByRole("button", { name: "Guardar producto" }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Abrir ficha del producto" }),
+  ).toBeVisible();
+  expect(
+    (await dialog
+      .getByRole("button", { name: "Abrir ficha del producto" })
+      .boundingBox())!.height,
+  ).toBeGreaterThanOrEqual(44);
+  await page.screenshot({
+    path: testInfo.outputPath("create-product-existing.png"),
+    fullPage: true,
+  });
+});
+
 test("a saved suggestion immediately offers bought/remove controls, including after marking bought", async ({
   page,
 }) => {
@@ -208,7 +362,7 @@ test("nested camera dialog traps keyboard focus, Escape restores focus and relea
   await page.keyboard.press("Tab");
   await expect(close).toBeFocused();
   const cameraTrigger = parent.getByRole("button", {
-    name: "Abrir cámara para escanear",
+    name: "Escanear código",
   });
   await cameraTrigger.click();
   const camera = page.getByRole("dialog", {

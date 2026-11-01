@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.1.0 — actualización desde 0.16.4 / 1.0.0
+## Despensa 1.2.0 — actualización de la instalación existente
 
-La versión 1.1.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.2.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.1.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.2.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -126,3 +126,10 @@ Se utiliza su servicio y clave existentes, sin cambiar seguridad ni datos.
 Cámara física, escrituras Alexa y actualización Supervisor requieren aceptación
 en la instalación real; no se dan por verificadas al publicar la versión.
 Véanse `docs/VALIDATION_V1.md` y `docs/REACT_PARITY.md` en el repositorio.
+
+
+## Product discovery and form controls (1.2.0)
+
+Open Food Facts and Open Products Facts remain enabled. Open Beauty Facts adds exact-code cosmetics lookup. Discovered images require trusted HTTPS image hosts; uploaded photos keep priority. A catalog may lack the product, its photo, or a complete name. Creation shows the returned name and offers **Usar este nombre**; it never overwrites typed names automatically. Manual name entry and sanitized photo upload remain available.
+
+Creation, camera, duplicate-review and native file-selection controls share the application button styling with keyboard focus and 44px touch targets. File selection retains native browser/camera behavior and existing upload validations.

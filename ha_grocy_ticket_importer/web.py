@@ -87,7 +87,7 @@ def security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https://images.openfoodfacts.org https://images.openproductsfacts.org; "
+        "img-src 'self' data: https://images.openfoodfacts.org https://images.openproductsfacts.org https://images.openbeautyfacts.org; "
         "media-src 'self' blob:; connect-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self'")
     if request.path.startswith("/api/v1/"):
         response.headers["Cache-Control"] = "no-store"

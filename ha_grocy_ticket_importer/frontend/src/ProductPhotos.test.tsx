@@ -1,11 +1,34 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { PhotoPreview } from "./ProductPhotos";
 import * as api from "./api";
 import { deferred, renderWithClient } from "./test/helpers";
 
 vi.mock("./api", () => ({ lookupPhoto: vi.fn() }));
 beforeEach(() => vi.resetAllMocks());
+
+it("offers a discovered name without a photo and applies it only on explicit choice", async () => {
+  vi.mocked(api.lookupPhoto).mockResolvedValue({
+    photo: {
+      barcode: "4006000082295",
+      name: "Nivea",
+      image_url: null,
+      source_url: "https://world.openbeautyfacts.org/product/4006000082295",
+      attribution: "Datos: Open Beauty Facts",
+    },
+  });
+  const useName = vi.fn();
+  renderWithClient(
+    <PhotoPreview barcode="4006000082295" onUseName={useName} />,
+  );
+  await screen.findByText("Nivea");
+  expect(useName).not.toHaveBeenCalled();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Usar este nombre" }),
+  );
+  expect(useName).toHaveBeenCalledExactlyOnceWith("Nivea");
+});
 
 it("does not request a photo for a name or incomplete barcode", () => {
   const { rerender } = renderWithClient(<PhotoPreview barcode="Leche" />);

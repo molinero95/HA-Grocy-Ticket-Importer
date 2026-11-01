@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] — 2026-11-01
+
+### Changed
+- Apply consistent primary/secondary buttons to product creation, camera scanning, duplicate review, audit/export and retry actions. Keep 44px touch targets, disabled/keyboard-focus styles, and matching native file-selector buttons.
+- Give plain form buttons a shared fallback style. Duplicate review cards use the full width; single-column headings no longer inherit action-group flex layout.
+
+### Added
+- Query Open Beauty Facts for cosmetics, alongside the existing Open Food Facts and Open Products Facts sources. Validate exact barcode matches and trusted HTTPS image hosts, and allow beauty images in stored metadata and CSP.
+- Display discovered product names and offer Use this name during creation. Applying a name is explicit, preserving typed names until chosen; incomplete catalog names remain editable.
+
+### Fixed
+- Treat catalog HTTP 404 as a normal missing product, not an outage. Continue past name-only matches to look for a photo in another catalog, while retaining useful name-only fallback data.
+- Regression coverage for cosmetic code lookup, image metadata/CSP, absent/malformed/unsafe results, and mobile creation/duplicate/file-selector layouts. External catalogs remain optional; existing photos and stock are preserved.
+
 ## [1.1.0] — 2026-11-01
 
 ### Changed

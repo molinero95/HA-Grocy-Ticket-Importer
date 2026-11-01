@@ -1,6 +1,7 @@
 import { useModal } from "./useModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ArrowUpRight, Check, X } from "lucide-react";
 import {
   createCatalogProduct,
   getCatalogUnits,
@@ -58,15 +59,29 @@ export function CreateProduct({
       aria-modal="true"
       aria-label="Crear producto"
     >
-      <section className="detail-panel">
+      <section className="detail-panel create-product-panel">
         <div className="detail-heading">
           <h2>Nuevo producto</h2>
-          <button onClick={onClose}>Cerrar</button>
+          <button
+            className="secondary-button create-product-close"
+            type="button"
+            aria-label="Cerrar"
+            title="Cerrar"
+            onClick={onClose}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
         </div>
         {units.isError && (
           <p role="alert">
             No se pudieron cargar las unidades de Grocy.{" "}
-            <button onClick={() => void units.refetch()}>Reintentar</button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void units.refetch()}
+            >
+              Reintentar
+            </button>
           </p>
         )}
         {save.data ? (
@@ -78,14 +93,19 @@ export function CreateProduct({
             </p>
             {photoMessage && <p>{photoMessage}</p>}
             {onOpenProduct && (
-              <button onClick={() => onOpenProduct(save.data.product_id)}>
+              <button
+                className="primary-button create-product-submit"
+                type="button"
+                onClick={() => onOpenProduct(save.data.product_id)}
+              >
+                <ArrowUpRight size={18} aria-hidden="true" />
                 Abrir ficha del producto
               </button>
             )}
           </>
         ) : (
           <form
-            className="variant-form"
+            className="variant-form create-product-form"
             onSubmit={(event) => {
               event.preventDefault();
               save.mutate({
@@ -114,8 +134,8 @@ export function CreateProduct({
                 onChange={(event) => setBarcode(event.target.value)}
               />
             </label>
-            <BarcodeScanner onDetect={setBarcode} />
-            <PhotoPreview barcode={barcode} />
+            <BarcodeScanner onDetect={setBarcode} label="Escanear código" />
+            <PhotoPreview barcode={barcode} onUseName={setName} />
             <label className="variant-field">
               Unidad
               <select
@@ -167,6 +187,7 @@ export function CreateProduct({
               </p>
             )}
             <button
+              className="primary-button create-product-submit"
               type="submit"
               disabled={
                 save.isPending ||
@@ -180,6 +201,7 @@ export function CreateProduct({
                     Number(packSize) > 1000))
               }
             >
+              <Check size={18} aria-hidden="true" />
               Guardar producto
             </button>
           </form>

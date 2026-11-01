@@ -33,7 +33,9 @@ export function Duplicates() {
             producto automáticamente.
           </p>
         </div>
-        <button onClick={() => void refetch()}>Volver a analizar</button>
+        <button className="secondary-button" onClick={() => void refetch()}>
+          Volver a analizar
+        </button>
       </div>
       <section className="item audit-panel">
         <h3>Auditoría completa (solo lectura)</h3>
@@ -42,6 +44,7 @@ export function Duplicates() {
           modifican existencias.
         </p>
         <button
+          className="primary-button"
           type="button"
           disabled={audit.isFetching}
           onClick={() => void audit.refetch()}
@@ -58,6 +61,7 @@ export function Duplicates() {
               compra sin producto
             </p>
             <button
+              className="secondary-button"
               type="button"
               onClick={() => {
                 const blob = new Blob([JSON.stringify(audit.data, null, 2)], {
@@ -80,14 +84,20 @@ export function Duplicates() {
       {isError && (
         <p role="alert" className="notice">
           No se pudo analizar el catálogo.{" "}
-          <button onClick={() => void refetch()}>Reintentar</button>
+          <button className="secondary-button" onClick={() => void refetch()}>
+            Reintentar
+          </button>
         </p>
       )}
       {data?.length === 0 && <p>No se han detectado posibles duplicados.</p>}
       {pair && (
         <section className="item audit-panel">
           <h3>Vista previa de fusión (solo lectura)</h3>
-          <button type="button" onClick={() => setPair(null)}>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => setPair(null)}
+          >
             Cerrar
           </button>
           {preview.isLoading && <p>Comprobando productos…</p>}
@@ -148,7 +158,7 @@ export function Duplicates() {
       )}
       <div className="items">
         {data?.map((group, index) => (
-          <article className="item" key={index}>
+          <article className="item duplicate-group" key={index}>
             <div>
               <strong>{group.reason}</strong>
               <ul>
@@ -163,6 +173,7 @@ export function Duplicates() {
               </ul>
               {group.items.length >= 2 && (
                 <button
+                  className="secondary-button"
                   onClick={() =>
                     setPair([group.items[0].id, group.items[1].id])
                   }
