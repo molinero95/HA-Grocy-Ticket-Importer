@@ -7,19 +7,23 @@ type Detection = { rawValue: string };
 type Detector = { detect(source: HTMLVideoElement): Promise<Detection[]> };
 type DetectorConstructor = new (options: { formats: string[] }) => Detector;
 
-/** Camera stays local: only the detected code is sent to our same-origin API. */
+/** Camera stays local; an optional complete frame is retained only in browser memory. */
 export function BarcodeScanner({
   onDetect,
   label,
+  onCapture,
 }: {
   onDetect: (code: string) => void;
   label?: string;
+  onCapture?: (code: string, frame: Blob) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const dialog = useModal(() => setOpen(false), open);
   const onDetectRef = useRef(onDetect);
   onDetectRef.current = onDetect;
+  const onCaptureRef = useRef(onCapture);
+  onCaptureRef.current = onCapture;
   const video = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -57,6 +61,32 @@ export function BarcodeScanner({
             isBarcode(item.rawValue),
           )?.rawValue;
           if (code && !stopped) {
+            const current = video.current;
+            const capture = onCaptureRef.current;
+            if (capture && current.videoWidth > 0 && current.videoHeight > 0) {
+              try {
+                const canvas = document.createElement("canvas");
+                const scale = Math.min(
+                  1,
+                  1600 / Math.max(current.videoWidth, current.videoHeight),
+                );
+                canvas.width = Math.round(current.videoWidth * scale);
+                canvas.height = Math.round(current.videoHeight * scale);
+                const context = canvas.getContext("2d");
+                if (context) {
+                  context.drawImage(current, 0, 0, canvas.width, canvas.height);
+                  canvas.toBlob(
+                    (blob) => {
+                      if (blob) capture(code, blob);
+                    },
+                    "image/jpeg",
+                    0.88,
+                  );
+                }
+              } catch {
+                /* Manual product-photo capture remains available. */
+              }
+            }
             onDetectRef.current(code);
             setOpen(false);
             return;

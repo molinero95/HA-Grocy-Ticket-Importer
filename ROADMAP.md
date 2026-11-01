@@ -84,3 +84,11 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [x] Alta contextual desde compra/Alexa sin candidatos, nombre editable, cero stock y asociación automática con cantidad/nota conservadas.
 - [x] Vínculo por ID limitado a episodio, confirmación de producto existente y recuperación de asociación sin duplicar alta ni fila.
 - [x] 1.12.0: selección/alta/unidades de cada línea de ticket, asociaciones por supermercado y cantidad final calculada de solo lectura.
+
+
+## Mejoras 1.13.0
+
+- [x] Endpoint de consultas Alexa separado, verificado y desactivado por defecto; modelo es-ES preparado.
+- [x] Reconocimiento de foto completa tras código sin resultados, acción explícita y sugerencia editable; conservar alta manual.
+- [ ] Configurar con el usuario Amazon Developer, skill/usuario autorizados y ruta Cloudflare del listener 8100; validar voz en Echo físico.
+- [ ] Validar una fotografía real del usuario contra su cuenta OpenAI tras la actualización. Las pruebas sustituyen el proveedor y no consumen su API.

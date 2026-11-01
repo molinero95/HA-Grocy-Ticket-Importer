@@ -64,16 +64,17 @@ def save_product_photo(product_id, image_url):
     return url
 
 
-def inventory_snapshot(include_archived=False):
+def inventory_snapshot(include_archived=False, *, read=None):
     """Read-only stock overview in three Grocy requests, not one per product.
 
     GET /stock returns the current stock for stocked products; catalog products
     absent from that response have zero stock. Any malformed response fails
     rather than incorrectly showing zero quantities.
     """
-    products = grocy("GET", "objects/products")
-    units_data = grocy("GET", "objects/quantity_units")
-    current_stock = grocy("GET", "objects/stock" if include_archived else "stock")
+    read = read or grocy
+    products = read("GET", "objects/products")
+    units_data = read("GET", "objects/quantity_units")
+    current_stock = read("GET", "objects/stock" if include_archived else "stock")
     if not all(isinstance(value, list) for value in (products, units_data, current_stock)):
         raise BarcodeError("Respuesta inesperada de Grocy al consultar el inventario")
     units = {int(unit["id"]): str(unit["name"]) for unit in units_data}

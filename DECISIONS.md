@@ -61,3 +61,11 @@ Conservar todos los datos persistentes y módulos Python espejo. Validación aut
 - Selección explícita por ID canónico o alta al confirmar. La configuración actual del producto existente controla Pack/Piece; nunca se modifica desde el ticket. Simular no crea productos ni existencias.
 - Asociaciones por supermercado + texto original normalizado, en tabla aditiva del ledger existente, solo después de importar correctamente. No usar coincidencia difusa; múltiples textos pueden apuntar al mismo ID. Revisar targets ausentes/archivados y cambios de unidad/conversión.
 - Cambiar cualquier línea exige nueva simulación. REVIEW/pending bloquean confirmación y preflight, manteniendo bloqueo compartido con worker, marcadores contra repetición y deduplicación por hash original.
+
+
+## Voz y fotografía completa 1.13.0
+
+- Endpoint Alexa aislado en proceso/puerto 8100, solo consultas y desactivado por defecto. Requiere skill y usuario Amazon autorizados, firma SHA-256, cadena de confianza y timestamp firmado. No relajar la autenticación/CSRF del panel. Configurar Cloudflare/Amazon después con el usuario.
+- Consultar stock real por ID/alias; aclarar ambigüedades, conservar unidades Piece/kg y respetar umbrales/opt-out. Error de consulta no equivale a cero. No efectuar escrituras Grocy/Alexa desde voz.
+- Búsqueda pública por código primero. Si no hay nombre o el servicio falla, ofrecer análisis explícito de fotografía completa; conservar encuadre, sanear EXIF y memoria acotada. La sugerencia visual no es búsqueda web ni verifica identidad/EAN. Aplicar nombre manualmente; no alterar código, stock ni conversiones.
+- Usar clave OpenAI existente, `store=false`, sin reintentos automáticos y sin persistir fotografías del reconocimiento. Los catálogos, fotos locales e historiales previos permanecen.

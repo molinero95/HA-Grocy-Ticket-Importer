@@ -1,10 +1,14 @@
 """Trusted product-photo discovery and local uploads for the React client."""
 import io
 import os
+import threading
+import product_recognition
 from pathlib import Path
 
 from flask import jsonify, request
 from PIL import Image, ImageOps, UnidentifiedImageError
+
+IDENTIFY_LOCK = threading.Lock()
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
@@ -23,6 +27,32 @@ def local_image_url(product_id):
 
 def register_photo_routes(app, barcode_stock, lock):
     import product_images
+
+    @app.post("/api/v1/photos/identify")
+    def api_v1_identify_product_photo():
+        if request.form.get('consent') != 'true':
+            return jsonify({'error': 'Confirma el envío de la fotografía a OpenAI'}), 400
+        uploaded = request.files.get('photo')
+        if not uploaded or not uploaded.filename:
+            return jsonify({'error': 'Selecciona una fotografía completa del producto'}), 400
+        try:
+            code = barcode_stock.validate_barcode(request.form.get('barcode'))
+        except (barcode_stock.BarcodeError, ValueError):
+            return jsonify({'error': 'Revisa el código de barras'}), 400
+        if not IDENTIFY_LOCK.acquire(blocking=False):
+            return jsonify({'error': 'Hay otro análisis de fotografía en curso'}), 409
+        try:
+            raw = uploaded.read(MAX_IMAGE_BYTES + 1)
+            if len(raw) > MAX_IMAGE_BYTES:
+                return jsonify({'error': 'La imagen supera 8 MiB'}), 413
+            return jsonify({'suggestion': product_recognition.identify(raw, code)})
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+        except Exception:
+            # Do not log photo bytes, labels, paid-provider response bodies or keys.
+            return jsonify({'error': 'No se pudo analizar la foto. Puedes completar el nombre manualmente.'}), 503
+        finally:
+            IDENTIFY_LOCK.release()
 
     @app.get("/api/v1/photos/<barcode>")
     def api_v1_photo_lookup(barcode):

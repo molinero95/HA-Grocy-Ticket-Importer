@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.12.0 — actualización de la instalación existente
+## Despensa 1.13.0 — actualización de la instalación existente
 
-La versión 1.12.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.13.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.12.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.13.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -203,3 +203,12 @@ Receipt review edits purchased quantity, stock unit and pack contents, selects a
 An optional merchant/original-text mapping is stored only after a successful line import in the additive `receipt_product_mappings` table of the existing receipt ledger. It does not replace or reset `receipt_items`. Keys normalize case/whitespace without fuzzy matching or crossing merchants. New reviews preselect a valid canonical ID; missing/archived targets or changed units/conversions require explicit review. No mappings or remote stock/products are written during simulation. Preserve the existing ledger in upgrades and backups.
 
 Every edit invalidates confirmation. Unresolved REVIEW/pending lines cannot authorize partial import; a catalog preflight under the shared worker lock must still pass at commit. One-shot receipt markers and source-hash deduplication remain. Uncertain outcomes are never retried automatically.
+
+
+## Alexa stock endpoint and complete product-photo fallback (1.13.0)
+
+`POST /alexa/despensa` runs in a dedicated Flask/Gunicorn process on internal TCP 8100 only when `alexa_skill_enabled` is true and both `alexa_skill_id` and `alexa_skill_user_id` are configured. Port publishing defaults to null; the existing ingress listener stays restricted to the HA proxy. The voice app has no frontend or ordinary API routes. Configure only the exact voice path in Cloudflare after installing; see the repository's `docs/ALEXA_SKILL.md`. Do not proxy the ingress application or expose port 8765. No installed options, tunnel or Amazon skill is changed automatically.
+
+The voice endpoint verifies `Signature-256`, the certificate chain against system roots, SAN `echo-api.amazon.com`, timestamp within 150 seconds, skill ID and owner ID. Certificate retrieval is HTTPS-only under `s3.amazonaws.com/echo.api/`, rejects redirects and is bounded in size/time. Stock uses three read-only Grocy calls with short timeouts; unknown/unavailable products are not reported as zero. Low-stock summaries respect opt-outs. Metadata aliases/thresholds are read through read-only SQLite connections.
+
+The UI offers full-photo identification after barcode lookup has no product name or fails. Scanner frames and manual photos stay local until the explicit OpenAI button. The authenticated CSRF-protected photo API sanitizes and resizes the full frame, removes EXIF, requests structured suggestions with `store=false` and never writes stock/products/photos or auto-retries. A suggestion changes the name only after explicit acceptance. Existing duplicate/EAN checks remain on save; the image/model never replaces the scanned code or pack configuration. The existing OpenAI API key is reused and normal API usage applies. Public barcode lookup remains the first attempt.

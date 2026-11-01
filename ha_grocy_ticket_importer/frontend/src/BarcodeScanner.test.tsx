@@ -114,3 +114,20 @@ it("stops a late camera stream after the dialog is closed", async () => {
   expect(stop).toHaveBeenCalledOnce();
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+it("captures the complete camera frame locally without cropping and still stops the stream", async () => {
+  const stop=vi.fn();const frame=new Blob(["full-frame"],{type:"image/jpeg"});const drawImage=vi.fn();const capture=vi.fn();
+  vi.stubGlobal("BarcodeDetector",class { detect=vi.fn().mockResolvedValue([{rawValue:"8412345678901"}]); });
+  Object.defineProperty(navigator,"mediaDevices",{configurable:true,value:{getUserMedia:vi.fn().mockResolvedValue({getTracks:()=>[{stop}]})}});
+  vi.spyOn(HTMLMediaElement.prototype,"play").mockResolvedValue(undefined);
+  vi.spyOn(HTMLMediaElement.prototype,"readyState","get").mockReturnValue(4);
+  vi.spyOn(HTMLVideoElement.prototype,"videoWidth","get").mockReturnValue(1200);
+  vi.spyOn(HTMLVideoElement.prototype,"videoHeight","get").mockReturnValue(600);
+  vi.spyOn(HTMLCanvasElement.prototype,"getContext").mockReturnValue({drawImage} as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype,"toBlob").mockImplementation(callback=>callback(frame));
+  render(<BarcodeScanner onDetect={vi.fn()} onCapture={capture}/>);
+  await userEvent.click(screen.getByRole("button",{name:"Abrir cámara para escanear"}));
+  await waitFor(()=>expect(capture).toHaveBeenCalledExactlyOnceWith("8412345678901",frame));
+  expect(drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement),0,0,1200,600);
+  expect(stop).toHaveBeenCalledOnce();
+});

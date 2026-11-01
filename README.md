@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.12.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.13.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.12.0
+## Despensa 1.13.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.12.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.13.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -243,3 +243,12 @@ Tras escanear, corrige **Cantidad del ticket**, **Unidad de stock** y **Piezas p
 **Cantidad final calculada** es de solo lectura y cambia al editar: 2 envases de 6 añaden 12 piezas. Se conserva el coste original de cada línea y el total del ticket; corregir unidades no cambia el importe pagado. Las cantidades pesadas admiten tres decimales.
 
 **Recordar este artículo para este supermercado** guarda el vínculo después de importar correctamente. Un texto distinto puede apuntar al mismo producto, sin renombrarlo; cada supermercado tiene sus propias asociaciones. En el siguiente ticket se selecciona el producto recordado. Si falta, está archivado o cambia su configuración, debes revisarlo. Cambiar una línea invalida la simulación; las líneas pendientes de revisión bloquean la confirmación. El historial de importaciones sigue impidiendo duplicar existencias.
+
+
+## Voz y reconocimiento de productos (1.13.0)
+
+El endpoint de Alexa está implementado para consultas de existencias, alias y productos con stock bajo. Se ejecuta en un proceso separado y está **desactivado por defecto**. La configuración de Amazon y Cloudflare se hará después; publicar esta versión no activa el acceso. Consulta [la guía de la skill](docs/ALEXA_SKILL.md) y el [modelo español](docs/alexa/interaction-model-es-ES.json).
+
+Si un código no está asociado a tu catálogo, **Dar de alta este código** abre el formulario con ese código y la imagen completa capturada por el escáner. Cuando los catálogos públicos no devuelven un nombre o fallan, aparece **Identificar con una foto**. Puedes conservar esa toma o fotografiar el frontal del envase y su etiqueta. **Analizar foto con OpenAI** envía la fotografía completa, sin recortarla al código, y muestra una sugerencia editable. **Usar nombre sugerido** aplica únicamente el nombre al formulario; guardar el producto sigue siendo una acción separada.
+
+La foto permanece en memoria del navegador hasta el envío explícito. Se sanea sin EXIF, se limita a 8 MiB/25 megapíxeles y se redimensiona manteniendo el encuadre. Se usa la clave OpenAI existente; la solicitud de análisis puede generar consumo en esa cuenta. No se trata de una búsqueda web ni de una verificación del EAN: el modelo interpreta lo visible y puede equivocarse. El código y los factores de compra se conservan. Puedes seguir introduciendo el nombre manualmente.

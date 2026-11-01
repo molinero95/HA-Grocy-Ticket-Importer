@@ -1,0 +1,16 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "mi despensa",
+      "intents": [
+        {"name": "GetStockIntent", "slots": [{"name": "Product", "type": "AMAZON.SearchQuery"}], "samples": ["cuánto queda de {Product}", "cuánta cantidad queda de {Product}", "cuántas unidades quedan de {Product}", "tenemos {Product}", "hay {Product}", "consulta las existencias de {Product}"]},
+        {"name": "LowStockIntent", "samples": ["qué productos faltan", "qué productos tienen stock bajo", "qué falta en la despensa"]},
+        {"name": "AMAZON.HelpIntent", "samples": []},
+        {"name": "AMAZON.CancelIntent", "samples": []},
+        {"name": "AMAZON.StopIntent", "samples": []},
+        {"name": "AMAZON.FallbackIntent", "samples": []}
+      ],
+      "types": []
+    }
+  }
+}
