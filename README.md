@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Estado:** candidata Despensa 1.0 en PR #10, sin publicar. React es la entrada de esta rama; `main` y la instalación existente siguen en 0.16.4. Validación automatizada contra Grocy 4.7.1 aislado; aceptación de despliegue HA/Android pendiente.
+> **Versión 1.0.0:** migración React integrada desde PR #10. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se consulta Open Food Facts automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía.
 
@@ -157,15 +157,15 @@ de consolidar productos existentes. No subas exportaciones reales a GitHub.
 **Limitación:** las unidades por compra de cada variante son informativas;
 no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
-la actualización de la instalación real antes de publicar.
+la actualización de la instalación real al instalar esta versión.
 
-## Desarrollo de Despensa 1.0 (PR #10, sin publicar)
+## Despensa 1.0.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
-JavaScript en `/basic`. El frontend HTML/JS anterior está retirado en esta rama.
-No se cambia la versión 0.16.4 ni se despliega automáticamente.
+JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
+La versión del manifiesto es 1.0.0; Home Assistant ofrece actualizar desde 0.16.4 al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.

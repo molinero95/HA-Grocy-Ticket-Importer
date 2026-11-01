@@ -92,11 +92,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Candidata Despensa 1.0 (sin publicar)
+## Despensa 1.0.0 — actualización desde 0.16.4
 
-La rama sirve React en `/`, conserva `/react/` como alias y ofrece compras
-sin JavaScript en `/basic`. El frontend completo anterior está retirado solo
-en esta rama. No se despliega ni cambia la versión estable 0.16.4.
+La versión 1.0.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+sin JavaScript en `/basic`. El frontend completo anterior está retirado.
+En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
+la instalación existente a 1.0.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 No se requieren opciones nuevas ni reinicializar bases de datos. Conservar
 `/config` y `/data`: ledger de tickets, fotos, variantes, colas, checkpoints y
@@ -117,5 +118,5 @@ fotos y HA todo se sustituyen. Las lecturas adicionales de Grocy instalado
 confirman 4.7.1 y el esquema; la entidad HA/Alexa devuelve pendientes válidos.
 Se utiliza su servicio y clave existentes, sin cambiar seguridad ni datos.
 Cámara física, escrituras Alexa y actualización Supervisor requieren aceptación
-antes de publicar.
+en la instalación real; no se dan por verificadas al publicar la versión.
 Véanse `docs/VALIDATION_V1.md` y `docs/REACT_PARITY.md` en el repositorio.

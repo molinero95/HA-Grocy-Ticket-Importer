@@ -1,6 +1,6 @@
 # Despensa 1.0 — matriz de paridad
 
-La candidata sirve React en `/`, alias `/react/`, con compras sin JavaScript en `/basic`. La versión instalada y `main` no se modifican. Esta matriz describe código probado, no un despliegue.
+La versión 1.0.0 sirve React en `/`, alias `/react/`, con compras sin JavaScript en `/basic`. Migración integrada en `main` y publicación autorizada para habilitar la actualización desde 0.16.4. Esta matriz describe código probado, no un despliegue.
 
 | Flujo anterior | React y API | Evidencia |
 | --- | --- | --- |
@@ -29,4 +29,4 @@ Retirados `PAGE`, scripts incrustados y rutas antiguas de formularios de aplicac
 
 ## Límites de la evidencia
 
-Véase [VALIDATION_V1.md](VALIDATION_V1.md). Grocy es el release oficial 4.7.1 sin modificar, con datos temporales. Solo OpenAI, búsqueda pública de fotos y HA todo se sustituyen en esas pruebas. Las lecturas adicionales del Grocy instalado confirman 4.7.1 y el esquema utilizado, y la entidad HA/Alexa devuelve pendientes válidos. No se prueba cámara física, actualización Supervisor ni escrituras sobre la cuenta Alexa real. No publicar ni afirmar aceptación de despliegue hasta resolver esas comprobaciones externas.
+Véase [VALIDATION_V1.md](VALIDATION_V1.md). Grocy es el release oficial 4.7.1 sin modificar, con datos temporales. Solo OpenAI, búsqueda pública de fotos y HA todo se sustituyen en esas pruebas. Las lecturas adicionales del Grocy instalado confirman 4.7.1 y el esquema utilizado, y la entidad HA/Alexa devuelve pendientes válidos. No se prueba cámara física, actualización Supervisor ni escrituras sobre la cuenta Alexa real. La publicación 1.0.0 autorizada no acredita esas comprobaciones externas.
