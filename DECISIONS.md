@@ -23,7 +23,8 @@
 
 ## Fotos, variantes y tickets
 
-- Buscar foto por código exacto al escanear/escribir; guardar solo URL validada por servidor y host HTTPS permitido. No consultar por producto en cada carga. Foto inexistente/servicio caído no bloquea el alta o asociación; conservar foto personalizada existente.
+- Buscar foto por código exacto al escanear/escribir en Open Food Facts, Open Products Facts y Open Beauty Facts; guardar solo URL validada por servidor y host HTTPS permitido. No consultar por producto en cada carga. Foto inexistente/servicio caído no bloquea el alta o asociación; conservar foto personalizada existente.
+- Desde 1.2.0, mostrar el nombre devuelto por el catálogo y permitir aplicarlo explícitamente durante el alta, sin sobrescribir el nombre escrito. Los catálogos pueden ser incompletos. Botones de formularios, revisión de duplicados y selectores nativos de archivo usan estilos comunes y objetivos táctiles de 44px.
 - Subida local saneada y sin metadatos privados; URL versionada compartida por compra, despensa y ficha. Persistir fotos en el almacenamiento existente.
 - Un genérico es un ID canónico de Grocy y posee todo su stock. Variantes añaden nombre, supermercado, marca, EAN y factor descriptivo. Comprobar propiedad del código en ambos registros; editar variante no cambia su EAN ni crea otro producto inadvertidamente. El factor canónico de compra controla las conversiones; el factor de variante no migra stock.
 - Tickets PDF/JPG/PNG: extraer, revisar nombres/piezas por pack, simular, confirmar bytes exactos y persistir historial contra duplicados. La simulación no escribe en Grocy. Conservar marcadores pendientes ante cortes.

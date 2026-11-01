@@ -35,6 +35,17 @@ class PhotoApiTests(unittest.TestCase):
         lookup.assert_called_once_with(CODE)
         grocy.assert_not_called()
 
+    def test_beauty_image_host_is_allowed_in_csp_and_server_side_save(self):
+        image = 'https://images.openbeautyfacts.org/images/products/test.jpg'
+        status = self.client.get('/api/v1/auth/status')
+        self.assertIn('https://images.openbeautyfacts.org', status.headers['Content-Security-Policy'])
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), \
+             patch('product_images.lookup_image', return_value={'image_url': image}), \
+             patch.object(web.barcode_stock, 'save_product_photo') as save:
+            response = self.client.post('/api/v1/catalog/products/7/photo-lookup', json={'barcode': CODE}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        save.assert_called_once_with(7, image)
+
     def test_photo_save_requires_csrf(self):
         with patch("product_images.lookup_image") as lookup:
             response = self.client.post("/api/v1/catalog/products/7/photo-lookup", json={"barcode": CODE})

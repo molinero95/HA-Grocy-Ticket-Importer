@@ -10,8 +10,10 @@ type DetectorConstructor = new (options: { formats: string[] }) => Detector;
 /** Camera stays local: only the detected code is sent to our same-origin API. */
 export function BarcodeScanner({
   onDetect,
+  label,
 }: {
   onDetect: (code: string) => void;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
@@ -103,15 +105,20 @@ export function BarcodeScanner({
   return (
     <>
       <button
-        className="camera-trigger"
+        className={
+          label
+            ? "secondary-button camera-trigger camera-trigger-labeled"
+            : "camera-trigger"
+        }
         type="button"
         onClick={() => {
           setError("");
           setOpen(true);
         }}
-        aria-label="Abrir cámara para escanear"
+        aria-label={label ?? "Abrir cámara para escanear"}
       >
         <Camera size={19} />
+        {label && <span>{label}</span>}
       </button>
       {open && (
         <div

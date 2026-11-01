@@ -4,7 +4,13 @@ import { isBarcode } from "./barcodes";
 import { lookupPhoto } from "./api";
 
 /** Lookup failure is advisory: a missing public photo must never block a save. */
-export function PhotoPreview({ barcode }: { barcode: string }) {
+export function PhotoPreview({
+  barcode,
+  onUseName,
+}: {
+  barcode: string;
+  onUseName?: (name: string) => void;
+}) {
   const code = barcode.trim();
   const lookupCode = useDebouncedValue(code);
   const photo = useQuery({
@@ -23,6 +29,22 @@ export function PhotoPreview({ barcode }: { barcode: string }) {
           Puedes guardar el producto sin foto. La búsqueda no está disponible.
         </p>
       )}
+      {photo.data?.photo?.name && (
+        <div className="discovered-product-name">
+          <p>
+            Nombre encontrado: <strong>{photo.data.photo.name}</strong>
+          </p>
+          {onUseName && (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => onUseName(photo.data!.photo!.name)}
+            >
+              Usar este nombre
+            </button>
+          )}
+        </div>
+      )}
       {photo.data && !photo.data.photo?.image_url && (
         <p>No se encontró fotografía para este código.</p>
       )}
@@ -33,14 +55,16 @@ export function PhotoPreview({ barcode }: { barcode: string }) {
             alt="Fotografía encontrada por código"
             referrerPolicy="no-referrer"
           />
-          <a
-            href={photo.data.photo.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {photo.data.photo.attribution}
-          </a>
         </>
+      )}
+      {photo.data?.photo && (
+        <a
+          href={photo.data.photo.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {photo.data.photo.attribution}
+        </a>
       )}
     </div>
   );

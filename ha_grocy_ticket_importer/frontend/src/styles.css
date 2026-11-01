@@ -21,6 +21,32 @@ button {
   font: inherit;
   cursor: pointer;
 }
+/* Plain form controls use the same secondary surface as explicit buttons. */
+button:not([class]),
+input[type="file"]::file-selector-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #d2dfd5;
+  border-radius: 10px;
+  background: #f0f6f1;
+  color: #176d4b;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+input[type="file"]::file-selector-button {
+  margin-inline-end: 10px;
+}
+input[type="file"]:disabled::file-selector-button {
+  opacity: 0.5;
+  cursor: default;
+}
 .shell {
   max-width: 1020px;
   margin: auto;
@@ -350,6 +376,7 @@ footer {
 .quantity button {
   display: grid;
   place-items: center;
+  padding: 0;
   background: #e8f3eb;
   color: #176d4b;
   border: 0;
@@ -378,6 +405,13 @@ footer {
 .camera-trigger {
   display: grid;
   place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #d2dfd5;
+  border-radius: 12px;
+  background: #f0f6f1;
+  color: #176d4b;
 }
 .scanner-backdrop {
   position: fixed;
@@ -525,6 +559,14 @@ footer {
   border-radius: 9px;
   font: inherit;
 }
+.variant-field input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: #f8faf8;
+  color: #60756a;
+  font-size: 13px;
+}
 .variant-buttons {
   display: flex;
   justify-content: flex-end;
@@ -645,7 +687,7 @@ select:focus-visible {
 .tabs button {
   min-height: 44px;
 }
-.heading > div:last-child {
+.heading > div + div {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -711,8 +753,12 @@ select:focus-visible {
   }
 }
 
-.audit-panel {
+.audit-panel,
+.duplicate-group {
   display: block;
+}
+.audit-panel {
+  margin-bottom: 12px;
 }
 .action-grid {
   display: grid;
@@ -771,7 +817,26 @@ select:focus-visible {
 .inventory-heading-actions {
   align-items: center;
 }
+.camera-trigger-labeled {
+  display: inline-flex;
+}
+.create-product-close {
+  min-width: 44px;
+  flex-shrink: 0;
+}
+.create-product-submit {
+  width: 100%;
+  margin-top: 16px;
+}
+.create-product-form {
+  margin-top: 12px;
+}
 @media (hover: hover) {
+  button:not([class]):not(:disabled):hover,
+  input[type="file"]:not(:disabled):hover::file-selector-button {
+    background: #e8f3eb;
+    border-color: #a9c8b4;
+  }
   .primary-button:hover {
     background: #115839;
   }
