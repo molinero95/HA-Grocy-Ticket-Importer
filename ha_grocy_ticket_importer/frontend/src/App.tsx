@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavigationContext, useAppNavigation } from "./navigation";
-import { FullscreenAction } from "./FullscreenAction";
 import { ProductDetail } from "./ProductDetail";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
@@ -203,7 +202,6 @@ function AuthenticatedApp() {
         <main>
           <h2>Acciones</h2>
           <div className="action-grid">
-            <FullscreenAction />
             <button
               aria-label="Escanear ticket"
               aria-describedby="receipt-action-description"
@@ -464,7 +462,7 @@ function AuthenticatedApp() {
           onClose={() => setSelectedProductId(null)}
         />
       )}
-      <footer>Despensa 1.9.0</footer>
+      <footer>Despensa 1.10.0</footer>
     </div>
     </NavigationContext.Provider>
   );

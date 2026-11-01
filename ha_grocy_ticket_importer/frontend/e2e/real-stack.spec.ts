@@ -373,14 +373,19 @@ test("a newly created product becomes an Alexa suggestion without another worker
 });
 
 
-test("an unused archived product can be permanently removed through the reviewed sheet", async ({ page }) => {
+test("archived movement history requires explicit confirmation before permanent removal", async ({ page }) => {
   await page.goto(base + "react/");
   await pantry(page);
   await page.getByRole("button", { name: "Nuevo producto", exact: true }).click();
   await page.getByLabel("Nombre", { exact: true }).fill("Archive deletion E2E");
   await page.getByLabel("Unidad", { exact: true }).selectOption({ label: "Piece" });
+  await page.getByLabel("Stock inicial").fill("1");
   await page.getByRole("button", { name: "Guardar producto", exact: true }).click();
   await page.getByRole("button", { name: "Abrir ficha del producto" }).click();
+  await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("1");
+  await page.getByLabel("Cantidad final", {exact: true}).fill("0");
+  await page.getByRole("button", {name: "Actualizar stock", exact: true}).click();
+  await expect(page.getByText("Stock actualizado correctamente")).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Archivar producto", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -391,6 +396,8 @@ test("an unused archived product can be permanently removed through the reviewed
   const confirm = page.getByRole("button", { name: "Eliminar producto definitivamente", exact: true });
   await expect(confirm).toBeDisabled();
   await page.getByLabel("Escribe «Archive deletion E2E» para confirmar", { exact: true }).fill("Archive deletion E2E");
+  await expect(confirm).toBeDisabled();
+  await page.getByRole("checkbox", {name: /Entiendo que se eliminarán/}).check();
   await confirm.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Archive deletion E2E", exact: true })).toHaveCount(0);
@@ -437,4 +444,19 @@ test("duplicate review persists differences and combines through the native Groc
   await page.getByRole("button", {name, exact: true}).click();
   await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("4");
   expect(Number(keep)).toBeGreaterThan(0);
+  await page.getByLabel("Umbral mínimo (Piece)").fill("4");
+  await Promise.all([page.waitForResponse(response => response.url().includes("/stock-threshold") && response.request().method() === "PUT"), page.getByRole("button", {name: "Guardar umbral", exact: true}).click()]);
+  await expect(page.getByText("Umbral guardado", {exact: true})).toBeVisible();
+  await page.getByRole("button", {name: "Cerrar ficha", exact: true}).click();
+  await expect(page.locator(".inventory-item").filter({hasText: name}).getByText("Stock bajo", {exact: true})).toBeVisible();
+  await page.getByRole("button", {name, exact: true}).click();
+  await page.getByRole("checkbox", {name: "No avisar de stock bajo"}).check();
+  await Promise.all([page.waitForResponse(response => response.url().includes("/stock-threshold") && response.request().method() === "PUT"), page.getByRole("button", {name: "Guardar umbral", exact: true}).click()]);
+  await expect(page.getByText("Umbral guardado", {exact: true})).toBeVisible();
+  await page.reload(); await pantry(page);
+  await page.getByRole("button", {name, exact: true}).click();
+  await expect(page.getByLabel("Umbral mínimo (Piece)")).toHaveValue("4");
+  await expect(page.getByRole("checkbox", {name: "No avisar de stock bajo"})).toBeChecked();
+  await page.getByRole("button", {name: "Cerrar ficha", exact: true}).click();
+  await expect(page.locator(".inventory-item").filter({hasText: name}).getByText("Stock bajo", {exact: true})).toHaveCount(0);
 });

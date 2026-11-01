@@ -5,7 +5,7 @@ import * as api from "./api";
 import { DeleteArchivedProduct } from "./DeleteArchivedProduct";
 import { deferred, renderWithClient } from "./test/helpers";
 vi.mock("./api", async (original) => ({ ...(await original<typeof api>()), getProductDeletion: vi.fn(), deleteArchivedProduct: vi.fn() }));
-const preview = { product_id: 7, name: "Sin uso", allowed: true, blockers: [], token: "a".repeat(64), barcode_count: 1, conversion_count: 0 };
+const preview = { product_id: 7, name: "Sin uso", allowed: true, blockers: [], history_count: 0, token: "a".repeat(64), barcode_count: 1, conversion_count: 0 };
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(api.getProductDeletion).mockResolvedValue(preview); });
 it("requires a fresh review and the exact name before one deletion, then clears the archived cache", async () => {
   const pending = deferred<unknown>();
@@ -23,7 +23,7 @@ it("requires a fresh review and the exact name before one deletion, then clears 
   expect(confirm).toHaveProperty("disabled", true);
   await userEvent.clear(input); await userEvent.type(input, "Sin uso");
   await userEvent.dblClick(confirm);
-  expect(api.deleteArchivedProduct).toHaveBeenCalledExactlyOnceWith(7, "Sin uso", "Sin uso", preview.token, expect.any(String));
+  expect(api.deleteArchivedProduct).toHaveBeenCalledExactlyOnceWith(7, "Sin uso", "Sin uso", preview.token, expect.any(String), false);
   await act(async () => pending.resolve({ deleted: true, product_id: 7 }));
   await waitFor(() => expect(onDeleted).toHaveBeenCalledOnce());
   expect(client.getQueryState(["archived"])?.isInvalidated).toBe(true);
@@ -58,4 +58,16 @@ it("locks an uncertain deletion against retry within the sheet", async () => {
   expect(screen.getByRole("button", { name: "Revisar eliminación" })).toHaveProperty("disabled", true);
   expect(api.deleteArchivedProduct).toHaveBeenCalledOnce();
   expect(onDeleted).not.toHaveBeenCalled();
+});
+
+it("requires explicit acknowledgement before deleting movement history", async () => {
+  vi.mocked(api.getProductDeletion).mockResolvedValue({ ...preview, history_count: 4 });
+  renderWithClient(<DeleteArchivedProduct id={7} onDeleted={vi.fn()} />);
+  await userEvent.click(screen.getByRole("button", { name: "Revisar eliminación" }));
+  await userEvent.type(await screen.findByRole("textbox"), "Sin uso");
+  const submit = screen.getByRole("button", { name: "Eliminar producto definitivamente" });
+  expect(submit).toHaveProperty("disabled", true);
+  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.click(submit);
+  expect(api.deleteArchivedProduct).toHaveBeenCalledExactlyOnceWith(7, "Sin uso", "Sin uso", preview.token, expect.any(String), true);
 });

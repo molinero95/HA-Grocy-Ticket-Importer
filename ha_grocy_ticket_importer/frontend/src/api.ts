@@ -259,6 +259,8 @@ export const saveDiscoveredPhoto = (id: number, code: string) =>
     { barcode: code },
   );
 export type CatalogProduct = {
+  stock_threshold?: string;
+  stock_warning_enabled?: boolean;
   active?: boolean;
   id: number;
   name: string;
@@ -401,14 +403,16 @@ export const savePurchaseConfiguration = (
 
 export type ProductDeletion = {
   product_id: number; name: string; allowed: boolean; blockers: string[];
-  token: string; barcode_count: number; conversion_count: number;
+  token: string; history_count: number; barcode_count: number; conversion_count: number;
 };
 export const getProductDeletion = (id: number) => request<ProductDeletion>("catalog/products/" + id + "/deletion");
-export const deleteArchivedProduct = (id: number, expectedName: string, confirmation: string, token: string, operationId: string) =>
-  request("catalog/products/" + id, "DELETE", { expected_name: expectedName, confirmation, token, operation_id: operationId });
+export const deleteArchivedProduct = (id: number, expectedName: string, confirmation: string, token: string, operationId: string, deleteHistory = false) =>
+  request("catalog/products/" + id, "DELETE", { expected_name: expectedName, confirmation, token, operation_id: operationId, delete_history: deleteHistory });
 
 export type DuplicateDifference = { left_id: number; right_id: number; left_name: string; right_name: string };
 export const getDuplicateDifferences = () => request<{ differences: DuplicateDifference[] }>("catalog/duplicates/differences");
 export const markProductsDifferent = (left: DuplicateCandidate, right: DuplicateCandidate) => request("catalog/duplicates/differences", "PUT", { left_id: left.id, right_id: right.id, left_name: left.name, right_name: right.name });
 export const undoProductDifference = (left: number, right: number) => request("catalog/duplicates/differences/" + left + "/" + right, "DELETE");
 export const mergeCatalogProducts = (preview: MergePreview, confirmation: string, operationId: string) => request("catalog/products/merge", "POST", { source_id: preview.source.id, target_id: preview.target.id, expected_source: preview.source.name, expected_target: preview.target.name, token: preview.token, confirmation, operation_id: operationId });
+
+export const saveStockThreshold = (id: number, amount: string, expected: string, warningEnabled = true, expectedWarningEnabled = true) => request<{stock_threshold: string; stock_warning_enabled: boolean}>("catalog/products/" + id + "/stock-threshold", "PUT", {amount, expected, warning_enabled: warningEnabled, expected_warning_enabled: expectedWarningEnabled});

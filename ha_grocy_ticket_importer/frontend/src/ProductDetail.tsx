@@ -1,3 +1,4 @@
+import { ProductThreshold } from "./ProductThreshold";
 import { ProductPurchase } from "./ProductPurchase";
 import { DeleteArchivedProduct } from "./DeleteArchivedProduct";
 import { useModal } from "./useModal";
@@ -444,6 +445,7 @@ export function ProductDetail({
                   min="0"
                   step="0.01"
                   value={targetStock}
+                  disabled={!product.data || product.isError || adjustStock.isPending}
                   onChange={(event) => {
                     setExpectedStock((previous) => previous ?? currentStock);
                     setDesiredStock(event.target.value);
@@ -468,6 +470,7 @@ export function ProductDetail({
               )}
               {stockMessage && <p role="status">{stockMessage}</p>}
             </form>
+            {product.data && <ProductThreshold id={id} threshold={product.data.stock_threshold ?? "0"} unit={currentUnit} warningEnabled={product.data.stock_warning_enabled !== false} />}
             <h3>
               {product.data?.active === false
                 ? "Producto archivado"

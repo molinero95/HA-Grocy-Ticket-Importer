@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.10.0] — 2026-11-01
+
+### Added
+- Configure a per-product visual stock threshold (default 0) and opt out with “No avisar de stock bajo”. Highlight amounts at or below the threshold; distinguish positive low stock from zero stock. Persist display metadata in the existing catalog without touching Grocy minimum-stock settings or automatically adding shopping rows.
+
+### Changed
+- Allow deleting archived products with Grocy movement history, as explicitly requested. Show the movement count and require a separate irreversible-history acknowledgement plus the exact product name. Recheck the audited snapshot, journal one dispatch, and verify product/history absence.
+- Keep zero-stock and active-reference guards. Completed local receipt ledger entries remain intact for duplicate-import prevention; pending/uncertain receipt imports still block deletion. Native merge keeps its stricter local receipt-identity guard.
+- Remove the fullscreen action and its unused component; preserve internal Back navigation.
+
+### Fixed
+- Style successful status notices in green instead of error red, including saved duplicate differences and undo confirmations.
+
+### Tests
+- Cover history acknowledgement, pending/completed receipt distinctions, retained ledger bytes, lost-response protections, real Grocy cascade deletion and mobile confirmation/status styling.
+
 ## [1.9.0] — 2026-11-01
 
 ### Added

@@ -19,8 +19,8 @@ const normalize = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("es")
     .trim();
-const hasNoStock = (amount: string) =>
-  amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) <= 0;
+const hasLowStock = (amount: string, threshold = "0") =>
+  amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) <= Number(threshold);
 
 export function Inventory({ archived = false }: { archived?: boolean }) {
   const client = useQueryClient();
@@ -119,7 +119,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
       <div className="items">
         {items.map((item) => (
           <article
-            className={"item inventory-item" + (!archived && hasNoStock(item.amount) ? " out-of-stock" : "")}
+            className={"item inventory-item" + (!archived && item.stock_warning_enabled !== false && hasLowStock(item.amount, item.stock_threshold) ? " out-of-stock" : "")}
             key={item.id}
             aria-busy={step.isPending && step.variables?.id === item.id}
           >
@@ -147,8 +147,8 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
                 <small>
                   En casa: {item.amount} {item.unit}
                 </small>
-                {!archived && hasNoStock(item.amount) && (
-                  <span className="stock-status">Sin existencias</span>
+                {!archived && item.stock_warning_enabled !== false && hasLowStock(item.amount, item.stock_threshold) && (
+                  <span className="stock-status">{Number(item.amount) <= 0 ? "Sin existencias" : "Stock bajo"}</span>
                 )}
               </div>
             </div>
