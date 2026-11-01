@@ -192,6 +192,7 @@ from api_inventory import register_inventory_routes
 from api_shopping import register_shopping_routes
 from api_receipts import register_receipt_routes
 from api_catalog import register_catalog_routes
+from api_aliases import register_alias_routes
 from api_photos import register_photo_routes
 register_variant_routes(app, barcode_stock, variant_catalog, LOCK)
 register_inventory_routes(app, barcode_stock, LOCK)
@@ -199,6 +200,7 @@ register_shopping_routes(app, barcode_stock, shopping_match_queue, LOCK, lambda:
 register_receipt_routes(app, DATA, ALLOWED, extract, lambda rid, mode: run_import(rid, mode), LOCK)
 register_catalog_routes(app, barcode_stock, LOCK)
 register_photo_routes(app, barcode_stock, LOCK)
+register_alias_routes(app)
 
 
 if __name__ == "__main__":
