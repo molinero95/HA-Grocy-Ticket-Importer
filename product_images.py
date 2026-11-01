@@ -44,7 +44,7 @@ class _CatalogRedirectHandler(urllib.request.HTTPRedirectHandler):
 def _fetch_catalog(url, barcode):
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "Despensa/1.3.0 (https://github.com/molinero95/HA-Grocy-Ticket-Importer)", "Accept": "application/json"},
+        headers={"User-Agent": "Despensa/1.6.0 (https://github.com/molinero95/HA-Grocy-Ticket-Importer)", "Accept": "application/json"},
     )
     opener = urllib.request.build_opener(_CatalogRedirectHandler())
     with opener.open(req, timeout=8) as response:

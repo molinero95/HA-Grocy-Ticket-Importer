@@ -434,3 +434,27 @@ test("an expired session removes the private shopping view after an unauthorized
   await expect(page.locator(".item")).toHaveCount(0);
   expect(writes).toBe(1);
 });
+
+test("Alexa note conflicts expose a preserving association action on mobile", async ({ page }, testInfo) => {
+  let selected = false;
+  await page.route("**/api/v1/shopping", (route) => route.fulfill({ json: {
+    items: [{ id: 71, name: "Leche entera", amount: 2.5, unit: "Piece", done: false, product_id: selected ? 7 : null, image_url: null }],
+    pending_matches: selected ? [] : [{ key: "leche entera", name: "Leche entera", candidates: [{ id: 7, name: "Leche entera" }], requires_product: true }],
+    shopping_error: false, pending_matches_error: false,
+    sync: selected ? { state: "ok" } : { state: "error", reason: "note_conflict" },
+  } }));
+  await page.route("**/api/v1/alexa/matches/*/choose", async (route) => {
+    expect(route.request().postDataJSON().product_id).toBe(7);
+    selected = true;
+    await route.fulfill({ json: { ok: true, item_id: 71 } });
+  });
+  await page.goto(ingress);
+  await expect(page.getByText(/Alexa no se ha sincronizado: hay artículos de texto/)).toBeVisible();
+  await page.getByText("Elegir producto para «Leche entera»").click();
+  await expect(page.getByRole("option", { name: "Mantener artículo original" })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("alexa-note-review-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Guardar elección", exact: true }).click();
+  await expect(page.getByText(/Alexa no se ha sincronizado: hay artículos de texto/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Leche entera", exact: true })).toBeVisible();
+  await expect(page.locator("article")).toContainText("2.5 Piece");
+});

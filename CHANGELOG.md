@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.0] — 2026-11-01
+
+### Added
+- Show sanitized Alexa worker health in the shopping list, including disabled, failed and stale synchronization. Refresh the view periodically; never expose credentials, list names or raw exceptions in health data.
+- Offer explicit review for free-text Grocy notes matching a canonical product name. Association preserves the original shopping row, quantity and note; stock and unrelated lists are unchanged. Do not automatically convert or merge conflicting entries.
+
+### Fixed
+- Make exact-note conflicts resolvable from the UI instead of indefinitely blocking the worker with no corresponding suggestion. Existing products/duplicate notes still require explicit review or removal.
+- Ignore obsolete aliases absent from the current Alexa list; retain guards when an active alias references a missing/archived product. Surface and allow removing unavailable-product aliases in the editor.
+- Validate active alias targets, return structured failures, prevent stale deletion after an alias is reassigned, and lock editor context while saving.
+- Include nested alias/event regressions in unittest discovery, remove shadow package imports, and cover new runtime modules in mirror checks and Docker packaging. Align the previously stale lockfile and documentation with the release.
+
+### Validation
+- Add regression coverage for exact-note recovery and bidirectional synchronization, status sanitization, stale alias deletion, API auth/CSRF, alias editing and mobile review. Validate note row/quantity/stock preservation against real isolated Grocy.
+
 ## [1.5.0] — 2026-11-01
 
 ### Changed

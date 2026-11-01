@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.3.0 — actualización de la instalación existente
+## Despensa 1.6.0 — actualización de la instalación existente
 
-La versión 1.3.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.6.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.3.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.6.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -137,3 +137,9 @@ Creation, camera, duplicate-review and native file-selection controls share the 
 ## Universal discovery (1.3.0)
 
 Exact barcode lookup starts at the Open Facts universal v3 endpoint (`product_type=all`). Redirects are restricted to the existing Food, Products and Beauty HTTPS hosts before following them; attribution links to the final catalog. No Pet Food source is enabled. A universal 404 is a normal missing product. Direct catalog queries remain as fallback for failed or incomplete universal responses, including name-only results that might have a photo elsewhere. Existing photos, manual names and stock are preserved.
+
+## Alexa recovery and alias management (1.6.0)
+
+Actions → Alias de Alexa manages multiple names per selected product. Missing/archived product aliases can also be removed. Stale delete requests cannot remove an alias since reassigned to another product.
+
+The shopping view reports sanitized worker health and refreshes periodically. An exact-name free-text note is shown for explicit association: choose the matching product to preserve row ID, quantity and note, or remove only that list item. No automatic conversion, duplicate merge or stock change occurs. Existing duplicate product/note rows still need explicit review. The worker keeps its verified checkpoint after failures and does not write remotes with sync disabled. Updating requires preserving the existing queue, aliases, command journal and checkpoints.

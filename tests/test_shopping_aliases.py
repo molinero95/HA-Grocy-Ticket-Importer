@@ -1,10 +1,8 @@
 """Regression coverage for persistent many-to-one Alexa aliases."""
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ha_grocy_ticket_importer"))
 from shopping_aliases import set_alias, remove_alias, list_aliases, choices
 
 

@@ -4,11 +4,11 @@ Fecha: 2026-11-01. Migración de PR #10 integrada en `main`; publicación 1.0.0 
 
 ## Evidencia local
 
-- Python: 239 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
-- Vitest 4: 64 pruebas de interacciones React y cliente API en 1.3.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
+- Python: 271 regresiones de dominio/API, permisos, CSRF, concurrencia, idempotencia y empaquetado.
+- Vitest 4: 68 pruebas de interacciones React y cliente API en 1.6.0; incluye nombre descubierto explícito y las regresiones de stock/navegación/elección y retirada manual.
 - TypeScript 7: aplicación y e2e; Vite 7: compilación de producción.
-- Grocy real: 6 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
-- Chromium: 17 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
+- Grocy real: 7 contratos (Pack/consumo repetido, ticket/importador, foto/variante tras reinicio, otras listas/notas/completados, compra y archivado conservando historial, elección inmediata/checkbox/quitar sin worker ni escrituras Alexa).
+- Chromium: 18 escenarios móviles, ingress, fallback sin JavaScript y flujos completos con Grocy real: alta/stock/foto/variante/escáner, tickets repetidos, worker Alexa/elección/descartar/reinicio, Pack y archivar/restaurar. Seis escenarios nuevos cubren anchos de 360/768/1280 px, foco en diálogos anidados/Escape/scroll, respuesta de compra perdida y caducidad de sesión.
 
 ## Refuerzo de QA del frontend
 
@@ -16,9 +16,9 @@ Las pruebas de componentes cubren ajuste del total restante sin formulario de co
 
 Estas regresiones detectaron y corrigieron tres defectos: borrar una consulta de autenticación observada podía dejar la vista anterior y recrear caché privada; el frontend ignoraba `ready_to_commit: false`; el botón de alta no aplicaba el máximo de 1000 piezas por pack (el campo HTML y el servidor ya lo limitaban).
 
-`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **75,55 % líneas, 75,40 % sentencias, 79,23 % ramas y 64,00 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
+`npm run test:coverage` mide V8 sobre el código de aplicación, excluyendo tests, helpers, declaraciones y el punto de montaje `main.tsx`. Resultado local: **76,11 % líneas, 75,78 % sentencias, 79,25 % ramas y 65,21 % funciones**. Configuración de compra y previsualización de fotos: 100 % de líneas; tickets: 96,72 %. Es cobertura de componentes/API: no incorpora los escenarios Chromium ni demuestra exhaustividad o accesibilidad completa. El informe HTML/LCOV/JSON se genera en `frontend/coverage/` y CI lo publica como artefacto `frontend-coverage`; no se incluye en Git ni en el paquete del complemento.
 
-La ejecución local de navegador sin PHP/Grocy ejecuta 13 escenarios disponibles y omitió explícitamente los 4 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 17; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
+La ejecución local de navegador sin PHP/Grocy ejecuta 14 escenarios disponibles y omitió explícitamente los 4 de Grocy real. CI tiene configurado `GROCY_TEST_DIST` para ejecutar los 18; observar su resultado para el commit de este refuerzo antes de darlo por validado en integración.
 
 Las pruebas antiguas que solo verificaban el HTML retirado o autorizaban eliminación permanente se sustituyen por comprobaciones del comportamiento actual. El total de tests no mide por sí solo la paridad.
 
@@ -77,3 +77,9 @@ Chromium comprueba el alta con nombre opcional, controles de 44px, resultado de 
 La búsqueda usa primero Open Facts v3 con `product_type=all`; solo sigue redirecciones HTTPS a Food, Products y Beauty y atribuye el origen final. Se comprueban estados v3 y compatibilidad de respaldo v2, códigos incorrectos, datos incompletos, JSON inválido, caídas, ausencia 404 sin consultas redundantes y redirecciones no confiables. La consulta pública del EAN 4006000082295 redirige a Beauty y devuelve foto y nombre «Nivea»; son datos públicos, sin escrituras sobre Grocy/HA.
 
 Se retiran ProductShopping y sus pruebas aisladas al eliminar el formulario de compra de la ficha. La regresión de ficha verifica que ajustar existencias no llama a compras; se conservan pruebas del carrito de Mi despensa y de la API protegida. El flujo Chromium real configura Pack, cierra la ficha, añade dos piezas desde el inventario y verifica stock cero antes de retirar/archivar/restaurar. Los contratos Python reales conservan la prueba de conversión exacta de dos packs a ocho piezas.
+
+## Revisión Día 6 (1.6.0)
+
+La instalación 1.5.0 tiene sync habilitado y el listener conectado. Logs públicos del complemento muestran repetidamente el conflicto `A Grocy note conflicts with a canonical product`; una lectura privada confirma una nota exacta entre las filas activas. No se guardan nombres/contenido de esas filas en código, documentación o artefactos. No se modifica configuración, estado persistente o listas reales durante el diagnóstico. PR #18 figura cerrada sin integrar.
+
+Las nuevas regresiones reproducen el bloqueo, exigen resolución explícita y verifican conservación de ID/cantidad/nota antes de reanudar ambas direcciones. Se añade contrato Grocy real y escenario móvil de revisión, pruebas de API/CSRF y editor de alias. `tests/__init__.py` permite que unittest descubra las regresiones añadidas en Día 6; las pruebas de eventos pasan de funciones no descubiertas a unittest. CI comprueba también los espejos de alias/estado y su empaquetado. La versión instalada solo se considera recuperada después de la actualización y revisión por el usuario.

@@ -30,6 +30,8 @@ def list_aliases(path):
 
 
 def set_alias(path, name, product_id):
+    if not isinstance(name, str) or len(name) > 200 or type(product_id) is not int:
+        raise ValueError("Invalid alias")
     key = normalize(name)
     if not key:
         raise ValueError("Alias cannot be empty")
@@ -49,17 +51,23 @@ def set_alias(path, name, product_id):
             (key, str(name).strip(), pid))
 
 
-def remove_alias(path, name):
+def remove_alias(path, name, product_id=None):
     with closing(connect(path)) as db, db:
+        row = db.execute("SELECT product_id FROM alexa_aliases WHERE normalized_name=?", (normalize(name),)).fetchone()
+        if row and product_id is not None and row[0] != product_id:
+            raise ValueError("Alias changed since it was displayed")
         db.execute("DELETE FROM alexa_aliases WHERE normalized_name=?",
                    (normalize(name),))
 
 
-def choices(path, products):
+def choices(path, products, *, names=None):
     """Return validated choices; stale product IDs must not be silently reused."""
     catalog = {int(p["id"]) for p in products}
     result = {}
+    present = {normalize(name) for name in names} if names is not None else None
     for alias in list_aliases(path):
+        if present is not None and alias["key"] not in present:
+            continue
         if alias["product_id"] not in catalog:
             raise ValueError("Alexa alias references a missing product")
         result[alias["key"]] = {"product_id": alias["product_id"]}

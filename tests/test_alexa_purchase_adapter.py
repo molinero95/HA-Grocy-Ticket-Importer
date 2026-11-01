@@ -1,10 +1,7 @@
 """Contract tests: removing a purchased alias targets its Alexa UID, not Grocy's label."""
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ha_grocy_ticket_importer"))
 import shopping_sync_adapters as adapters
 
 
