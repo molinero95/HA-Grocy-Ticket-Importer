@@ -6,9 +6,9 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.2.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.3.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
-> **Fotos de productos:** al escanear o introducir un código de barras, se consultan Open Food Facts, Open Products Facts y Open Beauty Facts por código exacto. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
+> **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
 > **Controles rápidos:** los productos fuera de la lista muestran un botón `🛒 Añadir`; al pulsarlo se convierte en `− cantidad +`. Cuando la cantidad vuelve a cero, reaparece el carrito. Todo se actualiza sin recargar la página ni cambiar la posición de desplazamiento. Los cambios se envían a Grocy y se reflejan en la misma fila; si fallan, se muestra un error sin falsear la cantidad.
 
@@ -16,15 +16,15 @@ Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) 
 
 - **Lista de la compra (inicio):** sincronizada con la lista predeterminada de Grocy; marcar artículos como comprados o quitarlos sin modificar el inventario.
 - **Mi despensa:** búsqueda de productos y cantidades actuales obtenidas de Grocy, con controles `− / +` directamente en cada fila para consultar y modificar la cantidad de la lista de compra. Los productos en kg cambian en pasos de 0,10 kg (100 g) y los demás en pasos de 1 unidad.
-- **Ficha de producto:** editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.
+- **Ficha de producto:** información y existencias, sin formulario para añadir a la compra; editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.
 - **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
-- **Alta de productos nuevos:** desde Acciones → Añadir producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
+- **Alta de productos nuevos:** desde Mi despensa → Nuevo producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
 - **Gestión de productos:** añadir un producto nuevo, ajustar la cantidad total que queda desde Existencias e importar un ticket. La ficha ya no muestra «Consumir producto». La asociación de códigos se realiza desde cada ficha de producto.
 - **Escáner de cámara:** lectura EAN/UPC desde un móvil compatible, con entrada manual alternativa.
 - **Tickets:** subir PDF/JPG/PNG, extraer líneas con OpenAI, revisar, simular y confirmar la importación.
 - **Historial de importaciones:** SQLite persistente para evitar registrar de nuevo líneas de tickets ya importadas.
 
-> Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; la edición avanzada puede usar otras unidades si tienen una conversión válida. Añadir a la lista no registra entrada de existencias.
+> Para cantidades de compra se admiten hasta **dos decimales**. El control rápido utiliza siempre la unidad de stock de Grocy, sin tocar las existencias; las compras se gestionan desde los controles de las listas, fuera de la ficha. Añadir a la lista no registra entrada de existencias.
 
 > **Pack y Piece:** Pack es unidad de compra; Piece es unidad de stock y consumo. Un pack de 5 debe registrar 5 piezas al comprarlo, no 1 pack como stock. **No se convierte automáticamente el stock existente** al cambiar configuraciones. Las fotos encontradas por código se guardan como referencias en la descripción del producto y la conversión Pack/Piece se comprueba contra Grocy 4.7.1 aislado. Consulta DECISIONS.md y ROADMAP.md.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.2.0
+## Despensa 1.3.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.2.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.3.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.

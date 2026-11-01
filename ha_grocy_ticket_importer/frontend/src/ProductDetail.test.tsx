@@ -11,7 +11,7 @@ vi.mock("./api", async (original) => ({
   getProductVariants: vi.fn(),
   getCatalogBarcodes: vi.fn(),
   adjustCatalogStock: vi.fn(),
-  getShoppingOptions: vi.fn(),
+  stepShopping: vi.fn(),
   saveProductVariant: vi.fn(),
   setCatalogProductActive: vi.fn(),
   saveCatalogBarcode: vi.fn(),
@@ -39,11 +39,6 @@ beforeEach(() => {
   vi.mocked(api.getCatalogBarcodes).mockResolvedValue([]);
   vi.mocked(api.adjustCatalogStock).mockResolvedValue({});
   vi.mocked(api.lookupPhoto).mockResolvedValue({ photo: null });
-  vi.mocked(api.getShoppingOptions).mockResolvedValue({
-    id: 7,
-    name: "Leche",
-    units: [{ id: 2, name: "Piece", factor: "1" }],
-  });
 });
 it("loads the real stock as the initial target and requires an intentional edit", async () => {
   const client = new QueryClient({
@@ -70,7 +65,7 @@ it("loads the real stock as the initial target and requires an intentional edit"
   expect(api.adjustCatalogStock).toHaveBeenCalledWith(7, "5", "3");
 });
 
-it("offers one stock control and sets the remaining total without a separate consumption form", async () => {
+it("sets remaining stock without consumption or shopping forms", async () => {
   renderWithClient(<ProductDetail id={7} onClose={vi.fn()} />);
   const input = await screen.findByLabelText("Cantidad final");
   expect(
@@ -78,12 +73,18 @@ it("offers one stock control and sets the remaining total without a separate con
   ).toBeNull();
   expect(screen.queryByRole("button", { name: "Consumir" })).toBeNull();
   expect(screen.queryByLabelText("Cantidad a consumir")).toBeNull();
+  expect(
+    screen.queryByRole("heading", { name: "Añadir cantidad a la compra" }),
+  ).toBeNull();
+  expect(screen.queryByLabelText("Cantidad para comprar")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Añadir cantidad" })).toBeNull();
   await userEvent.clear(input);
   await userEvent.type(input, "2");
   await userEvent.click(
     screen.getByRole("button", { name: "Actualizar stock" }),
   );
   expect(api.adjustCatalogStock).toHaveBeenCalledExactlyOnceWith(7, "2", "3");
+  expect(api.stepShopping).not.toHaveBeenCalled();
 });
 
 it("keeps the original expected stock when a background refresh changes the product", async () => {

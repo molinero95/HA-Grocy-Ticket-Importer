@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.2.0 — actualización de la instalación existente
+## Despensa 1.3.0 — actualización de la instalación existente
 
-La versión 1.2.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.3.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.2.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.3.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -103,7 +103,7 @@ La búsqueda de Mi despensa es automática por nombre o código, con campo de te
 
 La ficha usa un único ajuste de **Existencias**: escribe la cantidad total que queda.
 Se ha retirado el formulario «Consumir producto». Por ejemplo, si tienes 3 y queda 1,
-indica 1 en Cantidad final. Ajustar existencias no añade artículos a la compra.
+indica 1 en Cantidad final. La ficha contiene información del producto y stock, sin formulario para añadir a la compra. Las compras se gestionan desde Mi despensa o Lista de la compra; ajustar existencias no añade artículos a la compra.
 
 No se requieren opciones nuevas ni reinicializar bases de datos. Conservar
 `/config` y `/data`: ledger de tickets, fotos, variantes, colas, checkpoints y
@@ -113,7 +113,7 @@ Si el consumo se confirmó y falló la reposición, añadir únicamente la compr
 
 Pack es compra, Piece es stock. La conversión oficial de Grocy se verifica
 antes de añadir existencias. Cambiar la compra afecta al futuro, nunca convierte
-stock previo. Se pueden añadir cantidades exactas en las unidades verificadas.
+stock previo. Los controles rápidos de compra usan la unidad de stock.
 
 Archivar exige cero stock y ausencia de referencias activas; restaurar mantiene
 ID, historial, códigos y fotos. No hay borrado permanente ni consolidación.
@@ -133,3 +133,7 @@ Véanse `docs/VALIDATION_V1.md` y `docs/REACT_PARITY.md` en el repositorio.
 Open Food Facts and Open Products Facts remain enabled. Open Beauty Facts adds exact-code cosmetics lookup. Discovered images require trusted HTTPS image hosts; uploaded photos keep priority. A catalog may lack the product, its photo, or a complete name. Creation shows the returned name and offers **Usar este nombre**; it never overwrites typed names automatically. Manual name entry and sanitized photo upload remain available.
 
 Creation, camera, duplicate-review and native file-selection controls share the application button styling with keyboard focus and 44px touch targets. File selection retains native browser/camera behavior and existing upload validations.
+
+## Universal discovery (1.3.0)
+
+Exact barcode lookup starts at the Open Facts universal v3 endpoint (`product_type=all`). Redirects are restricted to the existing Food, Products and Beauty HTTPS hosts before following them; attribution links to the final catalog. No Pet Food source is enabled. A universal 404 is a normal missing product. Direct catalog queries remain as fallback for failed or incomplete universal responses, including name-only results that might have a photo elsewhere. Existing photos, manual names and stock are preserved.

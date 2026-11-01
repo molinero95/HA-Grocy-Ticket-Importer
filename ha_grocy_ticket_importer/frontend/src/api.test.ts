@@ -12,7 +12,7 @@ const ok = (data: object, status = 200) =>
   });
 afterEach(() => vi.unstubAllGlobals());
 describe("same-origin API session and CSRF", () => {
-  it.each(["consume", "receipt", "purchase"])(
+  it.each(["consume", "receipt", "shopping"])(
     "never retries %s when its response is lost",
     async (operation) => {
       const fetch = vi
@@ -34,7 +34,7 @@ describe("same-origin API session and CSRF", () => {
             )
           : operation === "receipt"
             ? client.commitReceipt("ticket-fixture")
-            : client.addShoppingAmount(7, "2", 9, "operation-fixture");
+            : client.stepShopping(7, "plus");
       await expect(call).rejects.toThrow("Failed to fetch");
       expect(fetch).toHaveBeenCalledTimes(2);
       expect(fetch.mock.calls[1][1]).toMatchObject({

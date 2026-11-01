@@ -258,7 +258,7 @@ test("Alexa choices immediately create usable rows and removals survive sync and
   ).toHaveLength(1);
 });
 
-test("purchase configuration, exact pack shopping amount and reversible archive preserve history", async ({
+test("purchase configuration, inline shopping and reversible archive preserve history", async ({
   page,
 }) => {
   await page.goto(base + "react/");
@@ -272,27 +272,38 @@ test("purchase configuration, exact pack shopping amount and reversible archive 
   await expect(page.getByLabel("Piezas por pack", { exact: true })).toHaveValue(
     "4",
   );
+  await expect(page.getByLabel("Cantidad para comprar")).toHaveCount(0);
   await expect(
-    page
-      .getByLabel("Unidad de la cantidad")
-      .getByRole("option", { name: "Pack" }),
-  ).toHaveCount(1);
-  await page
-    .getByLabel("Unidad de la cantidad")
-    .selectOption({ label: "Pack" });
-  await page.getByLabel("Cantidad para comprar").fill("2");
-  await page
-    .getByRole("button", { name: "Añadir cantidad", exact: true })
-    .click();
-  await expect(page.getByText("Cantidad añadida a la lista.")).toBeVisible();
+    page.getByRole("button", { name: "Añadir cantidad", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Stock actual: 0 Piece.", { exact: false }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Cerrar ficha" }).click();
+  const add = page.getByRole("button", {
+    name: "Añadir a compra: Producto sin uso",
+    exact: true,
+  });
+  await add.click();
+  await expect(
+    page.getByRole("button", {
+      name: "Quitar de compra: Producto sin uso",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await add.click();
+  const inventoryRow = page.locator("article").filter({
+    has: page.getByRole("button", { name: "Producto sin uso", exact: true }),
+  });
+  await expect(inventoryRow.locator(".quantity")).toContainText("2 Piece");
+  await expect(inventoryRow).toContainText("En casa: 0 Piece");
   await page
     .getByRole("button", { name: "Lista de la compra", exact: true })
     .click();
   const row = page.locator("article").filter({
     has: page.getByRole("button", { name: "Producto sin uso", exact: true }),
   });
-  await expect(row).toContainText("8 Piece");
+  await expect(row).toContainText("2 Piece");
   await row
     .getByRole("button", { name: "Quitar Producto sin uso", exact: true })
     .click();
