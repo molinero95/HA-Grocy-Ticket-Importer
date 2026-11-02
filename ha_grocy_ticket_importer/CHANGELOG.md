@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.18.0] — 2026-11-02
+
+### Added
+- Instant name search in the shopping list, including purchased rows and unresolved Alexa arrivals, ignoring case and accents. Clear the query, show matching/total counts and distinguish no matches from an empty list.
+- Keep synchronization warnings and review priority visible while searching. Preserve the query during background refreshes and hide the global completed-item deletion action while a search is active.
+
+### Tests
+- Search/refresh/Alexa/purchased-row regressions and a 360px mobile/ingress browser scenario. Filtering performs no writes or extra API requests.
+
 ## [1.17.0] — 2026-11-02
 
 ### Changed

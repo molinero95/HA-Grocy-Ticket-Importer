@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.17.0 — actualización de la instalación existente
+## Despensa 1.18.0 — actualización de la instalación existente
 
-La versión 1.17.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.18.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.17.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.18.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -226,3 +226,8 @@ Duplicate review normalizes accents, punctuation, stop words and equivalent prin
 All automated OpenAI and public-catalog tests use mocked providers. No installed options/data, Amazon/Cloudflare setup or paid requests are changed by this release.
 
 Alexa warnings now expand into sanitized fixed cause codes, last check/success timestamps when available and the current list of actionable review rows. Pending/unassigned, stale-selection and duplicate-identity/name rows are shown first with a distinct background and text label. Generic connectivity errors are explicitly global and do not falsely blame normal rows. No extra HA/Alexa API calls or remote exception text are required for these details.
+
+
+## Shopping search (1.18.0)
+
+The shopping list has instant case/accent-insensitive name search over both persisted rows (including purchased items) and unresolved Alexa arrivals. Filtering is local, does not add requests or writes, preserves issue priority and keeps global sync notices/details visible. Show matching/total counts and a dedicated no-match state; clear resets the query. Background polling and row updates preserve the query. Hide the global clear-completed action while searching so hidden rows cannot be deleted by that action.

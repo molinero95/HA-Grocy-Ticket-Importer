@@ -10,6 +10,7 @@ vi.mock("./api", async (original) => ({
   ...(await original<typeof api>()),
   getAuthStatus: vi.fn(),
   getShopping: vi.fn(),
+  clearCompletedShopping: vi.fn(),
   toggleShopping: vi.fn(),
   removeShopping: vi.fn(),
   removeAlexaMatch: vi.fn(),
@@ -361,4 +362,39 @@ it("explains a connection-wide sync failure without falsely highlighting normal 
   await userEvent.click(screen.getByText("Ver detalles de sincronización"));
   expect(screen.getByText(/No se pudo completar la comunicación/)).toBeTruthy();
   expect(document.querySelectorAll(".sync-review-item").length).toBe(0);
+});
+
+it("searches purchased and pending Alexa items without case or accent sensitivity and keeps sync notices", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping,
+    items: [{ ...shopping.items[0], name: "Tomáte triturado", done: true }, { ...shopping.items[0], id: 13, name: "Arroz", product_id: 8 }],
+    pending_matches: [{ key: "tomate alexa", name: "Tomate Alexa", candidates: [] }],
+    sync: { state: "error", reason: "unavailable" },
+  });
+  renderWithClient(<App />);
+  await screen.findByText("Arroz");
+  const search = screen.getByRole("searchbox", { name: "Buscar en la lista de la compra" });
+  await userEvent.type(search, "TOMATE");
+  expect(screen.getByText("Tomáte triturado")).toBeTruthy();
+  expect(screen.getByText("Tomate Alexa")).toBeTruthy();
+  expect(screen.queryByText("Arroz")).toBeNull();
+  expect(screen.getByText("2 de 3 artículos")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Eliminar comprados/ })).toBeNull();
+  expect(screen.getByText("Ver detalles de sincronización")).toBeTruthy();
+  expect(api.getShopping).toHaveBeenCalledOnce();
+  await userEvent.click(screen.getByRole("button", { name: "Borrar búsqueda de compra" }));
+  expect(screen.getByText("Arroz")).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Eliminar comprados/ })).toBeTruthy();
+  expect(api.clearCompletedShopping).not.toHaveBeenCalled();
+});
+
+it("keeps the search during a shopping refresh and explains no matches without showing an empty-list claim", async () => {
+  const { client } = renderWithClient(<App />);
+  await screen.findByText("Leche");
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar en la lista de la compra" }), "arroz");
+  expect(screen.getByText("Sin resultados")).toBeTruthy();
+  expect(screen.queryByText("Tu lista de la compra está vacía.")).toBeNull();
+  act(() => client.setQueryData(["shopping"], { ...shopping, items: [...shopping.items, { ...shopping.items[0], id: 13, name: "Arroz" }] }));
+  expect(await screen.findByText("Arroz")).toBeTruthy();
+  expect(screen.queryByText("Leche")).toBeNull();
+  expect(screen.getByRole("searchbox", { name: "Buscar en la lista de la compra" })).toHaveProperty("value", "arroz");
 });
