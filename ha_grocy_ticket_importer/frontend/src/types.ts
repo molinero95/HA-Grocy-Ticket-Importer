@@ -21,7 +21,7 @@ export type ShoppingResponse = {
   pending_matches: AlexaMatch[];
   shopping_error: boolean;
   pending_matches_error: boolean;
-  sync?: { state: "unconfigured" | "disabled" | "unknown" | "stale" | "error" | "ok"; reason?: string | null; detail_code?: string | null; checked_at?: number; last_success_at?: number | null };
+  sync?: { state: "unconfigured" | "disabled" | "unknown" | "stale" | "error" | "ok"; reason?: string | null; detail_code?: string | null; affected_product_ids?: number[]; checked_at?: number; last_success_at?: number | null };
 };
 export type InventoryItem = {
   stock_threshold?: string;

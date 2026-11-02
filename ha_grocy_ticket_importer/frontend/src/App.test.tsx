@@ -398,3 +398,17 @@ it("keeps the search during a shopping refresh and explains no matches without s
   expect(screen.queryByText("Leche")).toBeNull();
   expect(screen.getByRole("searchbox", { name: "Buscar en la lista de la compra" })).toHaveProperty("value", "arroz");
 });
+
+it("highlights the exact product reported by the worker even when it is already bought", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping,
+    items: [{ ...shopping.items[0], id: 12, name: "Producto ya comprado", done: true, product_id: 7 }, { ...shopping.items[0], id: 13, name: "Normal", product_id: 8 }],
+    sync: { state: "error", reason: "identity_conflict", detail_code: "stale_selection", affected_product_ids: [7] },
+  });
+  renderWithClient(<App />);
+  await screen.findByText("Normal");
+  const rows = document.querySelectorAll(".items > article");
+  expect(rows[0].textContent).toContain("Producto ya comprado");
+  expect(rows[0].classList.contains("sync-review-item")).toBe(true);
+  await userEvent.click(screen.getByText("Ver detalles de sincronización"));
+  expect(screen.getAllByText(/La última sincronización rechazó una asociación/).length).toBeGreaterThan(0);
+});

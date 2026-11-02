@@ -227,6 +227,9 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
             app.logger.exception("api_v1_shopping_failed")
             return jsonify({"items": [], "pending_matches": [], "shopping_error": True,
                             "pending_matches_error": False}), 503
+        from shopping_sync_status import snapshot
+        health = snapshot(shopping_match_queue.DEFAULT_PATH)
+        affected_ids = set(health.get('affected_product_ids', []))
         try:
             # The catalog may change independently of Alexa's next worker event.
             # Refresh only advisory local candidates; never invoke remote sync.
@@ -241,14 +244,13 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
                     shopping_match_queue.refresh_catalog(shopping_match_queue.DEFAULT_PATH, products, notes)
             matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
                        if not row.get("removed")
-                       and (not row.get("dismissed") or row.get("selection_stale"))]
+                       and (not row.get("dismissed") or row.get("selection_stale") or row.get("selected_product_id") in affected_ids)]
             matches_error = False
         except Exception:
             app.logger.exception("api_v1_alexa_matches_failed")
             matches, matches_error = [], True
-        from shopping_sync_status import snapshot
         return jsonify({"items": items, "pending_matches": matches,
-                        "sync": snapshot(shopping_match_queue.DEFAULT_PATH),
+                        "sync": health,
                         "shopping_error": False, "pending_matches_error": matches_error})
 
 

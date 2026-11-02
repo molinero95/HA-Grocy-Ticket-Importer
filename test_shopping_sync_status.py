@@ -52,3 +52,9 @@ class SyncStatusTests(unittest.TestCase):
         health = snapshot(self.path)
         self.assertIsNone(health['detail_code'])
         self.assertNotIn('private', json.dumps(health))
+
+    def test_candidate_conflict_reports_only_product_ids_and_success_clears_them(self):
+        record(self.path, dry_run=False, error=IdentityConflict('Selected product is no longer a valid candidate', product_ids=(7, 7, -1, True)))
+        self.assertEqual(snapshot(self.path)['affected_product_ids'], [7])
+        record(self.path, dry_run=False)
+        self.assertEqual(snapshot(self.path)['affected_product_ids'], [])

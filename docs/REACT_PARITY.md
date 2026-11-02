@@ -53,3 +53,6 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.18.0: búsqueda local por nombre en compra con normalización de tildes/mayúsculas, comprados y pendientes, estados de vacío correctos y conservación de avisos/consulta durante refrescos. Validación Vitest y Chromium móvil.
+
+
+1.19.0: una asociación contextual explícita conserva identidad por ID con nombre editado; diagnóstico por producto afectado y visibilidad de filas compradas/elecciones ocultas. Regresión completa de worker y comprobación de identities en el contrato Grocy real.

@@ -9,6 +9,9 @@ from shopping_sync import normalize, snapshot, suggest_catalog_matches
 
 class IdentityConflict(ValueError):
     """An ambiguous or concurrently changed list cannot be synchronized safely."""
+    def __init__(self, message, *, product_ids=()):
+        super().__init__(message)
+        self.product_ids = tuple(sorted({pid for pid in product_ids if type(pid) is int and pid > 0}))
 
 
 def identities(alexa_names, grocy_rows, products, choices=None):
@@ -29,12 +32,12 @@ def identities(alexa_names, grocy_rows, products, choices=None):
         if selected is not None:
             pid = int(selected["product_id"])
             if pid not in by_id:
-                raise IdentityConflict("Selected product is no longer in Grocy")
+                raise IdentityConflict("Selected product is no longer in Grocy", product_ids=(pid,))
             decision, candidates = suggest_catalog_matches(name, products)
-            if (not selected.get("trusted_alias") and
+            if (not (selected.get("trusted_alias") or selected.get("trusted_creation")) and
                     ((decision != "review" and not (decision == "exact" and selected.get("exact_note"))) or
                      pid not in {int(candidate["id"]) for candidate in candidates})):
-                raise IdentityConflict("Selected product is no longer a valid candidate")
+                raise IdentityConflict("Selected product is no longer a valid candidate", product_ids=(pid,))
             key = "p:" + str(pid)
         else:
             decision, candidates = suggest_catalog_matches(name, products)

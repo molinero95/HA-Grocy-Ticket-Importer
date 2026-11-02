@@ -99,3 +99,8 @@ Los avisos de sincronización deben mostrar detalles saneados y fechas, con art�
 ## Buscador de compra 1.18.0
 
 Filtrar localmente por nombre al escribir, ignorando tildes/mayúsculas, incluyendo comprados y pendientes de Alexa. Conservar orden de revisión, avisos globales y búsqueda durante refrescos. Mostrar coincidencias/total; no confundir ausencia de resultados con lista vacía. Ocultar eliminación global de comprados con filtro activo.
+
+
+## Corrección de asociación contextual 1.19.0
+
+La creación/asociación explícita desde una nota Alexa es evidencia por ID de ese episodio, incluso con nombre de catálogo distinto. No volver a validarla como coincidencia difusa en identities; confiar solo si coincide con created_product_id seleccionado y vigente. Conservar límites de episodio, guardas de identidad y rechazos de elecciones ordinarias obsoletas. Los conflictos indican IDs afectados sin nombres en el estado de salud; filas compradas también deben señalarse si bloquean la sincronización. No resetear listas, colas ni checkpoints para ocultar el error.
