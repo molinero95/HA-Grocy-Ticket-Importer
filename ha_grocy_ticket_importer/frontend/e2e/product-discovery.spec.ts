@@ -10,7 +10,7 @@ test("name-only AI discovery shows sources and requires a choice before creation
     image_url: "https://images.openbeautyfacts.org/disposable-example.png",
     source_url: "https://world.openbeautyfacts.org/product/" + code,
     search_source_url: "https://es.openbeautyfacts.org/product/" + code + "/example",
-    attribution: "Datos: Open Beauty Facts",
+    attribution: "Datos: Open Beauty Facts", discovery_token: "signed-candidate",
   };
   await page.route("https://images.openbeautyfacts.org/disposable-example.png", route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0fYAAAAASUVORK5CYII=", "base64") }));
   await page.route("**/api/v1/catalog/units", route => route.fulfill({ json: { units: [{ id: 2, name: "Piece" }] } }));
@@ -25,9 +25,9 @@ test("name-only AI discovery shows sources and requires a choice before creation
     expect(route.request().postDataJSON()).toMatchObject({ name: "Crema Example 100 ml", barcode: code, initial_stock: "0" });
     await route.fulfill({ json: { created: true, product_id: 74 } });
   });
-  await page.route("**/api/v1/catalog/products/74/photo-lookup", async route => {
+  await page.route("**/api/v1/catalog/products/74/photo-discovery", async route => {
     photos++;
-    expect(route.request().postDataJSON()).toEqual({ barcode: code });
+    expect(route.request().postDataJSON()).toEqual({ token: "signed-candidate" });
     await route.fulfill({ json: { saved: true, image_url: candidate.image_url } });
   });
   await page.goto(base);

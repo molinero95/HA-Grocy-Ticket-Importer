@@ -6,16 +6,16 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.16.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.17.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
-> **Controles rápidos:** los productos fuera de la lista muestran un botón `🛒 Añadir`; al pulsarlo se convierte en `− cantidad +`. Cuando la cantidad vuelve a cero, reaparece el carrito. Todo se actualiza sin recargar la página ni cambiar la posición de desplazamiento. Los cambios se envían a Grocy y se reflejan en la misma fila; si fallan, se muestra un error sin falsear la cantidad.
+> **Controles rápidos:** en Mi despensa, `− / +` ajusta el stock real (1 Piece o 0,10 kg), agrupando pulsaciones rápidas en una sola operación. El carrito añade a la compra. En Lista de la compra, **Modificar cantidad** permite escribir la cantidad total y guardarla una vez; nunca cambia existencias.
 
 ## Funcionalidades
 
 - **Lista de la compra (inicio):** sincronizada con la lista predeterminada de Grocy; marcar artículos como comprados o quitarlos sin modificar el inventario.
-- **Mi despensa:** búsqueda de productos y cantidades actuales obtenidas de Grocy, con controles `− / +` directamente en cada fila para consultar y modificar la cantidad de la lista de compra. Los productos en kg cambian en pasos de 0,10 kg (100 g) y los demás en pasos de 1 unidad.
+- **Mi despensa:** búsqueda por nombre/código, filtros y existencias de Grocy. Los botones `− / +` modifican stock; las cantidades a comprar se editan en Lista de la compra.
 - **Ficha de producto:** información y existencias, sin formulario para añadir a la compra; editar el nombre, configurar las unidades de compra/stock y piezas por pack cuando corresponda, asociar códigos de barras, guardar imágenes de referencia y modificar existencias con controles de seguridad.
 - **Corrección de existencias:** ajustar la cantidad disponible con un máximo de **dos decimales** y guardado directo, sin confirmación adicional; los ajustes se registran como movimientos en Grocy.
 - **Alta de productos nuevos:** desde Mi despensa → Nuevo producto, se comprueba nombre y código de barras; si ya existe, se enlaza a su ficha sin crear duplicados. Si es nuevo, se elige unidad de medida, código opcional y stock inicial (admite 0 y hasta dos decimales).
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.16.0
+## Despensa 1.17.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.16.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.17.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -175,8 +175,7 @@ El registro `stock-commands.sqlite3` reside junto al historial (configurable con
 `STOCK_COMMAND_DB`); nunca borrarlo para repetir un resultado incierto. Si el
 consumo se confirma y falla la reposición, añadir solo la compra pendiente.
 
-La búsqueda por nombre o código funciona al escribir; la barra tiene el campo de texto, la cámara y el icono de filtro. El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha permite **Archivar** productos sin existencias ni dependencias y
-**Restaurar** desde Acciones → Productos archivados. Archivar/restaurar conserva historial e identidad. Duplicados permite marcar diferencias o revisar una combinación nativa.
+La búsqueda por nombre o código funciona al escribir; la barra tiene el campo de texto, la cámara y el icono de filtro. El botón **Nuevo producto** se encuentra solo en Mi despensa. La ficha ofrece **Eliminar producto**, con un modal Sí/No. Los productos ocultos de versiones anteriores siguen accesibles desde Acciones → Productos archivados para restaurarlos o eliminarlos. Duplicados permite marcar diferencias o revisar una combinación nativa.
 No hay migración automática de stock Pack antiguo ni combinación automática de productos.
 Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).
 
@@ -197,13 +196,13 @@ Un cambio guardado desde Despensa despierta al sincronizador mediante un aviso l
 
 Mi despensa destaca en ámbar los productos sin stock y muestra **Sin existencias**, aunque ya estén en la lista de compra. Los archivados mantienen su estilo neutro.
 
-Para eliminar un producto sin uso: **Acciones → Productos archivados → ficha → Revisar eliminación**. Solo se permite con stock cero, sin referencias de compra, recetas, productos dependientes, variantes o Alexa. La revisión explica cada impedimento. Escribe el nombre exacto para confirmar el borrado irreversible de la ficha, códigos y configuración de unidades. Se comprueba otra vez antes de enviar. Desde 1.10.0, si tiene movimientos de Grocy, se muestra cuántos y hay que aceptar expresamente su eliminación irreversible. Los registros locales de tickets ya importados, fotos y checkpoints se conservan; importaciones pendientes o inciertas bloquean el borrado. Ante un resultado incierto, comprueba Grocy y vuelve a abrir la ficha; no reenvíes la misma operación.
+Para eliminar un producto, abre su ficha → **Eliminar producto** → **Sí**. El modal muestra existencias y movimientos que se borrarán. No necesitas archivarlo ni escribir el nombre. Las referencias activas en recetas, compras, variantes, alias/colas/checkpoints Alexa o tickets pendientes siguen bloqueando la operación hasta resolverlas; los registros locales de tickets importados y fotos se conservan. Un cambio tras la revisión invalida la eliminación. Los resultados inciertos no se reenvían automáticamente.
 
 **Atrás** cierra primero el diálogo/cámara y vuelve entre las secciones visitadas. En el inicio se conserva la salida normal al contenedor. El botón de pantalla completa se ha retirado en 1.10.0 por petición del usuario; se conserva la navegación interna.
 
 La auditoría de borrado cubre las cascadas de Grocy 4.7.1 y serializa los escritores de Despensa con su worker. Grocy no ofrece un borrado condicional transaccional: evita editar ese producto directamente en Grocy u otras aplicaciones mientras confirmas la eliminación.
 
-La eliminación solo se habilita en Grocy 4.7.1, cuya cascada está verificada; otras versiones conservan el archivado hasta revisar sus reglas de borrado.
+La eliminación solo se habilita en Grocy 4.7.1, cuya cascada está verificada; otras versiones bloquean la eliminación hasta revisar sus reglas de borrado.
 
 
 ## Resolver duplicados (1.9.0)
@@ -249,20 +248,12 @@ Tras escanear, corrige **Cantidad del ticket**, **Unidad de stock** y **Piezas p
 
 El endpoint de Alexa está implementado para consultas de existencias, alias y productos con stock bajo. Se ejecuta en un proceso separado y está **desactivado por defecto**. La configuración de Amazon y Cloudflare se hará después; publicar esta versión no activa el acceso. Consulta [la guía de la skill](docs/ALEXA_SKILL.md) y el [modelo español](docs/alexa/interaction-model-es-ES.json).
 
-Si un código no está asociado a tu catálogo, **Dar de alta este código** abre el formulario con ese código. Cuando los catálogos públicos no devuelven un nombre o fallan, aparece **Identificar con una foto**. Pulsa **Tomar otra foto para buscar con IA** para tomar una foto nueva del frontal del envase o su etiqueta. La imagen del escáner de códigos no se reutiliza. **Analizar foto con OpenAI** envía la fotografía completa, sin recortarla al código, y muestra una sugerencia editable. **Usar nombre sugerido** aplica únicamente el nombre al formulario; guardar el producto sigue siendo una acción separada.
+Si el código no está asociado a tu catálogo, **Dar de alta este código** abre el formulario conservándolo. El alta usa **Piece** por defecto; puedes cambiar a kg u otra unidad disponible.
 
-La foto permanece en memoria del navegador hasta el envío explícito. Se sanea sin EXIF, se limita a 8 MiB/25 megapíxeles y se redimensiona manteniendo el encuadre. Se usa la clave OpenAI existente; la solicitud de análisis puede generar consumo en esa cuenta. No se trata de una búsqueda web ni de una verificación del EAN: el modelo interpreta lo visible y puede equivocarse. El código y los factores de compra se conservan. Puedes seguir introduciendo el nombre manualmente.
+**Buscar imagen y código con IA** busca por nombre, marca y formato en los catálogos públicos. Se ha retirado la toma/subida de fotografías para identificar con IA. Si el código no devuelve imagen, escribe un nombre preciso y busca; revisa el resultado y pulsa **Usar imagen y conservar código**. Con el campo de código vacío puedes elegir **Usar código e imagen**. La elección aún no crea el producto: debes guardar después. Se utiliza la clave OpenAI existente, con coste de búsqueda/API y sin reintentos automáticos. Las fotos manuales siguen disponibles en la ficha.
 
-En 1.14.0, la foto nueva analizada con IA se guarda como imagen local al crear el producto, saneada y sin EXIF. Se prioriza esa toma del frontal o etiqueta. Si el alta detecta un producto existente, conserva su imagen. Un fallo al guardar la foto no repite el alta ni las existencias y se informa para añadirla desde la ficha.
-
+Las imágenes proceden de una consulta exacta al catálogo y las elecciones están firmadas y vinculadas a la sesión, nombre y código revisados. Nunca se descarga una URL arbitraria del modelo o navegador. Los duplicados existentes mantienen su foto y stock.
 
 En **Mi despensa**, el icono de filtro junto a la cámara permite elegir **Todos los productos**, **Falta de stock** o **En la lista de la compra**. Falta de stock respeta el umbral inclusivo y los avisos activados de cada producto; compra muestra cantidades pendientes mayores que cero. El filtro se combina con la búsqueda por nombre/código y se puede quitar con la X sin borrar la búsqueda. No modifica existencias ni compras.
 
-
-## Buscar imagen y código durante el alta (1.16.0)
-
-En **Nuevo producto**, escribe el nombre con marca y formato y pulsa **Buscar imagen y código con IA**. También puedes tomar y analizar una foto sin tener un código previo, aplicar su nombre sugerido y buscar a partir de él. La búsqueda envía solo el nombre y el código opcional a OpenAI; es una acción explícita, con coste de búsqueda/API en la cuenta configurada y sin reintentos automáticos.
-
-La IA busca páginas de Open Food Facts, Open Products Facts y Open Beauty Facts. Solo se ofrecen códigos GTIN de 8/12/13/14 dígitos con control válido, citados en fuentes realmente consultadas y confirmados después por la API del catálogo. La imagen se obtiene de esa consulta por código, nunca de una URL inventada por el modelo. El resultado puede corresponder a otra variante: revisa marca, tamaño y envase. Un código ya escrito o escaneado se mantiene como restricción y no se sustituye.
-
-**Usar código e imagen** incorpora el código al formulario; la imagen del catálogo se consulta y guarda al crear una ficha nueva. **Usar este código** aparece si no hay imagen pública. Elegir no crea productos ni existencias: aún debes pulsar **Guardar producto**. Si no encuentras una coincidencia, puedes continuar con tu foto analizada y un código manual u opcional. Los duplicados conservan su imagen y stock; un fallo de foto no repite el alta. Se ignoran respuestas tardías al cambiar nombre/código o cerrar.
+Los avisos de Alexa incluyen **Ver detalles de sincronización**, con causa y última comprobación disponible. Los artículos con asociaciones pendientes u obsoletas o filas duplicadas aparecen primero y con color salmón y etiqueta **Revisar sincronización**. Un fallo general de conexión se explica sin señalar artículos concretos como culpables.

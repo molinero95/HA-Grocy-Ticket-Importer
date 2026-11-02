@@ -37,7 +37,7 @@ beforeEach(() => {
     variants: [],
   });
   vi.mocked(api.getCatalogBarcodes).mockResolvedValue([]);
-  vi.mocked(api.adjustCatalogStock).mockResolvedValue({});
+  vi.mocked(api.adjustCatalogStock).mockResolvedValue({ after: "3", before: "3" });
   vi.mocked(api.lookupPhoto).mockResolvedValue({ photo: null });
 });
 it("loads the real stock as the initial target and requires an intentional edit", async () => {
@@ -106,7 +106,7 @@ it("keeps the original expected stock when a background refresh changes the prod
   expect(api.adjustCatalogStock).toHaveBeenCalledWith(7, "5", "3");
 });
 
-it("disables stock writes and archiving when the product cannot be verified", async () => {
+it("disables stock writes and deletion when the product cannot be verified", async () => {
   vi.mocked(api.getCatalogProduct).mockRejectedValue(new Error("Sin conexión"));
   renderWithClient(<ProductDetail id={7} onClose={vi.fn()} />);
   await screen.findByText("No se pudo verificar el stock.", { exact: false });
@@ -114,7 +114,7 @@ it("disables stock writes and archiving when the product cannot be verified", as
     screen.getByRole("button", { name: "Actualizar stock" }),
   ).toHaveProperty("disabled", true);
   expect(
-    screen.getByRole("button", { name: "Archivar producto" }),
+    screen.getByRole("button", { name: "Eliminar producto" }),
   ).toHaveProperty("disabled", true);
   expect(api.setCatalogProductActive).not.toHaveBeenCalled();
 });
@@ -182,7 +182,7 @@ it("keeps an existing variant barcode immutable during editing", async () => {
 });
 
 it("saves a barcode once when advisory photo discovery fails", async () => {
-  vi.mocked(api.saveCatalogBarcode).mockResolvedValue({});
+  vi.mocked(api.saveCatalogBarcode).mockResolvedValue({ after: "3", before: "3" });
   vi.mocked(api.saveDiscoveredPhoto).mockRejectedValue(
     new Error("Proveedor caído"),
   );

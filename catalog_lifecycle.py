@@ -121,12 +121,10 @@ def deletion_preview(product_id):
     blockers = []
     if version != '4.7.1':
         blockers.append('una versión de Grocy cuyas cascadas de borrado aún no se han verificado')
-    if is_active(product):
-        blockers.append('el producto no está archivado')
     # Grocy's stock/products detail endpoint rejects inactive products. Audit
     # the complete authoritative stock rows instead; an empty set proves zero.
     snapshot = {'product': product, 'grocy_version': version}
-    checks = [('stock', 'product_id', 'lotes de existencias'),
+    checks = [('stock', 'product_id', None),
               ('stock_log', 'product_id', None),
               ('shopping_list', 'product_id', 'referencias en listas de compra'),
               ('recipes_pos', 'product_id', 'ingredientes de recetas'),
@@ -144,19 +142,20 @@ def deletion_preview(product_id):
         if reason and linked:
             blockers.append(reason)
     amounts = [Decimal(str(row['amount'])) for row in snapshot['stock']]
-    if any(not amount.is_finite() or amount != 0 for amount in amounts):
-        blockers.append('existencias distintas de cero o desconocidas')
+    if any(not amount.is_finite() or amount < 0 for amount in amounts):
+        blockers.append('existencias desconocidas o no válidas')
     blockers.extend(_local_deletion_blockers(pid, allow_completed_receipts=True))
     snapshot['local_blockers'] = blockers
     token = hashlib.sha256(json.dumps(snapshot, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return {'product_id': pid, 'name': product['name'], 'allowed': not blockers,
             'blockers': blockers, 'token': token,
+            'stock_amount': str(sum(amounts, Decimal('0'))),
             'history_count': len(snapshot['stock_log']),
             'barcode_count': len(snapshot['product_barcodes']),
             'conversion_count': len(snapshot['quantity_unit_conversions'])}
 
 
-def delete_archived(product_id, expected_name, token, delete_history=False):
+def delete_product(product_id, expected_name, token, delete_history=False):
     """Reaudit at dispatch. Caller holds app/worker locks and at-most-once journal."""
     import hmac
     preview = deletion_preview(product_id)
@@ -171,6 +170,9 @@ def delete_archived(product_id, expected_name, token, delete_history=False):
     products = barcode_stock.grocy('GET', 'objects/products')
     if not isinstance(products, list) or any(int(row['id']) == pid for row in products):
         raise RuntimeError('No se pudo verificar la eliminación')
+    remaining_stock = barcode_stock.grocy('GET', 'objects/stock')
+    if not isinstance(remaining_stock, list) or any(int(row['product_id']) == pid for row in remaining_stock):
+        raise RuntimeError('No se pudo verificar el borrado de las existencias')
     history = barcode_stock.grocy('GET', 'objects/stock_log')
     if not isinstance(history, list) or any(int(row['product_id']) == pid for row in history):
         raise RuntimeError('No se pudo verificar el borrado del historial')

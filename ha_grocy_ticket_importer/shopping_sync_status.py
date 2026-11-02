@@ -6,6 +6,21 @@ import time
 from pathlib import Path
 
 
+
+DETAILS = {
+    'Multiple Alexa items resolve to the same identity': 'duplicate_alexa_identity',
+    'Shopping entry references a missing Grocy product': 'missing_product',
+    'Duplicate normalized Grocy shopping name': 'duplicate_shopping_name',
+    'Duplicate Grocy shopping identity': 'duplicate_shopping_identity',
+    'An Alexa item changed its product identity': 'changed_identity',
+    'An Alexa selection needs renewed review': 'stale_selection',
+    'Selected product is no longer in Grocy': 'stale_selection',
+    'Selected product is no longer a valid candidate': 'stale_selection',
+    'Alexa alias conflicts with a pending manual choice': 'alias_selection_conflict',
+    'A Grocy note conflicts with a canonical product': 'note_conflict',
+    'A Grocy note conflicts with a selected product': 'note_conflict',
+}
+
 def _read(path):
     try:
         data = json.loads(Path(str(path) + ".sync-status.json").read_text())
@@ -22,6 +37,7 @@ def record(path, *, dry_run, error=None):
             "identity_conflict" if isinstance(error, IdentityConflict) else "unavailable")
     now = time.time()
     data = {"state": "error" if error else "ok", "reason": reason,
+            "detail_code": DETAILS.get(str(error)) if isinstance(error, IdentityConflict) else None,
             "checked_at": now, "last_success_at": _read(path).get("last_success_at"), "dry_run": bool(dry_run)}
     if error is None and not dry_run:
         data["last_success_at"] = now
@@ -60,8 +76,10 @@ def snapshot(path):
     except ValueError:
         interval = 120
     if time.time() - checked > max(180, interval * 3):
-        return {"state": "stale"}
+        return {"state": "stale", "checked_at": checked}
     reason = data.get("reason")
     return {"state": "error" if data.get("state") == "error" else "ok",
             "reason": reason if reason in ("note_conflict", "identity_conflict", "unavailable") else None,
-            "checked_at": checked}
+            "checked_at": checked,
+            "last_success_at": data.get("last_success_at") if isinstance(data.get("last_success_at"), (int, float)) else None,
+            "detail_code": data.get("detail_code") if data.get("detail_code") in DETAILS.values() else None}

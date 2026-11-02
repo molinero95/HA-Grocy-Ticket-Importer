@@ -474,7 +474,7 @@ def remove_product_barcode(product_id, barcode):
     return {"removed": True, "barcode": barcode, "product_id": pid}
 
 
-def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
+def prepare_stock_adjustment(product_id, desired_amount, expected_amount, max_decimals=2):
     """Validate a deliberate stock correction without writing to Grocy."""
     pid = int(product_id)
     if pid <= 0:
@@ -486,8 +486,8 @@ def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
         raise BarcodeError("Introduce una cantidad válida") from exc
     if not target.is_finite() or not expected.is_finite() or target < 0 or expected < 0:
         raise BarcodeError("La cantidad debe ser un número positivo o cero")
-    if target.as_tuple().exponent < -2:
-        raise BarcodeError("Máximo dos decimales")
+    if target.as_tuple().exponent < -max_decimals:
+        raise BarcodeError("Demasiados decimales en la cantidad")
     details = grocy("GET", f"stock/products/{pid}")
     current = Decimal(str(details.get("stock_amount", 0)))
     if not current.is_finite() or current != expected:
@@ -495,13 +495,13 @@ def prepare_stock_adjustment(product_id, desired_amount, expected_amount):
     if current == target:
         raise BarcodeError("La cantidad indicada ya es la actual")
     return {"product_id": pid, "before": str(current), "after": str(target),
-            "difference": str(abs(target - current)), "direction": "add" if target > current else "consume"}
+            "precision": max_decimals, "difference": str(abs(target - current)), "direction": "add" if target > current else "consume"}
 
 
 def apply_stock_adjustment(preview):
     """Apply an explicitly confirmed difference, after checking for stale stock."""
     pid = int(preview["product_id"])
-    validated = prepare_stock_adjustment(pid, preview["after"], preview["before"])
+    validated = prepare_stock_adjustment(pid, preview["after"], preview["before"], preview.get("precision", 2))
     if validated["direction"] != preview["direction"] or validated["difference"] != preview["difference"]:
         raise BarcodeError("El ajuste ha cambiado; debes revisarlo de nuevo")
     diff = validated["difference"]
@@ -711,3 +711,30 @@ def remove_one(barcode):
         raise BarcodeError("El producto no tiene una unidad completa disponible en stock")
     grocy("POST", f"stock/products/{pid}/consume", {"amount": 1, "spoiled": False})
     return {"product_id": pid, "name": name}
+
+
+def set_shopping_quantity(item_id, amount, expected_amount, expected_product_id, expected_done):
+    """Set a single verified row's absolute amount; no catalog scan, stock or Alexa call."""
+    try:
+        target = Decimal(str(amount).strip().replace(',', '.'))
+        expected = Decimal(str(expected_amount).strip().replace(',', '.'))
+    except (ArithmeticError, ValueError, TypeError) as exc:
+        raise BarcodeError('Introduce una cantidad válida') from exc
+    if (not target.is_finite() or target <= 0 or target.as_tuple().exponent < -2
+            or not expected.is_finite() or expected < 0):
+        raise BarcodeError('Introduce una cantidad positiva con máximo dos decimales')
+    path = f'objects/shopping_list/{int(item_id)}'
+    row = grocy('GET', path)
+    if (not isinstance(row, dict) or int(row.get('id', 0)) != int(item_id)
+            or int(row.get('shopping_list_id') or 1) != 1
+            or int(row.get('product_id') or 0) != expected_product_id
+            or _done(row.get('done')) != expected_done
+            or Decimal(str(row.get('amount'))) != expected):
+        raise BarcodeError('La compra ha cambiado. Vuelve a abrir la cantidad')
+    if target != expected:
+        grocy('PUT', path, {'amount': float(target)})
+        saved = grocy('GET', path)
+        if (not isinstance(saved, dict) or Decimal(str(saved.get('amount'))) != target
+                or any(str(saved.get(key)) != str(row.get(key)) for key in ('id', 'product_id', 'shopping_list_id', 'done', 'note', 'qu_id'))):
+            raise RuntimeError('No se pudo confirmar la cantidad de compra')
+    return {'id': int(item_id), 'amount': str(target)}

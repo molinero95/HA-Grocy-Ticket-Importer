@@ -173,8 +173,12 @@ export const adjustCatalogStock = (
   id: number,
   desired: string,
   expected: string,
+  operationId = crypto.randomUUID(),
+  step = false,
 ) =>
-  request("catalog/products/" + id + "/stock", "POST", {
+  request<{ after: string; before: string }>("catalog/products/" + id + "/stock", "POST", {
+    operation_id: operationId,
+    step,
     desired_amount: desired,
     expected_amount: expected,
   });
@@ -432,11 +436,11 @@ export const savePurchaseConfiguration = (
 
 export type ProductDeletion = {
   product_id: number; name: string; allowed: boolean; blockers: string[];
-  token: string; history_count: number; barcode_count: number; conversion_count: number;
+  stock_amount?: string; token: string; history_count: number; barcode_count: number; conversion_count: number;
 };
 export const getProductDeletion = (id: number) => request<ProductDeletion>("catalog/products/" + id + "/deletion");
-export const deleteArchivedProduct = (id: number, expectedName: string, confirmation: string, token: string, operationId: string, deleteHistory = false) =>
-  request("catalog/products/" + id, "DELETE", { expected_name: expectedName, confirmation, token, operation_id: operationId, delete_history: deleteHistory });
+export const deleteProduct = (id: number, expectedName: string, token: string, operationId: string) =>
+  request("catalog/products/" + id, "DELETE", { expected_name: expectedName, confirmed: true, token, operation_id: operationId, delete_history: true });
 
 export type DuplicateDifference = { left_id: number; right_id: number; left_name: string; right_name: string };
 export const getDuplicateDifferences = () => request<{ differences: DuplicateDifference[] }>("catalog/duplicates/differences");
@@ -464,8 +468,17 @@ export async function identifyProductPhoto(barcode: string, photo: Blob) {
   return request<{ suggestion: ProductSuggestion }>("photos/identify", "POST", form);
 }
 
-export type ProductDiscoveryCandidate = PhotoLookup & { search_source_url: string };
+export type ProductDiscoveryCandidate = PhotoLookup & { search_source_url: string; discovery_token?: string };
 export const discoverProduct = (name: string, barcode: string) =>
   request<{ candidates: ProductDiscoveryCandidate[]; advisory: true }>(
     "photos/discover", "POST", { name, barcode, consent: true },
   );
+
+
+export const setShoppingQuantity = (item: import("./types").ShoppingItem, amount: string, operationId: string) =>
+  request<{ id: number; amount: string }>("shopping/" + item.id + "/quantity", "PUT", {
+    amount, expected_amount: String(item.amount), product_id: item.product_id || 0,
+    expected_done: item.done, operation_id: operationId,
+  });
+
+export const saveNameDiscoveredPhoto = (id: number, token: string) => request("catalog/products/" + id + "/photo-discovery", "POST", { token });

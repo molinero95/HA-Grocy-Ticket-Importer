@@ -108,3 +108,14 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [x] Buscar imagen y código por nombre con IA en el alta, con fuentes, comprobación GTIN/catálogo y selección explícita.
 - [x] Reconocer una foto sin código previo, aplicar el nombre y buscar; mantener alta manual/foto propia si no hay coincidencias.
 - [ ] Aceptación instalada de búsquedas reales con el modelo/clave del usuario; las pruebas automatizadas sustituyen proveedores y no consumen API.
+
+
+## Mejora 1.17.0 — 2026-11-02
+
+- [x] Eliminar directamente con Sí/No y consecuencias visibles, sin paso de archivado ni nombre escrito.
+- [x] +/− de despensa para stock, pulsaciones agrupadas y cantidad absoluta en compra sin esperar sincronización.
+- [x] Más candidatos de duplicados por orden, puntuación, formato y erratas; decisiones manuales.
+- [x] Retirar foto para IA, buscar por nombre conservando código y seleccionar Piece por defecto.
+- [ ] Aceptación instalada de tiempos de respuesta/cámara de códigos y búsqueda pagada real.
+
+- [x] Detalles desplegables de sincronización Alexa; filas pendientes/obsoletas/duplicadas arriba y resaltadas, sin atribuciones falsas en fallos globales.

@@ -5,7 +5,7 @@ import threading
 import product_recognition
 from pathlib import Path
 
-from flask import jsonify, request
+from flask import jsonify, request, session
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 IDENTIFY_LOCK = threading.Lock()
@@ -70,7 +70,13 @@ def register_photo_routes(app, barcode_stock, lock):
         if not IDENTIFY_LOCK.acquire(blocking=False):
             return jsonify({"error": "Hay otra búsqueda o análisis de IA en curso"}), 409
         try:
-            return jsonify(product_recognition.discover(name, code))
+            from itsdangerous import URLSafeTimedSerializer
+            result = product_recognition.discover(name, code)
+            signer = URLSafeTimedSerializer(app.secret_key, salt="product-name-photo-v1")
+            for candidate in result['candidates']:
+                candidate['discovery_token'] = signer.dumps({'name': name.strip(), 'context_code': code,
+                    'candidate_code': candidate['barcode'], 'source_url': candidate['search_source_url'], 'session': session.get('csrf')})
+            return jsonify(result)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception:
@@ -88,6 +94,34 @@ def register_photo_routes(app, barcode_stock, lock):
         except Exception:
             app.logger.warning("api_v1_photo_lookup_unavailable")
             return jsonify({"error": "No se pudo consultar la fotografía. Puedes continuar sin ella."}), 503
+
+    @app.post("/api/v1/catalog/products/<int:product_id>/photo-discovery")
+    def api_v1_save_name_photo(product_id):
+        from itsdangerous import URLSafeTimedSerializer, BadData
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get('token'), str) or len(payload['token']) > 8192:
+            return jsonify({'error': 'Vuelve a elegir una imagen de la búsqueda'}), 400
+        try:
+            choice = URLSafeTimedSerializer(app.secret_key, salt="product-name-photo-v1").loads(payload['token'], max_age=1800)
+            if choice.get('session') != session.get('csrf'): raise ValueError('Otra sesión')
+        except (BadData, ValueError, TypeError):
+            return jsonify({'error': 'La selección de imagen ha caducado. Vuelve a buscar.'}), 409
+        if not lock.acquire(blocking=False): return jsonify({'error': 'operation_in_progress'}), 409
+        try:
+            product = barcode_stock.product_detail(product_id)
+            code = choice['context_code'] or choice['candidate_code']
+            if product['name'] != choice['name'] or code not in product['barcodes']:
+                return jsonify({'error': 'El nombre o el código han cambiado. Vuelve a elegir la imagen.'}), 409
+            existing = local_image_url(product_id) or product.get('image_url')
+            if existing: return jsonify({'saved': False, 'preserved': True})
+            found = product_images.verify_discovered_product(choice['source_url'])
+            image = product_images.safe_image_url(found.get('image_url')) if found and found['barcode'] == choice['candidate_code'] else None
+            if not image: return jsonify({'saved': False})
+            barcode_stock.save_product_photo(product_id, image)
+            return jsonify({'saved': True, 'image_url': image})
+        except Exception:
+            return jsonify({'error': 'El producto se conserva. No se pudo guardar la imagen seleccionada.'}), 503
+        finally: lock.release()
 
     @app.post("/api/v1/catalog/products/<int:product_id>/photo-lookup")
     def api_v1_save_discovered_photo(product_id):

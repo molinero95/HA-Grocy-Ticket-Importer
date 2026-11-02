@@ -1,18 +1,15 @@
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useQuery } from "@tanstack/react-query";
 import { isBarcode } from "./barcodes";
-import { ProductRecognition } from "./ProductRecognition";
 import { lookupPhoto } from "./api";
 
 /** Lookup failure is advisory: a missing public photo must never block a save. */
 export function PhotoPreview({
   barcode,
   onUseName,
-  onRecognitionPhoto,
 }: {
   barcode: string;
   onUseName?: (name: string) => void;
-  onRecognitionPhoto?: (photo: File | null) => void;
 }) {
   const code = barcode.trim();
   const lookupCode = useDebouncedValue(code);
@@ -59,9 +56,6 @@ export function PhotoPreview({
             referrerPolicy="no-referrer"
           />
         </>
-      )}
-      {onUseName && (photo.isError || (photo.data && !photo.data.photo?.name)) && (
-        <ProductRecognition key={code} barcode={code} onUseName={onUseName} onPhotoReady={onRecognitionPhoto} />
       )}
       {photo.data?.photo && (
         <a

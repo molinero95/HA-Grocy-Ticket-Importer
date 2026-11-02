@@ -1,6 +1,6 @@
 import { ProductThreshold } from "./ProductThreshold";
 import { ProductPurchase } from "./ProductPurchase";
-import { DeleteArchivedProduct } from "./DeleteArchivedProduct";
+import { DeleteProduct } from "./DeleteProduct";
 import { useModal } from "./useModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isBarcode } from "./barcodes";
@@ -471,40 +471,8 @@ export function ProductDetail({
               {stockMessage && <p role="status">{stockMessage}</p>}
             </form>
             {product.data && <ProductThreshold id={id} threshold={product.data.stock_threshold ?? "0"} unit={currentUnit} warningEnabled={product.data.stock_warning_enabled !== false} />}
-            <h3>
-              {product.data?.active === false
-                ? "Producto archivado"
-                : "Archivar producto"}
-            </h3>
-            <p>
-              Archivar oculta el producto de Mi despensa y conserva sus códigos,
-              fotos e historial. Puedes restaurarlo desde Archivados. Requiere
-              stock cero y no tener referencias activas.
-            </p>
-            <button
-              type="button"
-              disabled={
-                !product.data ||
-                lifecycle.isPending ||
-                (product.data.active !== false && Number(currentStock) !== 0)
-              }
-              onClick={() => {
-                if (
-                  window.confirm(
-                    product.data?.active === false
-                      ? "¿Restaurar este producto?"
-                      : "¿Archivar este producto conservando su historial?",
-                  )
-                )
-                  lifecycle.mutate(product.data?.active === false);
-              }}
-            >
-              {product.data?.active === false
-                ? "Restaurar producto"
-                : "Archivar producto"}
-            </button>
-            {lifecycle.isError && <p role="alert">{lifecycle.error.message}</p>}
-            {product.data?.active === false && <DeleteArchivedProduct id={id} onDeleted={onClose} />}
+            {product.data?.active === false && <button type="button" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate(true)}>Restaurar producto</button>}
+            <DeleteProduct id={id} disabled={!product.data || product.isError} onDeleted={onClose} />
             <h3>Variantes por supermercado</h3>
             {data.variants.length === 0 ? (
               <p>Este producto aún no tiene variantes asociadas.</p>

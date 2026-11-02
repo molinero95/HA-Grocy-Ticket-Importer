@@ -1,18 +1,17 @@
 import { useModal } from "./useModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Check, X } from "lucide-react";
 import {
   createCatalogProduct,
   getCatalogUnits,
   saveDiscoveredPhoto,
-  uploadCatalogPhoto,
+  saveNameDiscoveredPhoto,
 } from "./api";
 import type { CatalogProductInput } from "./api";
 import { isBarcode } from "./barcodes";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { ProductDiscovery } from "./ProductDiscovery";
-import { ProductRecognition } from "./ProductRecognition";
 import { PhotoPreview } from "./ProductPhotos";
 
 export function CreateProduct({
@@ -44,10 +43,11 @@ export function CreateProduct({
   const [unit, setUnit] = useState("");
   const [initialStock, setInitialStock] = useState("0");
   const [packSize, setPackSize] = useState("1");
-  const [recognitionPhoto, setRecognitionPhoto] = useState<{
-    code: string;
-    file: File;
-  } | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ token: string; name: string; code: string } | null>(null);
+  useEffect(() => {
+    const piece = units.data?.find(value => value.name.trim().toLowerCase() === "piece");
+    if (piece) setUnit(previous => previous || String(piece.id));
+  }, [units.data]);
   const [photoMessage, setPhotoMessage] = useState("");
   const isPack = units.data?.some(
     (value) =>
@@ -55,23 +55,20 @@ export function CreateProduct({
   );
   const save = useMutation({
     mutationFn: ({
-      recognition_photo: _photo,
+      discovery_photo: _photo,
       ...product
-    }: CatalogProductInput & { recognition_photo?: File | null }) =>
+    }: CatalogProductInput & { discovery_photo?: string | null }) =>
       submitProduct(product),
     onSuccess: async (response, submitted) => {
       await client.invalidateQueries({ queryKey: ["shopping"] });
       // Never attach metadata to an existing duplicate as a side effect of creation.
       if (
         response.created &&
-        (submitted.recognition_photo || submitted.barcode)
+        (submitted.discovery_photo || submitted.barcode)
       ) {
         try {
-          if (submitted.recognition_photo)
-            await uploadCatalogPhoto(
-              response.product_id,
-              submitted.recognition_photo,
-            );
+          if (submitted.discovery_photo)
+            await saveNameDiscoveredPhoto(response.product_id, submitted.discovery_photo);
           else
             await saveDiscoveredPhoto(response.product_id, submitted.barcode);
         } catch {
@@ -144,10 +141,7 @@ export function CreateProduct({
               if (save.isPending || (oneAttempt && attempted)) return;
               if (oneAttempt) setAttempted(true);
               save.mutate({
-                recognition_photo:
-                  recognitionPhoto?.code === barcode.trim()
-                    ? recognitionPhoto.file
-                    : null,
+                discovery_photo: selectedPhoto?.name === name.trim() && selectedPhoto.code === barcode.trim() ? selectedPhoto.token : null,
                 name: name.trim(),
                 barcode: barcode.trim(),
                 unit_id: Number(unit),
@@ -174,26 +168,13 @@ export function CreateProduct({
               />
             </label>
             <BarcodeScanner onDetect={setBarcode} label="Escanear código" />
-            <PhotoPreview
-              barcode={barcode}
-              onUseName={setName}
-              onRecognitionPhoto={(photo) =>
-                setRecognitionPhoto(
-                  photo ? { code: barcode.trim(), file: photo } : null,
-                )
-              }
-            />
-            {!barcode.trim() && <ProductRecognition
-              barcode=""
-              onUseName={setName}
-              onPhotoReady={photo => setRecognitionPhoto(photo ? { code: "", file: photo } : null)}
-            />}
+            <PhotoPreview barcode={barcode} onUseName={setName} />
             <ProductDiscovery name={name} barcode={barcode} onUse={candidate => {
-              // Choosing a catalog variant is explicit; manually scanned codes are never replaced.
-              if (barcode.trim() && barcode.trim() !== candidate.barcode) return;
-              setRecognitionPhoto(null);
-              setBarcode(candidate.barcode);
+              const nextCode = barcode.trim() || candidate.barcode;
+              setBarcode(nextCode);
+              setSelectedPhoto(candidate.image_url && candidate.discovery_token ? { token: candidate.discovery_token, name: name.trim(), code: nextCode } : null);
             }} />
+            {selectedPhoto?.name === name.trim() && selectedPhoto.code === barcode.trim() && <p role="status">Imagen de catálogo seleccionada. Se guardará al crear el producto.</p>}
             <label className="variant-field">
               Unidad
               <select

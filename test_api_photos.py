@@ -121,6 +121,19 @@ class PhotoApiTests(unittest.TestCase):
         self.assertFalse(Path(self.temp.name, "7.jpg").exists())
 
 
+    def test_signed_name_photo_preserves_scanned_code_and_rejects_tampering(self):
+        from itsdangerous import URLSafeTimedSerializer
+        signer = URLSafeTimedSerializer(web.app.secret_key, salt='product-name-photo-v1')
+        token = signer.dumps({'name': 'Producto', 'context_code': CODE, 'candidate_code': '4006000082295', 'source_url': 'https://world.openbeautyfacts.org/product/4006000082295', 'session': self.token})
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), patch('product_images.verify_discovered_product', return_value={'barcode': '4006000082295', 'image_url': URL}), patch.object(web.barcode_stock, 'save_product_photo') as save:
+            self.assertEqual(self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token+'bad'}, headers=self.headers).status_code, 409)
+            save.assert_not_called()
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token}, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+            save.assert_called_once_with(7, URL)
+        self.assertEqual(self.product['barcodes'], [CODE])
+
+
 class StandaloneAuthTests(unittest.TestCase):
     def test_anonymous_bootstrap_login_rotation_and_logout(self):
         client = web.app.test_client()

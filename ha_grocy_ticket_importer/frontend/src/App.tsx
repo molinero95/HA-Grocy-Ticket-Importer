@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { NavigationContext, useAppNavigation } from "./navigation";
 import { ShoppingProductCreation } from "./ShoppingProductCreation";
 import { ProductDetail } from "./ProductDetail";
+import { ShoppingQuantity } from "./ShoppingQuantity";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
 import { Duplicates } from "./Duplicates";
@@ -27,7 +28,7 @@ import {
   removeAlexaMatch,
   toggleShopping,
 } from "./api";
-import type { AlexaMatch } from "./types";
+import type { AlexaMatch, ShoppingItem } from "./types";
 
 function Suggestions({
   match,
@@ -99,6 +100,7 @@ function AuthenticatedApp() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
   );
+  const [quantityItem, setQuantityItem] = useState<ShoppingItem | null>(null);
   const [creatingMatch, setCreatingMatch] = useState<{key: string; name: string} | null>(null);
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
@@ -152,6 +154,38 @@ function AuthenticatedApp() {
   const unassigned = (data?.pending_matches ?? []).filter(
     (match) => !assigned.has(match.key),
   );
+  const reviewReasons = new Map<number, string>();
+  const productCounts = new Map<number, number>();
+  const nameCounts = new Map<string, number>();
+  for (const item of data?.items ?? []) {
+    if (item.done) continue;
+    const key = normalizeName(item.name);
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+    if (item.product_id) productCounts.set(item.product_id, (productCounts.get(item.product_id) ?? 0) + 1);
+  }
+  for (const item of data?.items ?? []) {
+    if (item.done) continue;
+    const match = matches.get(normalizeName(item.name));
+    if (match?.selection_stale) reviewReasons.set(item.id, "La asociación anterior necesita revisión.");
+    else if (match?.requires_product || (match && !match.selected_product_id)) reviewReasons.set(item.id, "Elige un producto o revisa este artículo de Alexa.");
+    if ((item.product_id && (productCounts.get(item.product_id) ?? 0) > 1) || (nameCounts.get(normalizeName(item.name)) ?? 0) > 1)
+      reviewReasons.set(item.id, "Hay varias filas con el mismo producto o nombre. Revisa sus cantidades antes de quitar duplicados.");
+  }
+  const orderedItems = [...(data?.items ?? [])].sort((a, b) => Number(reviewReasons.has(b.id)) - Number(reviewReasons.has(a.id)));
+  const syncExplanations: Record<string, string> = {
+    note_conflict: "Un artículo guardado como texto coincide con un producto. Asócialo desde Elegir producto para conservar cantidad y nota, o quita el texto si no lo necesitas.",
+    duplicate_alexa_identity: "Varios nombres o alias de Alexa apuntan al mismo producto. Revisa sus asociaciones en Administrar alias de Alexa.",
+    duplicate_shopping_name: "Grocy tiene varias filas con el mismo nombre. Revisa las filas resaltadas y conserva la cantidad correcta.",
+    duplicate_shopping_identity: "Grocy tiene varias filas del mismo producto. Revisa sus cantidades antes de quitar una fila.",
+    missing_product: "Una fila apunta a un producto que ya no existe. Revisa su asociación o retira la fila.",
+    changed_identity: "Ha cambiado el producto asociado a un nombre de Alexa. Revisa alias y elecciones pendientes antes de sincronizar.",
+    stale_selection: "Una asociación guardada ya no es válida. Vuelve a elegir un producto en los artículos pendientes.",
+    alias_selection_conflict: "Un alias y una elección manual apuntan a productos distintos. Revisa ambos en Administrar alias de Alexa y Elegir producto.",
+    unavailable: "No se pudo completar la comunicación con Home Assistant, Alexa o Grocy. No se ha identificado un artículo concreto como causa. Comprueba la disponibilidad y la configuración del complemento.",
+  };
+  const syncDetail = data?.sync?.state === "disabled" ? "Activa la sincronización en la configuración del complemento si quieres intercambiar cambios con Alexa. Las decisiones manuales siguen disponibles."
+    : data?.sync?.state === "stale" || data?.sync?.state === "unknown" ? "No hay una ejecución reciente confirmada. Comprueba que el complemento y su worker siguen en marcha."
+    : syncExplanations[data?.sync?.detail_code || data?.sync?.reason || "unavailable"] || "El worker ha detectado una asociación incompatible. Revisa los artículos resaltados y los alias; no se ha aplicado una corrección automática.";
   const choiceSaved = () => {
     setActionError("");
     setActionMessage(
@@ -323,7 +357,7 @@ function AuthenticatedApp() {
             </p>
           )}
           {data?.sync && !["ok", "unconfigured"].includes(data.sync.state) && (
-            <p role="alert" className="notice">
+            <div role="alert" className="notice sync-notice"><p>
               {data.sync.state === "disabled"
                 ? "La sincronización con Alexa está desactivada; las sugerencias se consultan en modo lectura."
                 : data.sync.state === "stale" || data.sync.state === "unknown"
@@ -331,7 +365,15 @@ function AuthenticatedApp() {
                   : data.sync.reason === "note_conflict"
                     ? "Alexa no se ha sincronizado: hay artículos de texto que coinciden con productos. Asócialos con Elegir producto para conservar sus cantidades, o quita el artículo original de la lista."
                     : "Alexa no se ha sincronizado. Revisa las asociaciones y los logs del complemento antes de reintentar."}
-            </p>
+            </p><details><summary>Ver detalles de sincronización</summary>
+              <p>{syncDetail}</p>
+              {data.sync.checked_at && <p>Última comprobación: {new Date(data.sync.checked_at * 1000).toLocaleString("es-ES")}</p>}
+              {data.sync.last_success_at && <p>Última sincronización correcta: {new Date(data.sync.last_success_at * 1000).toLocaleString("es-ES")}</p>}
+              {reviewReasons.size || unassigned.length ? <><strong>Artículos que necesitan revisión</strong><ul>
+                {unassigned.map(match => <li key={match.key}>{match.name}: {match.selection_stale ? "asociación obsoleta" : "pendiente de elegir o crear producto"}.</li>)}
+                {orderedItems.filter(item => reviewReasons.has(item.id)).map(item => <li key={item.id}>{item.name}: {reviewReasons.get(item.id)}</li>)}
+              </ul></> : <p>No se ha identificado ninguna fila concreta que necesite corrección. El aviso puede afectar a la conexión completa.</p>}
+            </details></div>
           )}
           {data?.shopping_error && (
             <p role="alert" className="notice">
@@ -339,11 +381,44 @@ function AuthenticatedApp() {
             </p>
           )}
           <div className="items">
-            {data?.items.map((item) => {
+            {unassigned.map((match) => (
+              <article className="item sync-review-item" key={match.key}>
+                <div className="item-main">
+                  <span className="item-icon">
+                    <ShoppingBasket size={19} />
+                  </span>
+                  <div>
+                    <strong>{match.name}</strong>
+                    <small className="sync-review-reason">Revisar sincronización · pendiente de Alexa</small>
+                  </div>
+                </div>
+                <div className="item-actions">
+                  <button
+                    className="remove-button"
+                    aria-label={"Quitar " + match.name}
+                    disabled={
+                      removePending.isPending ||
+                      remove.isPending ||
+                      toggle.isPending ||
+                      clearCompleted.isPending
+                    }
+                    onClick={() => {
+                      setActionError("");
+                      setActionMessage("");
+                      removePending.mutate(match.key);
+                    }}
+                  >
+                    Quitar
+                  </button>
+                </div>
+                <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />
+              </article>
+            ))}
+            {orderedItems.map((item) => {
               const key = normalizeName(item.name);
               const match = matches.get(key);
               return (
-                <article className="item" key={item.id}>
+                <article className={"item" + (reviewReasons.has(item.id) ? " sync-review-item" : "")} key={item.id}>
                   <div className="item-main">
                     <span
                       className={item.done ? "item-icon done" : "item-icon"}
@@ -381,6 +456,7 @@ function AuthenticatedApp() {
                     </div>
                   </div>
                   <div className="item-actions">
+                    {!item.done && <button className="secondary-button" aria-label={"Modificar cantidad: " + item.name} onClick={() => setQuantityItem({ ...item })}>Modificar cantidad</button>}
                     <button
                       disabled={
                         toggle.isPending ||
@@ -414,44 +490,13 @@ function AuthenticatedApp() {
                       Quitar
                     </button>
                   </div>
+                  {reviewReasons.has(item.id) && <p className="sync-review-reason"><strong>Revisar sincronización</strong> · {reviewReasons.get(item.id)}</p>}
                   {!match && !item.product_id && !item.done && <button className="secondary-button shopping-create-button" onClick={() => setCreatingMatch({key: normalizeName(item.name), name: item.name})}>Crear producto para «{item.name}»</button>}
                   {match && <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />}
                 </article>
               );
             })}
-            {unassigned.map((match) => (
-              <article className="item" key={match.key}>
-                <div className="item-main">
-                  <span className="item-icon">
-                    <ShoppingBasket size={19} />
-                  </span>
-                  <div>
-                    <strong>{match.name}</strong>
-                    <small>Pendiente de revisar desde Alexa</small>
-                  </div>
-                </div>
-                <div className="item-actions">
-                  <button
-                    className="remove-button"
-                    aria-label={"Quitar " + match.name}
-                    disabled={
-                      removePending.isPending ||
-                      remove.isPending ||
-                      toggle.isPending ||
-                      clearCompleted.isPending
-                    }
-                    onClick={() => {
-                      setActionError("");
-                      setActionMessage("");
-                      removePending.mutate(match.key);
-                    }}
-                  >
-                    Quitar
-                  </button>
-                </div>
-                <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />
-              </article>
-            ))}
+
           </div>
           {data && !data.items.length && !data.pending_matches.length && (
             <div className="empty">
@@ -470,7 +515,8 @@ function AuthenticatedApp() {
         />
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
-      <footer>Despensa 1.16.0</footer>
+      {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
+      <footer>Despensa 1.17.0</footer>
     </div>
     </NavigationContext.Provider>
   );

@@ -331,3 +331,34 @@ it("offers creation for an Alexa arrival with no matching products", async () =>
   expect(screen.getByRole("button", {name: "Quitar Gel Alexa"})).toBeTruthy();
   expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
 });
+
+it("shows sync details and moves affected rows above normal products with a visible review label", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({
+    ...shopping,
+    items: [
+      { ...shopping.items[0], id: 11, name: "Normal", product_id: 8 },
+      { ...shopping.items[0], id: 12, name: "Leche entera" },
+    ],
+    pending_matches: [{ key: "leche entera", name: "Leche entera", requires_product: true, candidates: [{ id: 7, name: "Leche entera" }] }],
+    sync: { state: "error", reason: "note_conflict", detail_code: "note_conflict", checked_at: 1793600000 },
+  });
+  renderWithClient(<App />);
+  await screen.findByText("Normal");
+  const rows = document.querySelectorAll(".items > article");
+  expect(rows[0].textContent).toContain("Leche entera");
+  expect(rows[0].classList.contains("sync-review-item")).toBe(true);
+  expect(rows[1].classList.contains("sync-review-item")).toBe(false);
+  await userEvent.click(screen.getByText("Ver detalles de sincronización"));
+  expect(screen.getByText(/Un artículo guardado como texto coincide/)).toBeTruthy();
+  expect(screen.getByText(/Última comprobación:/)).toBeTruthy();
+  expect(screen.getByText("Revisar sincronización")).toBeTruthy();
+});
+
+it("explains a connection-wide sync failure without falsely highlighting normal rows", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping, items: [{ ...shopping.items[0], product_id: 7 }], sync: { state: "error", reason: "unavailable" } });
+  renderWithClient(<App />);
+  await screen.findByText("Leche");
+  await userEvent.click(screen.getByText("Ver detalles de sincronización"));
+  expect(screen.getByText(/No se pudo completar la comunicación/)).toBeTruthy();
+  expect(document.querySelectorAll(".sync-review-item").length).toBe(0);
+});

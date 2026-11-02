@@ -74,3 +74,15 @@ class DifferenceTests(unittest.TestCase):
         variant_catalog.CATALOG_DB.write_bytes(b'not sqlite')
         self.assertEqual(self.client.get('/api/v1/catalog/duplicates').status_code, 503)
         self.assertEqual(self.client.get('/api/v1/catalog/duplicates/differences').status_code, 503)
+
+    def test_token_order_punctuation_sizes_and_small_typos_are_reviewed_without_automatic_merge(self):
+        for left, right in [
+            ('Leche entera Asturiana 1 L', 'Asturiana - leche entera 1000ml'),
+            ('Tomate triturado Hacendado', 'Hacendado tomate triturdo'),
+            ('Yogur natural', 'Yogur natural Hacendado 125 g'),
+        ]:
+            with self.subTest(left=left, right=right):
+                self.products = [{'id': 1, 'name': left}, {'id': 2, 'name': right}]
+                self.assertEqual(self.pairs(), {(1, 2)})
+        self.products = [{'id': 1, 'name': 'Arroz 1 kg'}, {'id': 2, 'name': 'Leche 1 L'}]
+        self.assertEqual(self.pairs(), set())

@@ -115,6 +115,30 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         return jsonify(result)
 
 
+    @app.put("/api/v1/shopping/<int:item_id>/quantity")
+    def api_v1_shopping_quantity(item_id):
+        from stock_commands import execute_once
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or any(not isinstance(payload.get(key), str) for key in ('amount', 'expected_amount'))
+                or type(payload.get('product_id')) is not int or type(payload.get('expected_done')) is not bool):
+            return jsonify({'error': 'Revisa la cantidad de compra'}), 400
+        if not lock.acquire(blocking=False): return jsonify({'error': 'operation_in_progress'}), 409
+        try:
+            def change():
+                try:
+                    result = barcode_stock.set_shopping_quantity(item_id, payload['amount'], payload['expected_amount'], payload['product_id'], payload['expected_done'])
+                    return {'status': 200, 'body': result}
+                except (ValueError, barcode_stock.BarcodeError) as exc:
+                    return {'status': 409, 'body': {'error': str(exc)}}
+            with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+                result = execute_once(payload.get('operation_id'), {**payload, 'item_id': item_id, 'command': 'shopping_quantity'}, change)
+            return jsonify(result['body']), result['status']
+        except (BlockingIOError, CommandConflict):
+            return jsonify({'error': 'No se ha repetido la operación. Actualiza la compra antes de continuar.'}), 409
+        except Exception:
+            return jsonify({'error': 'Cantidad sin confirmar. Consulta la compra antes de intentarlo otra vez.'}), 502
+        finally: lock.release()
+
     @app.post("/api/v1/shopping/<int:item_id>/toggle")
     def api_v1_toggle_shopping(item_id):
         payload = request.get_json(silent=True)
