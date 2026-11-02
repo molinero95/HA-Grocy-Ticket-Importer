@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.19.0] — 2026-11-02
+
+### Fixed
+- Honor the durable explicit product association made during contextual Alexa/shopping creation even when its edited catalog name differs from the original Alexa text. The full identity planner now accepts that scoped evidence instead of blocking with “Selected product is no longer a valid candidate”. Ordinary stale fuzzy choices remain rejected; bindings expire with their source review episode.
+- Report rejected product IDs in sanitized sync health and surface their dismissed review entries. Highlight the affected shopping row even if already purchased, so the warning can identify an actionable product.
+
+### Tests
+- Regression reproducing the former creation/identity failure, complete worker sync and purchased-item removal without re-import, source-episode isolation, sanitized diagnostics, API/UI visibility and real Grocy identity validation.
+
 ## [1.18.0] — 2026-11-02
 
 ### Added

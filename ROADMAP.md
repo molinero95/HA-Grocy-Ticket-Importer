@@ -124,3 +124,10 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 ## Mejora 1.18.0
 
 - [x] Buscador por nombre en la compra, con comprados/pendientes Alexa, coincidencias/total y avisos conservados.
+
+
+## Corrección 1.19.0
+
+- [x] Validación de identidad completa tras alta/asociación contextual con nombre editado; compra confirmada no se reimporta.
+- [x] Identificación de producto rechazado en avisos, incluso comprado o elección antes oculta.
+- [ ] Confirmar el siguiente ciclo de la instalación del usuario después de actualizar; no se han modificado sus listas durante el diagnóstico.

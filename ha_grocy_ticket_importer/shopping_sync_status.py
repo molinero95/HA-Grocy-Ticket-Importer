@@ -38,6 +38,7 @@ def record(path, *, dry_run, error=None):
     now = time.time()
     data = {"state": "error" if error else "ok", "reason": reason,
             "detail_code": DETAILS.get(str(error)) if isinstance(error, IdentityConflict) else None,
+            "affected_product_ids": list(error.product_ids)[:20] if isinstance(error, IdentityConflict) else [],
             "checked_at": now, "last_success_at": _read(path).get("last_success_at"), "dry_run": bool(dry_run)}
     if error is None and not dry_run:
         data["last_success_at"] = now
@@ -81,5 +82,6 @@ def snapshot(path):
     return {"state": "error" if data.get("state") == "error" else "ok",
             "reason": reason if reason in ("note_conflict", "identity_conflict", "unavailable") else None,
             "checked_at": checked,
+            "affected_product_ids": [pid for pid in data.get('affected_product_ids', []) if type(pid) is int and pid > 0][:20] if isinstance(data.get('affected_product_ids', []), list) else [],
             "last_success_at": data.get("last_success_at") if isinstance(data.get("last_success_at"), (int, float)) else None,
             "detail_code": data.get("detail_code") if data.get("detail_code") in DETAILS.values() else None}

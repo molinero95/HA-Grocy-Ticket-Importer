@@ -317,7 +317,14 @@ class RealStackTests(unittest.TestCase):
             if original: self.assertEqual(saved['id'], original['id'])
             self.assertEqual(float(self.instance.http('GET', f'stock/products/{pid}')['stock_amount']), 0)
             for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
-            self.assertEqual(queue.resolved_choices(queue.DEFAULT_PATH, [name], self.instance.http('GET', 'objects/products'))[name.lower()]['product_id'], pid)
+            catalog = self.instance.http('GET', 'objects/products')
+            choices = queue.resolved_choices(queue.DEFAULT_PATH, [name], catalog)
+            self.assertEqual(choices[name.lower()]['product_id'], pid)
+            from shopping_identity_sync import identities
+            canonical = next(p['name'] for p in catalog if p['id'] == pid)
+            alexa_identity, grocy_identity = identities([name], [(canonical, saved)], catalog, choices)
+            self.assertEqual(set(alexa_identity), {'p:' + str(pid)})
+            self.assertEqual(set(grocy_identity), {'p:' + str(pid)})
             self.instance.http('DELETE', f"objects/shopping_list/{saved['id']}")
 
     def test_receipt_review_maps_merchant_text_to_existing_id_without_duplicate_creation(self):

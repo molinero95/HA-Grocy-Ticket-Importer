@@ -136,3 +136,55 @@ class ShoppingCreationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.json)
         self.assertEqual(response.json['name'], 'Gel / Alexa')
         self.creator.assert_not_called()
+
+    def test_explicit_contextual_creation_survives_full_identity_validation_with_a_different_name(self):
+        from shopping_identity_sync import identities
+        payload = self.payload()
+        response = self.client.post(self.url + 'create-product', json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.json)
+        queue.refresh(self.path, ['Gel Alexa'], self.products,
+                      [(self.products[-1]['name'], self.rows[0])])
+        choices = queue.resolved_choices(self.path, ['Gel Alexa'], self.products)
+        alexa, grocy = identities(['Gel Alexa'], [(self.products[-1]['name'], self.rows[0])], self.products, choices)
+        self.assertEqual(set(alexa), {'p:8'})
+        self.assertEqual(set(grocy), {'p:8'})
+        self.assertEqual((self.rows[0]['amount'], self.rows[0]['note']), (2.5, 'Gel Alexa'))
+
+    def test_full_worker_accepts_created_identity_then_propagates_bought_without_readding(self):
+        import shopping_sync_worker as worker
+        response = self.client.post(self.url + 'create-product', json=self.payload(), headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.json)
+        names = ['Gel Alexa']
+        def grocy_rows():
+            return [] if self.rows[0]['done'] else [(self.products[-1]['name'], copy.deepcopy(self.rows[0]))]
+        def remove_alexa(row):
+            self.assertEqual(row['name'], 'Gel Alexa')
+            names.remove(row['name'])
+        with patch.object(worker, 'MATCH_QUEUE', self.path), patch.object(worker, 'STATE_V2', self.root / 'identity-v2.json'), \
+             patch.object(worker, 'ha_todo_items', side_effect=lambda: list(names)), \
+             patch.object(worker, 'grocy_entries', side_effect=grocy_rows), \
+             patch.object(worker, 'grocy', side_effect=self.grocy), \
+             patch.object(worker, 'remove_alexa_identity', side_effect=remove_alexa) as remove, \
+             patch.object(worker, 'add_alexa', side_effect=AssertionError('No duplicate Alexa writes')), \
+             patch.object(worker, 'add_grocy_identity', side_effect=AssertionError('No duplicate Grocy writes')), \
+             patch.object(worker, 'remove_grocy_identity', side_effect=AssertionError('Do not delete bought row')):
+            first = worker.run_once(dry_run=False)
+            self.assertEqual(first['next_baseline'], ['p:8'])
+            self.rows[0]['done'] = 1
+            second = worker.run_once(dry_run=False)
+            self.assertEqual(second['next_baseline'], [])
+            worker.run_once(dry_run=False)
+            remove.assert_called_once()
+        self.assertEqual((self.rows[0]['id'], self.rows[0]['amount'], self.rows[0]['note'], self.rows[0]['done']), (10, 2.5, 'Gel Alexa', 1))
+        self.assertEqual(self.puts, 1)
+
+    def test_worker_reported_rejected_choice_is_visible_even_when_previously_dismissed(self):
+        proposal = {'key': 'gel alexa', 'name': 'Gel Alexa', 'candidates': [{'id': 7, 'name': 'Producto distinto'}],
+                    'selected_product_id': 7, 'dismissed': True, 'removed': False, 'selection_stale': False, 'requires_product': True}
+        item = {'id': 10, 'product_id': 7, 'name': 'Producto distinto', 'amount': '1', 'unit': 'Piece', 'done': True, 'image_url': None}
+        with patch.object(barcode_stock, 'shopping_list_snapshot', return_value=[item]), \
+             patch.object(queue, 'pending', return_value=[proposal]), patch.object(queue, 'refresh_catalog'), \
+             patch('shopping_sync_status.snapshot', return_value={'state': 'error', 'reason': 'identity_conflict', 'affected_product_ids': [7]}):
+            response = self.client.get('/api/v1/shopping')
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual([row['key'] for row in response.json['pending_matches']], ['gel alexa'])

@@ -95,7 +95,7 @@ def _run_once(*, dry_run=True):
     # silently become free text and trigger a deletion via the old checkpoint.
     for row in pending_matches(MATCH_QUEUE):
         if not row.get("removed") and row["selected_product_id"] is not None and row["key"] not in choices:
-            raise IdentityConflict("An Alexa selection needs renewed review")
+            raise IdentityConflict("An Alexa selection needs renewed review", product_ids=(row["selected_product_id"],))
     previous = load_identity_state(STATE_V2)
     from shopping_choice_conversion import project_choices, apply_choices
     projected, conversions = project_choices(grocy_rows, products, choices)

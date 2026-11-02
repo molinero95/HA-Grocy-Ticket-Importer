@@ -157,6 +157,7 @@ function AuthenticatedApp() {
   const unassigned = (data?.pending_matches ?? []).filter(
     (match) => !assigned.has(match.key),
   );
+  const affectedProductIds = new Set(data?.sync?.affected_product_ids ?? []);
   const reviewReasons = new Map<number, string>();
   const productCounts = new Map<number, number>();
   const nameCounts = new Map<string, number>();
@@ -167,6 +168,8 @@ function AuthenticatedApp() {
     if (item.product_id) productCounts.set(item.product_id, (productCounts.get(item.product_id) ?? 0) + 1);
   }
   for (const item of data?.items ?? []) {
+    if (item.product_id && affectedProductIds.has(item.product_id))
+      reviewReasons.set(item.id, "La última sincronización rechazó una asociación de este producto. Revisa la elección o sus alias, aunque esté marcado como comprado.");
     if (item.done) continue;
     const match = matches.get(normalizeName(item.name));
     if (match?.selection_stale) reviewReasons.set(item.id, "La asociación anterior necesita revisión.");
@@ -386,7 +389,7 @@ function AuthenticatedApp() {
               {reviewReasons.size || unassigned.length ? <><strong>Artículos que necesitan revisión</strong><ul>
                 {unassigned.map(match => <li key={match.key}>{match.name}: {match.selection_stale ? "asociación obsoleta" : "pendiente de elegir o crear producto"}.</li>)}
                 {orderedItems.filter(item => reviewReasons.has(item.id)).map(item => <li key={item.id}>{item.name}: {reviewReasons.get(item.id)}</li>)}
-              </ul></> : <p>No se ha identificado ninguna fila concreta que necesite corrección. El aviso puede afectar a la conexión completa.</p>}
+              </ul></> : <p>No hay filas concretas identificadas en esta lista. El aviso corresponde a la última comprobación del sincronizador.</p>}
             </details></div>
           )}
           {data?.shopping_error && (
@@ -534,7 +537,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.18.0</footer>
+      <footer>Despensa 1.19.0</footer>
     </div>
     </NavigationContext.Provider>
   );

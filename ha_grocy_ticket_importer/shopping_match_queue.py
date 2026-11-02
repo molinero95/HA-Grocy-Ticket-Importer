@@ -247,6 +247,10 @@ def resolved_choices(path, alexa_names, products):
             continue
         result[key] = {"product_id": selected, "product_name": catalog[selected]["name"],
                        "original_name": entry["name"]}
+        if selected == entry.get('created_product_id'):
+            # This ID was explicitly created/prepared and selected in this source episode.
+            # It is deliberate identity evidence even when the edited name is unrelated.
+            result[key]['trusted_creation'] = True
         if entry.get("requires_product"):
             result[key]["exact_note"] = True
     return result

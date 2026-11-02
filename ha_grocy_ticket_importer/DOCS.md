@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.18.0 — actualización de la instalación existente
+## Despensa 1.19.0 — actualización de la instalación existente
 
-La versión 1.18.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.19.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.18.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.19.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -231,3 +231,12 @@ Alexa warnings now expand into sanitized fixed cause codes, last check/success t
 ## Shopping search (1.18.0)
 
 The shopping list has instant case/accent-insensitive name search over both persisted rows (including purchased items) and unresolved Alexa arrivals. Filtering is local, does not add requests or writes, preserves issue priority and keeps global sync notices/details visible. Show matching/total counts and a dedicated no-match state; clear resets the query. Background polling and row updates preserve the query. Hide the global clear-completed action while searching so hidden rows cannot be deleted by that action.
+
+
+## Contextual creation sync fix (1.19.0)
+
+`resolved_choices` now marks a selected ID as trusted contextual creation evidence only when it equals the durable `created_product_id` of the current active source episode and remains an active catalog candidate. The identity planner honors that internal evidence, as it already does validated persistent aliases, while still rejecting stale ordinary fuzzy selections, missing products, duplicate identities and changed checkpoints. This also covers explicitly accepted existing products prepared through the contextual creation flow. Source disappearance/reactivation resets the scoped metadata as before; no permanent alias is inferred.
+
+The previous UI/API creation tests stopped at materializing a shopping row, leaving the next worker identity pass untested. New regressions run the complete worker through sync, purchase removal and another cycle without re-import; the real Grocy contract also validates both canonical identities after contextual creation. No production list/stock or checkpoint reset is performed.
+
+Identity-conflict exceptions can carry positive product IDs only. Sanitized health stores/exposes these IDs without names, keys or raw remote exception bodies. The shopping read includes dismissed choices named by the worker, and the UI highlights their product rows even when bought. Generic connection errors still identify no individual product. Existing installations recover their intentional contextual bindings after updating; a new sync cycle verifies the real result.
