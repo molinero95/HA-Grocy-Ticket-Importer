@@ -282,7 +282,7 @@ test("purchase configuration and quantity editing leave pantry stock unchanged",
   await page.getByRole("button", { name: "Cerrar ficha" }).click();
   await page.getByRole("button", { name: "Añadir a compra: Producto sin uso", exact: true }).click();
   await page.getByRole("button", { name: "Lista de la compra", exact: true }).click();
-  await page.getByRole("button", { name: "Modificar cantidad: Producto sin uso", exact: true }).click();
+  await page.getByRole("button", { name: "Editar cantidad: Producto sin uso", exact: true }).click();
   await page.getByLabel("Cantidad para comprar (Piece)").fill("2");
   await page.getByRole("button", { name: "Guardar cantidad", exact: true }).click();
   const row = page.locator("article").filter({ has: page.getByRole("button", { name: "Producto sin uso", exact: true }) });

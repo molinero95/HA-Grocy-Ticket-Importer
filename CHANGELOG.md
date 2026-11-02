@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.0] — 2026-11-02
+
+### Changed
+- Replace the large shopping quantity button with a pencil and “Editar cantidad” text link below the amount, aligned with the product name. Keep the existing accessible modal and 44 px touch target.
+- Align purchase/removal controls in a fixed column across mobile rows, including long names, photos and purchased products; retain side-by-side controls on wider screens.
+
+### Validation
+- Existing mobile browser flow checks alignment and overflow at 320, 360 and 690 px and still saves an absolute quantity once.
+
 ## [1.19.0] — 2026-11-02
 
 ### Fixed

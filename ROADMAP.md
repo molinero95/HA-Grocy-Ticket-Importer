@@ -131,3 +131,8 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [x] Validación de identidad completa tras alta/asociación contextual con nombre editado; compra confirmada no se reimporta.
 - [x] Identificación de producto rechazado en avisos, incluso comprado o elección antes oculta.
 - [ ] Confirmar el siguiente ciclo de la instalación del usuario después de actualizar; no se han modificado sus listas durante el diagnóstico.
+
+
+## Mejora 1.20.0
+
+- [x] Editar cantidad como enlace con lápiz, alineado bajo cantidad/nombre y controles estables en móvil.

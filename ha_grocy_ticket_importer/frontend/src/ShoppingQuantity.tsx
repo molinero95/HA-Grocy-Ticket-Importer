@@ -11,9 +11,9 @@ export function ShoppingQuantity({ item, onClose }: { item: ShoppingItem; onClos
   const [error, setError] = useState("");
   const attempted = useRef(false);
   const dialog = useModal(() => { if (!busy) onClose(); });
-  return <div ref={dialog} tabIndex={-1} className="detail-backdrop" role="dialog" aria-modal="true" aria-label="Modificar cantidad">
+  return <div ref={dialog} tabIndex={-1} className="detail-backdrop" role="dialog" aria-modal="true" aria-label="Editar cantidad">
     <section className="detail-panel confirmation-panel">
-      <h2>Modificar cantidad</h2><p>{item.name}</p>
+      <h2>Editar cantidad</h2><p>{item.name}</p>
       <form className="variant-form" onSubmit={async event => {
         event.preventDefault();
         if (attempted.current) return;

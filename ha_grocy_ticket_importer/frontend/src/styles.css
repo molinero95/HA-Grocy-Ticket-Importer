@@ -467,6 +467,31 @@ footer {
   text-decoration-color: #c5d8cb;
   text-underline-offset: 3px;
 }
+.quantity-edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #176d4b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: #c5d8cb;
+  text-underline-offset: 3px;
+}
+.quantity-edit-link svg {
+  flex-shrink: 0;
+}
+.quantity-edit-link:hover {
+  text-decoration-color: currentColor;
+}
 .detail-backdrop {
   position: fixed;
   inset: 0;
@@ -1041,3 +1066,18 @@ select:focus-visible {
 
 .search-box .shopping-search-clear { flex: 0 0 44px; width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
 .search-box input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+/* Shopping actions keep their own column; editing belongs with the amount. */
+.shopping-item > .item-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+@media (max-width: 580px) {
+  .item.shopping-item {
+    grid-template-columns: minmax(0, 1fr) 106px;
+  }
+  .shopping-item > .item-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

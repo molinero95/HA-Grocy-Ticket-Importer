@@ -4,7 +4,10 @@ test("kg stock taps batch into one stock write and shopping quantity is an indep
   await page.setViewportSize({ width: 360, height: 850 });
   let stock = "0.123", quantity = "0.1", stockWrites = 0, shoppingWrites = 0;
   await page.route("**/api/v1/inventory", route => route.fulfill({ json: { items: [{ id: 7, name: "Tomate pesado", amount: stock, unit: "kg", image_url: null, shopping_amount: quantity, shopping_step: "0.10", shopping_unit: "kg", shopping_can_subtract: true }] } }));
-  await page.route("**/api/v1/shopping", route => route.fulfill({ json: { items: [{ id: 4, name: "Tomate pesado", amount: quantity, unit: "kg", done: false, product_id: 7, image_url: null }], pending_matches: [], shopping_error: false, pending_matches_error: false } }));
+  await page.route("**/api/v1/shopping", route => route.fulfill({ json: { items: [{ id: 4, name: "Tomate pesado", amount: quantity, unit: "kg", done: false, product_id: 7, image_url: null },
+    { id: 5, name: "Producto con un nombre mucho más largo", amount: "2", unit: "Piece", done: false, product_id: 8, image_url: "/product-photo.svg" },
+    { id: 6, name: "Comprado", amount: "1", unit: "Piece", done: true, product_id: 9, image_url: null }], pending_matches: [], shopping_error: false, pending_matches_error: false } }));
+  await page.route("**/product-photo.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="green"/></svg>' }));
   await page.route("**/api/v1/catalog/products/7/stock", async route => {
     stockWrites++;
     const body = route.request().postDataJSON();
@@ -29,8 +32,21 @@ test("kg stock taps batch into one stock write and shopping quantity is an indep
   expect(shoppingWrites).toBe(0);
   await page.screenshot({ path: testInfo.outputPath("pantry-stock-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "Lista de la compra", exact: true }).click();
-  await page.getByRole("button", { name: "Modificar cantidad: Tomate pesado" }).click();
-  const dialog = page.getByRole("dialog", { name: "Modificar cantidad", exact: true });
+  for (const width of [320, 360, 690]) {
+    await page.setViewportSize({ width, height: 850 });
+    const actions = page.locator(".items > article .item-actions");
+    const boxes = await actions.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().x));
+    expect(Math.max(...boxes) - Math.min(...boxes)).toBeLessThan(1);
+    const edit = page.getByRole("button", { name: "Editar cantidad: Tomate pesado" });
+    expect((await edit.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const quantity = page.getByText("0.1 kg", { exact: true });
+    expect(Math.abs((await edit.boundingBox())!.x - (await quantity.boundingBox())!.x)).toBeLessThan(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width: 360, height: 850 });
+  await page.screenshot({ path: testInfo.outputPath("shopping-edit-link-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Editar cantidad: Tomate pesado" }).click();
+  const dialog = page.getByRole("dialog", { name: "Editar cantidad", exact: true });
   await dialog.getByLabel("Cantidad para comprar (kg)").fill("2.75");
   await page.screenshot({ path: testInfo.outputPath("shopping-quantity-mobile.png"), fullPage: true });
   await dialog.getByRole("button", { name: "Guardar cantidad" }).click();
