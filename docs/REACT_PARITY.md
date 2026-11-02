@@ -56,3 +56,6 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.19.0: una asociación contextual explícita conserva identidad por ID con nombre editado; diagnóstico por producto afectado y visibilidad de filas compradas/elecciones ocultas. Regresión completa de worker y comprobación de identities en el contrato Grocy real.
+
+
+1.20.0: Editar cantidad con lápiz, sin fondo, bajo la cantidad y con objetivo táctil de 44 px. Columna de acciones uniforme en móvil; comprobaciones de alineación a 320, 360 y 690 px.

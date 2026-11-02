@@ -18,6 +18,7 @@ import {
   Copy,
   Search,
   X,
+  Pencil,
 } from "lucide-react";
 import {
   chooseAlexaMatch,
@@ -435,7 +436,7 @@ function AuthenticatedApp() {
               const key = normalizeName(item.name);
               const match = matches.get(key);
               return (
-                <article className={"item" + (reviewReasons.has(item.id) ? " sync-review-item" : "")} key={item.id}>
+                <article className={"item shopping-item" + (reviewReasons.has(item.id) ? " sync-review-item" : "")} key={item.id}>
                   <div className="item-main">
                     <span
                       className={item.done ? "item-icon done" : "item-icon"}
@@ -470,10 +471,20 @@ function AuthenticatedApp() {
                       <small>
                         {item.amount} {item.unit}
                       </small>
+                      {!item.done && (
+                        <button
+                          type="button"
+                          className="quantity-edit-link"
+                          aria-label={"Editar cantidad: " + item.name}
+                          onClick={() => setQuantityItem({ ...item })}
+                        >
+                          <Pencil size={14} aria-hidden="true" />
+                          <span>Editar cantidad</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="item-actions">
-                    {!item.done && <button className="secondary-button" aria-label={"Modificar cantidad: " + item.name} onClick={() => setQuantityItem({ ...item })}>Modificar cantidad</button>}
                     <button
                       disabled={
                         toggle.isPending ||
@@ -537,7 +548,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.19.0</footer>
+      <footer>Despensa 1.20.0</footer>
     </div>
     </NavigationContext.Provider>
   );

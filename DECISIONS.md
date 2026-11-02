@@ -104,3 +104,8 @@ Filtrar localmente por nombre al escribir, ignorando tildes/mayúsculas, incluye
 ## Corrección de asociación contextual 1.19.0
 
 La creación/asociación explícita desde una nota Alexa es evidencia por ID de ese episodio, incluso con nombre de catálogo distinto. No volver a validarla como coincidencia difusa en identities; confiar solo si coincide con created_product_id seleccionado y vigente. Conservar límites de episodio, guardas de identidad y rechazos de elecciones ordinarias obsoletas. Los conflictos indican IDs afectados sin nombres en el estado de salud; filas compradas también deben señalarse si bloquean la sincronización. No resetear listas, colas ni checkpoints para ocultar el error.
+
+
+## Edición de cantidad 1.20.0
+
+La compra usa «Editar cantidad» con lápiz y aspecto de enlace, bajo la cantidad y alineado con el nombre. Mantener botón semántico, foco visible y objetivo táctil de 44 px. Acciones Comprado/Pendiente y Quitar en columna fija móvil y fila común en ancho amplio; no dependen del largo del nombre o de la presencia de foto.

@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.19.0 — actualización de la instalación existente
+## Despensa 1.20.0 — actualización de la instalación existente
 
-La versión 1.19.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.20.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.19.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.20.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -215,7 +215,7 @@ The voice endpoint verifies `Signature-256`, the certificate chain against syste
 
 Pantry +/− adjusts actual stock: 1 stock unit or 0.10 kg. The UI batches a rapid burst over 500 ms into a single absolute stock update with an expected amount and unique operation ID. A requested edit still commits when changing tabs. Preserve three-decimal weighed inventory; manual absolute stock editing stays at two decimals. No shopping/Alexa lock or refresh is part of stock completion. Uncertain outcomes freeze controls until a fresh read; commands are never automatically retried.
 
-Shopping rows offer **Modificar cantidad**. PUT `/api/v1/shopping/<id>/quantity` checks row ID, default list, expected amount, product and done status; updates only amount and verifies preserved metadata. It is journaled and holds the worker lock only for the short row operation. It never calls Alexa or changes stock. The UI updates the cached row instead of awaiting full synchronization. Zero is removed via the separate Quitar action.
+Shopping rows offer **Editar cantidad**, a pencil text action aligned under the displayed amount. On mobile, purchase/removal buttons use a fixed, stacked column; wider layouts keep both actions side by side. PUT `/api/v1/shopping/<id>/quantity` checks row ID, default list, expected amount, product and done status; updates only amount and verifies preserved metadata. It is journaled and holds the worker lock only for the short row operation. It never calls Alexa or changes stock. The UI updates the cached row instead of awaiting full synchronization. Zero is removed via the separate Quitar action.
 
 The archive action is retired. **Eliminar producto** opens a focus-trapped Yes/No dialog with stock/history counts and irreversible consequences. Confirmed deletion of active or legacy archived products uses a fresh snapshot token and at-most-once journal. Grocy 4.7.1 cascades remove the selected stock/history/codes/conversions; readbacks verify absence. Active shopping/recipe/parent/variant/Alexa dependencies and pending/uncertain receipt imports remain blockers. Existing local ledgers, photos and metadata are preserved. Legacy archives remain accessible/restorable; the compatibility active endpoint remains for existing clients.
 
