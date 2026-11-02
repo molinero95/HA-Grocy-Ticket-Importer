@@ -50,3 +50,6 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.17.0 sustituye la interacción previa: stock agrupado en despensa, edición absoluta de compra, borrado directo Sí/No, candidatos de duplicados más completos, foto por nombre sin captura IA y Piece por defecto. Pruebas de incertidumbre, preservación de filas/notas y cascadas Grocy 4.7.1 son obligatorias antes de fusionar.
+
+
+1.18.0: búsqueda local por nombre en compra con normalización de tildes/mayúsculas, comprados y pendientes, estados de vacío correctos y conservación de avisos/consulta durante refrescos. Validación Vitest y Chromium móvil.

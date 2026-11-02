@@ -119,3 +119,8 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [ ] Aceptación instalada de tiempos de respuesta/cámara de códigos y búsqueda pagada real.
 
 - [x] Detalles desplegables de sincronización Alexa; filas pendientes/obsoletas/duplicadas arriba y resaltadas, sin atribuciones falsas en fallos globales.
+
+
+## Mejora 1.18.0
+
+- [x] Buscador por nombre en la compra, con comprados/pendientes Alexa, coincidencias/total y avisos conservados.

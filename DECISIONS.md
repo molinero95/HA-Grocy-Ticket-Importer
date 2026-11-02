@@ -94,3 +94,8 @@ Los +/− de Mi despensa ajustan stock, agrupando pulsaciones rápidas y conserv
 Retirar interfaz de foto para IA; buscar imagen por nombre cuando el código no tenga resultados, sin reemplazar un código escaneado. Selección de imagen firmada y guardado solo tras alta nueva; fotos manuales de ficha se mantienen. Piece es la unidad inicial por nombre, nunca por ID fijo; respetar la selección del usuario.
 
 Los avisos de sincronización deben mostrar detalles saneados y fechas, con artículos revisables arriba y color/texto distinto. Un problema de conexión global no identifica por sí mismo una fila culpable; no inventar afectados.
+
+
+## Buscador de compra 1.18.0
+
+Filtrar localmente por nombre al escribir, ignorando tildes/mayúsculas, incluyendo comprados y pendientes de Alexa. Conservar orden de revisión, avisos globales y búsqueda durante refrescos. Mostrar coincidencias/total; no confundir ausencia de resultados con lista vacía. Ocultar eliminación global de comprados con filtro activo.

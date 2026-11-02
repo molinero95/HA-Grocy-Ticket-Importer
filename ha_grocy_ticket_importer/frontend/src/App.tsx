@@ -16,6 +16,8 @@ import {
   Archive,
   Tags,
   Copy,
+  Search,
+  X,
 } from "lucide-react";
 import {
   chooseAlexaMatch,
@@ -100,6 +102,7 @@ function AuthenticatedApp() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
   );
+  const [shoppingSearch, setShoppingSearch] = useState("");
   const [quantityItem, setQuantityItem] = useState<ShoppingItem | null>(null);
   const [creatingMatch, setCreatingMatch] = useState<{key: string; name: string} | null>(null);
   const [actionError, setActionError] = useState("");
@@ -172,6 +175,12 @@ function AuthenticatedApp() {
       reviewReasons.set(item.id, "Hay varias filas con el mismo producto o nombre. Revisa sus cantidades antes de quitar duplicados.");
   }
   const orderedItems = [...(data?.items ?? [])].sort((a, b) => Number(reviewReasons.has(b.id)) - Number(reviewReasons.has(a.id)));
+  const normalizedSearch = normalizeName(shoppingSearch);
+  const matchesSearch = (name: string) => normalizeName(name).includes(normalizedSearch);
+  const visibleItems = orderedItems.filter(item => matchesSearch(item.name));
+  const visibleUnassigned = unassigned.filter(match => matchesSearch(match.name));
+  const totalCount = (data?.items.length ?? 0) + unassigned.length;
+  const visibleCount = visibleItems.length + visibleUnassigned.length;
   const syncExplanations: Record<string, string> = {
     note_conflict: "Un artículo guardado como texto coincide con un producto. Asócialo desde Elegir producto para conservar cantidad y nota, o quita el texto si no lo necesitas.",
     duplicate_alexa_identity: "Varios nombres o alias de Alexa apuntan al mismo producto. Revisa sus asociaciones en Administrar alias de Alexa.",
@@ -307,9 +316,9 @@ function AuthenticatedApp() {
             </div>
             <div>
               <span className="count">
-                {(data?.items.length ?? 0) + unassigned.length} artículos
+                {normalizedSearch ? `${visibleCount} de ${totalCount}` : totalCount} artículos
               </span>
-              {data?.items.some((item) => item.done) && (
+              {!normalizedSearch && data?.items.some((item) => item.done) && (
                 <button
                   disabled={
                     clearCompleted.isPending ||
@@ -332,6 +341,11 @@ function AuthenticatedApp() {
                 </button>
               )}
             </div>
+          </div>
+          <div className="search-box" role="search" aria-label="Buscar artículos de compra">
+            <Search size={20} aria-hidden="true" />
+            <input type="search" aria-label="Buscar en la lista de la compra" placeholder="Buscar en la lista de la compra" value={shoppingSearch} onChange={event => setShoppingSearch(event.target.value)} />
+            {shoppingSearch && <button className="icon-button shopping-search-clear" type="button" aria-label="Borrar búsqueda de compra" title="Borrar búsqueda" onClick={() => setShoppingSearch("")}><X size={19} aria-hidden="true" /></button>}
           </div>
           {isLoading && <p role="status">Cargando artículos…</p>}
           {isError && (
@@ -381,7 +395,7 @@ function AuthenticatedApp() {
             </p>
           )}
           <div className="items">
-            {unassigned.map((match) => (
+            {visibleUnassigned.map((match) => (
               <article className="item sync-review-item" key={match.key}>
                 <div className="item-main">
                   <span className="item-icon">
@@ -414,7 +428,7 @@ function AuthenticatedApp() {
                 <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />
               </article>
             ))}
-            {orderedItems.map((item) => {
+            {visibleItems.map((item) => {
               const key = normalizeName(item.name);
               const match = matches.get(key);
               return (
@@ -498,6 +512,10 @@ function AuthenticatedApp() {
             })}
 
           </div>
+          {data && !isError && totalCount > 0 && normalizedSearch && visibleCount === 0 && <div className="empty">
+            <h3>Sin resultados</h3><p>No hay artículos que coincidan con la búsqueda.</p>
+            <button className="secondary-button" type="button" onClick={() => setShoppingSearch("")}>Mostrar toda la compra</button>
+          </div>}
           {data && !data.items.length && !data.pending_matches.length && (
             <div className="empty">
               <ShoppingBasket size={30} />
@@ -516,7 +534,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.17.0</footer>
+      <footer>Despensa 1.18.0</footer>
     </div>
     </NavigationContext.Provider>
   );
