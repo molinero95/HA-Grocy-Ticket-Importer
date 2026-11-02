@@ -153,16 +153,22 @@ def register_catalog_routes(app, barcode_stock, lock):
         if not lock.acquire(blocking=False):
             return jsonify({"error": "operation_in_progress"}), 409
         try:
-            preview = barcode_stock.prepare_stock_adjustment(product_id, payload["desired_amount"], payload["expected_amount"])
-            result = barcode_stock.apply_stock_adjustment(preview)
-        except barcode_stock.BarcodeError as exc:
+            from stock_commands import execute_once, CommandConflict
+            def change():
+                try:
+                    preview = barcode_stock.prepare_stock_adjustment(product_id, payload["desired_amount"], payload["expected_amount"], 3 if payload.get("step") is True else 2)
+                    result = barcode_stock.apply_stock_adjustment(preview)
+                    return {"status": 200, "body": result}
+                except barcode_stock.BarcodeError as exc:
+                    return {"status": 409, "body": {"error": str(exc)}}
+            result = execute_once(payload.get("operation_id"), {**payload, "product_id": product_id, "command": "stock_adjustment"}, change)
+            return jsonify(result["body"]), result["status"]
+        except CommandConflict as exc:
             return jsonify({"error": str(exc)}), 409
         except Exception:
-            app.logger.exception("api_v1_catalog_stock_uncertain")
-            return jsonify({"error": "stock_update_uncertain", "details": "Comprueba el stock de Grocy antes de reintentar."}), 502
+            return jsonify({"error": "Stock sin confirmar. Comprueba Grocy antes de otra operación."}), 502
         finally:
             lock.release()
-        return jsonify(result)
 
     @app.post("/api/v1/catalog/products/<int:product_id>/consume")
     def api_v1_consume_catalog_product(product_id):
@@ -275,30 +281,30 @@ def register_catalog_routes(app, barcode_stock, lock):
         except BlockingIOError:
             return jsonify({"error": "operation_in_progress"}), 409
         except Exception:
-            return jsonify({"error": "No se pudo verificar si el producto puede eliminarse. Conserva el archivado y vuelve a consultar."}), 503
+            return jsonify({"error": "No se pudo verificar si el producto puede eliminarse. Vuelve a consultar."}), 503
 
     @app.delete("/api/v1/catalog/products/<int:product_id>")
     def api_v1_delete_catalog_product(product_id):
-        from catalog_lifecycle import delete_archived
+        from catalog_lifecycle import delete_product
         from shopping_match_queue import mutation_lock, DEFAULT_PATH
         from stock_commands import execute_once, CommandConflict
         import re
         payload = request.get_json(silent=True)
         if (not isinstance(payload, dict) or not isinstance(payload.get('expected_name'), str)
-                or payload.get('confirmation') != payload['expected_name'] or not payload['expected_name']
+                or payload.get('confirmed') is not True or not payload['expected_name']
                 or type(payload.get('delete_history', False)) is not bool
                 or not isinstance(payload.get('token'), str) or not re.fullmatch(r'[a-f0-9]{64}', payload['token'])):
-            return jsonify({"error": "Escribe el nombre exacto del producto y revisa su borrado antes de confirmar."}), 400
+            return jsonify({"error": "Confirma la eliminación después de revisar el producto."}), 400
         if not lock.acquire(blocking=False):
             return jsonify({"error": "operation_in_progress"}), 409
         try:
             with mutation_lock(DEFAULT_PATH, blocking=False):
                 def change():
                     try:
-                        return {"status": 200, "body": delete_archived(product_id, payload['expected_name'], payload['token'], payload.get('delete_history', False))}
+                        return {"status": 200, "body": delete_product(product_id, payload['expected_name'], payload['token'], payload.get('delete_history', False))}
                     except barcode_stock.BarcodeError as exc:
                         return {"status": 409, "body": {"error": str(exc)}}
-                result = execute_once(payload.get('operation_id'), {**payload, 'product_id': product_id, 'command': 'delete_archived'}, change)
+                result = execute_once(payload.get('operation_id'), {**payload, 'product_id': product_id, 'command': 'delete_product'}, change)
             return jsonify(result['body']), result['status']
         except BlockingIOError:
             return jsonify({"error": "operation_in_progress"}), 409

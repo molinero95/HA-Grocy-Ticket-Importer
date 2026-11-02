@@ -41,3 +41,14 @@ class SyncStatusTests(unittest.TestCase):
     def test_status_io_failure_does_not_change_worker_outcome(self):
         with patch('shopping_sync_status.tempfile.mkstemp', side_effect=OSError()):
             record(self.path, dry_run=False)
+
+    def test_fixed_identity_details_and_last_success_are_exposed_without_raw_exceptions(self):
+        record(self.path, dry_run=False)
+        record(self.path, dry_run=False, error=IdentityConflict('Multiple Alexa items resolve to the same identity'))
+        health = snapshot(self.path)
+        self.assertEqual(health['detail_code'], 'duplicate_alexa_identity')
+        self.assertIsInstance(health['last_success_at'], (int, float))
+        record(self.path, dry_run=False, error=RuntimeError('private provider exception'))
+        health = snapshot(self.path)
+        self.assertIsNone(health['detail_code'])
+        self.assertNotIn('private', json.dumps(health))

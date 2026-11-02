@@ -47,6 +47,8 @@ class DeletionFixture:
         if method == 'DELETE':
             self.assertEqual(path, 'objects/products/7')
             self.deleted = True
+            self.amount = '0'
+            self.rows['stock'] = []
             self.rows['stock_log'] = [row for row in self.rows['stock_log'] if row['product_id'] != 7]
             if self.uncertain: raise ConnectionError('private endpoint')
             return {}
@@ -71,26 +73,28 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         self.assertTrue(preview['allowed'])
         self.assertEqual((preview['barcode_count'], preview['conversion_count']), (1, 1))
         self.assert_no_write()
-        self.assertEqual(lifecycle.delete_archived(7, 'Sin uso', preview['token']), {'deleted': True, 'product_id': 7})
+        self.assertEqual(lifecycle.delete_product(7, 'Sin uso', preview['token']), {'deleted': True, 'product_id': 7})
         self.assertEqual([call.args for call in self.mock_grocy.call_args_list if call.args[0] != 'GET'], [('DELETE', 'objects/products/7')])
 
     def test_every_grocy_history_and_dependency_blocks_deletion(self):
-        for collection in ('stock', 'shopping_list', 'recipes_pos', 'recipes', 'meal_plan', 'products'):
+        for collection in ('shopping_list', 'recipes_pos', 'recipes', 'meal_plan', 'products'):
             with self.subTest(collection=collection):
                 field = 'parent_product_id' if collection == 'products' else 'product_id'
                 self.rows[collection] = [{'id': 50, field: 7, **({'amount': 0} if collection == 'stock' else {})}]
                 preview = lifecycle.deletion_preview(7)
                 self.assertFalse(preview['allowed'])
                 with self.assertRaises(barcode_stock.BarcodeError):
-                    lifecycle.delete_archived(7, 'Sin uso', preview['token'])
+                    lifecycle.delete_product(7, 'Sin uso', preview['token'])
                 self.rows[collection] = []
         self.assert_no_write()
 
     def test_active_nonzero_nan_and_unknown_stock_fail_closed(self):
         self.product['active'] = 1
-        self.assertFalse(lifecycle.deletion_preview(7)['allowed'])
+        self.assertTrue(lifecycle.deletion_preview(7)['allowed'])
+        self.amount = '1'
+        self.assertTrue(lifecycle.deletion_preview(7)['allowed'])
         self.product['active'] = 0
-        for amount in ('1', '-1', 'NaN', 'Infinity'):
+        for amount in ('-1', 'NaN', 'Infinity'):
             self.amount = amount
             self.assertFalse(lifecycle.deletion_preview(7)['allowed'])
         self.amount = None
@@ -101,10 +105,10 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         token = lifecycle.deletion_preview(7)['token']
         self.rows['product_barcodes'] = [{'id': 1, 'product_id': 7, 'barcode': '8412345678901'}]
         with self.assertRaisesRegex(barcode_stock.BarcodeError, 'han cambiado'):
-            lifecycle.delete_archived(7, 'Sin uso', token)
+            lifecycle.delete_product(7, 'Sin uso', token)
         token = lifecycle.deletion_preview(7)['token']
         self.product['active'] = 1
-        with self.assertRaises(barcode_stock.BarcodeError): lifecycle.delete_archived(7, 'Sin uso', token)
+        with self.assertRaises(barcode_stock.BarcodeError): lifecycle.delete_product(7, 'Sin uso', token)
         self.assert_no_write()
 
     def test_unverified_grocy_version_blocks_unreviewed_cascades(self):
@@ -112,7 +116,7 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         preview = lifecycle.deletion_preview(7)
         self.assertFalse(preview['allowed'])
         with self.assertRaises(barcode_stock.BarcodeError):
-            lifecycle.delete_archived(7, 'Sin uso', preview['token'])
+            lifecycle.delete_product(7, 'Sin uso', preview['token'])
         self.assert_no_write()
 
     def test_incomplete_reference_read_cannot_authorize_deletion(self):
@@ -143,9 +147,9 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         self.assertTrue(preview['allowed'])
         self.assertEqual(preview['history_count'], 1)
         with self.assertRaisesRegex(barcode_stock.BarcodeError, 'Confirma expresamente'):
-            lifecycle.delete_archived(7, 'Sin uso', preview['token'])
+            lifecycle.delete_product(7, 'Sin uso', preview['token'])
         self.assert_no_write()
-        lifecycle.delete_archived(7, 'Sin uso', preview['token'], delete_history=True)
+        lifecycle.delete_product(7, 'Sin uso', preview['token'], delete_history=True)
         self.assertEqual(self.rows['stock_log'], [])
 
     def test_completed_receipt_ledger_is_retained_without_blocking_confirmed_deletion(self):
@@ -156,7 +160,7 @@ class DeletionTests(DeletionFixture, unittest.TestCase):
         before = path.read_bytes()
         preview = lifecycle.deletion_preview(7)
         self.assertTrue(preview['allowed'])
-        lifecycle.delete_archived(7, 'Sin uso', preview['token'])
+        lifecycle.delete_product(7, 'Sin uso', preview['token'])
         self.assertEqual(path.read_bytes(), before)
 
     def test_pending_alexa_choices_and_removals_block_without_deleting_queue(self):
@@ -185,13 +189,13 @@ class DeletionApiTests(DeletionFixture, unittest.TestCase):
     def payload(self):
         preview = self.client.get('/api/v1/catalog/products/7/deletion')
         self.assertEqual(preview.status_code, 200, preview.json)
-        return {'expected_name': 'Sin uso', 'confirmation': 'Sin uso', 'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
+        return {'expected_name': 'Sin uso', 'confirmed': True, 'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
 
     def test_auth_csrf_and_exact_typed_confirmation_precede_dispatch(self):
         with patch.object(web, 'INGRESS_MODE', False):
             self.assertEqual(self.client.get('/api/v1/catalog/products/7/deletion').status_code, 401)
         self.assertEqual(self.client.delete('/api/v1/catalog/products/7', json={}).status_code, 403)
-        payload = self.payload(); payload['confirmation'] = 'incorrect'
+        payload = self.payload(); payload['confirmed'] = False
         self.assertEqual(self.client.delete('/api/v1/catalog/products/7', json=payload, headers=self.headers).status_code, 400)
         self.assert_no_write()
 

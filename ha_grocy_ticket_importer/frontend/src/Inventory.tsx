@@ -1,8 +1,9 @@
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, ShoppingBasket, ListFilter, X } from "lucide-react";
+import { Plus, ShoppingBasket, ListFilter, X } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
+import { StockStepper } from "./StockStepper";
 import { ProductDetail } from "./ProductDetail";
 import { CreateProduct } from "./CreateProduct";
 import {
@@ -62,11 +63,10 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
       id: number;
       direction: "plus" | "minus";
     }) => stepShopping(id, direction),
-    onSuccess: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: ["inventory"] }),
-        client.invalidateQueries({ queryKey: ["shopping"] }),
-      ]),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["inventory"] });
+      void client.invalidateQueries({ queryKey: ["shopping"] });
+    },
   });
   const items = useMemo(
     () =>
@@ -92,7 +92,7 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
           <p>
             {archived
               ? "Consulta, restaura o elimina productos archivados sin uso."
-              : "Stock de Grocy y cantidades pendientes de compra."}
+              : "Ajusta las existencias que tienes en casa."}
           </p>
         </div>
         <div className="inventory-heading-actions">
@@ -187,40 +187,10 @@ export function Inventory({ archived = false }: { archived?: boolean }) {
               >
                 Ver producto
               </button>
-            ) : Number(item.shopping_amount) === 0 ? (
-              <button
-                className="cart-button"
-                disabled={step.isPending}
-                aria-label={"Añadir a compra: " + item.name}
-                onClick={() => step.mutate({ id: item.id, direction: "plus" })}
-              >
-                <ShoppingBasket size={17} /> Añadir
-              </button>
-            ) : (
-              <div className="quantity">
-                <button
-                  disabled={step.isPending || !item.shopping_can_subtract}
-                  aria-label={"Quitar de compra: " + item.name}
-                  onClick={() =>
-                    step.mutate({ id: item.id, direction: "minus" })
-                  }
-                >
-                  <Minus size={17} />
-                </button>
-                <span>
-                  {item.shopping_amount} {item.shopping_unit}
-                </span>
-                <button
-                  disabled={step.isPending}
-                  aria-label={"Añadir a compra: " + item.name}
-                  onClick={() =>
-                    step.mutate({ id: item.id, direction: "plus" })
-                  }
-                >
-                  <Plus size={17} />
-                </button>
-              </div>
-            )}
+            ) : <div className="pantry-actions">
+              <StockStepper id={item.id} name={item.name} amount={item.amount} unit={item.unit} />
+              {Number(item.shopping_amount) === 0 ? <button className="cart-button" disabled={step.isPending} aria-label={"Añadir a compra: " + item.name} onClick={() => step.mutate({ id: item.id, direction: "plus" })}><ShoppingBasket size={17} /> Añadir</button> : <small className="shopping-badge">En la compra</small>}
+            </div>}
             {step.isError && step.variables?.id === item.id && (
               <p className="row-error" role="alert">
                 {step.error.message}

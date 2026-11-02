@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.17.0] — 2026-11-02
+
+### Changed
+- Pantry +/− controls now adjust actual stock (1 Piece or 0.10 kg). Rapid taps are grouped into one journaled absolute update, with immediate draft feedback and preserved weighed-stock precision. Stock controls do not wait for shopping/Alexa refreshes.
+- Shopping rows offer an absolute quantity editor, preserving row identity, notes, units and completed state without modifying stock or calling Alexa synchronously.
+- Delete active or previously archived products directly through a Yes/No modal. No archive action, typed product name or separate history checkbox; show stock/history consequences and retain dependency, snapshot and at-most-once guards.
+- Duplicate review handles token order, punctuation, equivalent printed sizes and small typos. Decisions remain manual and saved differences remain respected.
+- Remove photo upload/capture for AI identification. Search catalog images by name, including when a scanned code is unknown; explicitly chosen images use signed, session-bound selections and preserve the scanned code.
+- Expand Alexa synchronization warnings with sanitized cause details and timestamps; place actionable review/duplicate rows first with a distinct color and text label, without blaming individual rows for connection-wide failures.
+- Select the actual Grocy Piece unit by default when creating a product, including contextual shopping creation.
+
+### Tests
+- Stock-burst, uncertain-write, absolute shopping quantity, direct stock/history deletion, duplicate-name and signed name-photo regressions, plus mobile/ingress and real Grocy contracts.
+
 ## [1.16.0] — 2026-11-01
 
 ### Added

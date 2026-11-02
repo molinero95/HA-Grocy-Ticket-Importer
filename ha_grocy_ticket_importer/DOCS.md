@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.16.0 — actualización de la instalación existente
+## Despensa 1.17.0 — actualización de la instalación existente
 
-La versión 1.16.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.17.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.16.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.17.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -161,7 +161,7 @@ The cascade audit is verified against Grocy 4.7.1. The app and worker share muta
 
 Browser Back closes the top dialog (including camera) before returning through visited sections; the root exits normally to its host. Same-document history preserves ingress paths and host state. Fullscreen is an explicit action under Acciones and depends on the iframe/browser/Android WebView permissions. The host can reject it or exit fullscreen on the first Back. This does not reconfigure the Home Assistant menu or native Android navigation.
 
-Permanent deletion is enabled only for the audited Grocy 4.7.1 release; a different version stays archived until its cascades have been reviewed.
+Permanent deletion is enabled only for the audited Grocy 4.7.1 release; a different version blocks deletion until its cascades have been reviewed.
 
 
 ## Duplicate review and native merge (1.9.0)
@@ -175,7 +175,7 @@ Require compatible units/conversions and no unsupported hierarchy/tare/source cu
 
 ## Archived history deletion and status feedback (1.10.0)
 
-The user explicitly authorizes deleting an archived product's Grocy movement history. The preview reports history_count; when nonzero, require a separate delete_history acknowledgement plus exact typed name and fresh snapshot. Recheck before the journaled DELETE and verify both product and history absence. Stock, active Grocy/local/Alexa dependencies and pending receipt imports remain blockers. Completed local receipt ledger entries are preserved byte-for-byte for deduplication. Native merge still uses its stricter source receipt guard.
+Since 1.17.0, the Yes/No deletion modal explicitly covers the selected stock and movement history; no typed name or additional checkbox is required. Expected-state, dependency and journal guards still apply.
 
 Successful status notices are green. The fullscreen button/component has been removed; internal Back navigation remains. These changes supersede the older 1.8 history/fullscreen descriptions above.
 
@@ -211,20 +211,18 @@ Every edit invalidates confirmation. Unresolved REVIEW/pending lines cannot auth
 
 The voice endpoint verifies `Signature-256`, the certificate chain against system roots, SAN `echo-api.amazon.com`, timestamp within 150 seconds, skill ID and owner ID. Certificate retrieval is HTTPS-only under `s3.amazonaws.com/echo.api/`, rejects redirects and is bounded in size/time. Stock uses three read-only Grocy calls with short timeouts; unknown/unavailable products are not reported as zero. Low-stock summaries respect opt-outs. Metadata aliases/thresholds are read through read-only SQLite connections.
 
-The UI offers full-photo identification after barcode lookup has no product name or fails. Since 1.14.0, “Tomar otra foto para buscar con IA” requests a fresh rear-camera photo of the product front or label. Barcode-scanner frames are not captured or reused for recognition. The new photo stays local until the explicit OpenAI analysis button. The authenticated CSRF-protected photo API sanitizes and resizes the full frame, removes EXIF, requests structured suggestions with `store=false` and never writes stock/products/photos or auto-retries. A suggestion changes the name only after explicit acceptance. Existing duplicate/EAN checks remain on save; the image/model never replaces the scanned code or pack configuration. The existing OpenAI API key is reused and normal API usage applies. Public barcode lookup remains the first attempt.
+## Current interaction model (1.17.0)
 
-1.14.0 saves the newly analyzed front/label photo through the existing sanitized local-photo endpoint after a genuinely new product is created. Snapshot the file with creation variables and never send it inside the product JSON. Existing duplicates keep their images. Photo failures are advisory and must not replay catalog creation or stock. Raw recognition uploads are still not persisted by the analysis endpoint; saving the new product is the persistence action.
+Pantry +/− adjusts actual stock: 1 stock unit or 0.10 kg. The UI batches a rapid burst over 500 ms into a single absolute stock update with an expected amount and unique operation ID. A requested edit still commits when changing tabs. Preserve three-decimal weighed inventory; manual absolute stock editing stays at two decimals. No shopping/Alexa lock or refresh is part of stock completion. Uncertain outcomes freeze controls until a fresh read; commands are never automatically retried.
 
+Shopping rows offer **Modificar cantidad**. PUT `/api/v1/shopping/<id>/quantity` checks row ID, default list, expected amount, product and done status; updates only amount and verifies preserved metadata. It is journaled and holds the worker lock only for the short row operation. It never calls Alexa or changes stock. The UI updates the cached row instead of awaiting full synchronization. Zero is removed via the separate Quitar action.
 
-En **Mi despensa**, el icono de filtro junto a la cámara permite elegir **Todos los productos**, **Falta de stock** o **En la lista de la compra**. Falta de stock respeta el umbral inclusivo y los avisos activados de cada producto; compra muestra cantidades pendientes mayores que cero. El filtro se combina con la búsqueda por nombre/código y se puede quitar con la X sin borrar la búsqueda. No modifica existencias ni compras.
+The archive action is retired. **Eliminar producto** opens a focus-trapped Yes/No dialog with stock/history counts and irreversible consequences. Confirmed deletion of active or legacy archived products uses a fresh snapshot token and at-most-once journal. Grocy 4.7.1 cascades remove the selected stock/history/codes/conversions; readbacks verify absence. Active shopping/recipe/parent/variant/Alexa dependencies and pending/uncertain receipt imports remain blockers. Existing local ledgers, photos and metadata are preserved. Legacy archives remain accessible/restorable; the compatibility active endpoint remains for existing clients.
 
+New-product forms select the real Piece ID by name when available, preserving any explicitly chosen unit. There is no AI photo capture/upload UI. Public photo lookup by barcode remains first; explicit **Buscar imagen y código con IA** searches by name even if the scanned code is not in the catalogs. Search only the existing Open Facts domains and verify cited GTINs through exact-code catalog APIs. Picking an image never replaces an existing scanned code. `/photos/discover` issues a signed, session-bound choice token; `/catalog/products/<id>/photo-discovery` validates its expiry, current name/code, source and trusted image host before saving after genuinely-new creation. A name/code edit invalidates the selection. Existing photos are preserved and failures do not replay creation. Manual sanitized image uploads remain available in product details. The old photo-identification endpoint is kept for compatibility; the current UI does not call it.
 
-## Product-image and GTIN discovery (1.16.0)
+Duplicate review normalizes accents, punctuation, stop words and equivalent printed sizes, compares word order independently and tolerates small typos. Generic/variant candidates are explicitly labeled for brand/format review; no automatic merge, stock transfer or deletion. Saved per-pair differences remain respected.
 
-During creation, **Buscar imagen y código con IA** sends the current name and optional barcode to OpenAI Responses `web_search`, using the existing API key/model and `store=false`. It is explicit and paid; no automatic retries or background enrichment. Photo recognition now also accepts an absent barcode: take a fresh photo, analyze it, apply the suggested name and then search. OCR-visible digits remain advisory and are not assigned automatically.
+All automated OpenAI and public-catalog tests use mocked providers. No installed options/data, Amazon/Cloudflare setup or paid requests are changed by this release.
 
-Search is restricted to Open Food Facts, Open Products Facts and Open Beauty Facts. Only cited product-page URLs also present in completed search-tool sources are considered. Extracted GTINs require valid length/checksum and a second exact-code catalog API confirmation. At most three unique cited codes are looked up. No model/client-supplied URL is fetched, no arbitrary image host is enabled, and a supplied scanned code cannot be replaced. Sources and catalog attribution are visible; users must confirm brand/variant/size.
-
-Selection changes only the form barcode, clears the previously selected photo, and lets the existing exact-code photo-save path use a catalog image after genuinely-new creation. Without a catalog image the code remains usable; a fresh product photo can still be taken. Empty or unavailable discovery keeps manual creation and the previous analyzed photo available. Duplicates never receive image writes, and photo failure never replays creation/stock. Authentication, CSRF and a shared nonblocking AI lock apply to `POST /api/v1/photos/discover`; provider errors are sanitized. Local/CI tests mock OpenAI and public catalogs and never use paid or installed credentials.
-
-Official search API reference: https://developers.openai.com/api/docs/guides/tools-web-search
+Alexa warnings now expand into sanitized fixed cause codes, last check/success timestamps when available and the current list of actionable review rows. Pending/unassigned, stale-selection and duplicate-identity/name rows are shown first with a distinct background and text label. Generic connectivity errors are explicitly global and do not falsely blame normal rows. No extra HA/Alexa API calls or remote exception text are required for these details.

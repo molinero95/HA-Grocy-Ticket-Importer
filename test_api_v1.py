@@ -77,7 +77,7 @@ class ShoppingApiTests(unittest.TestCase):
     def test_catalog_stock_rejects_stale_quantity_without_writing(self):
         with patch.object(web, "INGRESS_MODE", True), patch.object(web.barcode_stock, "prepare_stock_adjustment", side_effect=web.barcode_stock.BarcodeError("stock changed")), patch.object(web.barcode_stock, "apply_stock_adjustment") as apply:
             token = self.client.get("/api/v1/session").json["csrf_token"]
-            response = self.client.post("/api/v1/catalog/products/7/stock", json={"desired_amount": "5", "expected_amount": "2"}, headers={"X-CSRF-Token": token})
+            response = self.client.post("/api/v1/catalog/products/7/stock", json={"desired_amount": "5", "expected_amount": "2", "operation_id": __import__("uuid").uuid4().__str__()}, headers={"X-CSRF-Token": token})
         self.assertEqual(response.status_code, 409)
         apply.assert_not_called()
 

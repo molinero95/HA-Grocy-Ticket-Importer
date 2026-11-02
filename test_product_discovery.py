@@ -56,7 +56,6 @@ class DiscoveryTests(unittest.TestCase):
             (["https://world.openbeautyfacts.org.evil.invalid/product/" + CODE], None, ""),
             (["https://user:pass@world.openbeautyfacts.org/product/" + CODE], None, ""),
             (["https://world.openbeautyfacts.org/product/4006000082291"], None, ""),
-            ([PAGE], None, OTHER),
         ):
             with self.subTest(urls=urls):
                 output, _, verify = self.search(self.result(urls, sources), code)

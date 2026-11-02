@@ -59,7 +59,7 @@ export function ProductDiscovery({ name, barcode, onUse }: {
     </button>
     {error && <p role="alert">{error} Puedes volver a pulsar para reintentar.</p>}
     {result?.identity === identity && <div aria-live="polite">
-      {result.candidates.length === 0 ? <p>No se encontraron coincidencias con código verificable. Puedes continuar con tu foto y el código manual.</p> : <>
+      {result.candidates.length === 0 ? <p>No se encontraron coincidencias con código verificable. Puedes continuar con el nombre y el código manual.</p> : <>
         <p>Revisa marca, variante y tamaño. Elige solo el mismo envase y formato.</p>
         {result.candidates.map(candidate => <article className="discovery-candidate" key={candidate.barcode}>
           {candidate.image_url && <img src={candidate.image_url} alt={"Imagen de catálogo: " + candidate.name} referrerPolicy="no-referrer" />}
@@ -68,9 +68,9 @@ export function ProductDiscovery({ name, barcode, onUse }: {
           {!candidate.image_url && <p>Este catálogo no tiene imagen para el producto.</p>}
           <a href={candidate.search_source_url} target="_blank" rel="noopener noreferrer">Ver fuente de la búsqueda</a>
           <a href={candidate.source_url} target="_blank" rel="noopener noreferrer">{candidate.attribution}</a>
-          <button className="secondary-button" type="button" onClick={() => onUse(candidate)}>
-            {candidate.image_url ? "Usar código e imagen" : "Usar este código"}
-          </button>
+          {(!barcode.trim() || barcode.trim() === candidate.barcode || candidate.image_url) && <button className="secondary-button" type="button" onClick={() => onUse(candidate)}>
+            {candidate.image_url ? (barcode.trim() && barcode.trim() !== candidate.barcode ? "Usar imagen y conservar código" : "Usar código e imagen") : "Usar este código"}
+          </button>}
         </article>)}
       </>}
     </div>}

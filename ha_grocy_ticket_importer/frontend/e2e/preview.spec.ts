@@ -36,13 +36,8 @@ test("standalone session, mobile alignment, stock controls and camera fallback",
   await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
   const add = page.getByRole("button", { name: /Añadir a compra: Tomate/ });
   await add.click();
-  await expect(
-    page.getByRole("button", { name: /Quitar de compra: Tomate/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Quitar de compra: Tomate/ }).click();
-  await expect(
-    page.getByRole("button", { name: /Quitar de compra: Tomate/ }),
-  ).toHaveCount(0);
+  await expect(page.getByText("En la compra", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Aumentar stock: Tomate/ })).toBeVisible();
   await page
     .getByLabel("Buscar por nombre o código de barras")
     .fill("8412345678901");

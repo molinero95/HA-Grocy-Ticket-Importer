@@ -203,7 +203,7 @@ class RealStackTests(unittest.TestCase):
         self.assertTrue(preview.json['allowed'], preview.json)
         self.assertEqual(preview.json['barcode_count'], 1)
         self.assertGreater(preview.json['conversion_count'], 0)
-        payload = {'expected_name': 'Disposable archive', 'confirmation': 'Disposable archive',
+        payload = {'expected_name': 'Disposable archive', 'confirmed': True,
                    'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
         for _ in range(2):
             response = self.client.delete(url, json=payload, headers=self.headers)
@@ -225,7 +225,7 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(preview.status_code, 200, preview.json)
         self.assertTrue(preview.json['allowed'], preview.json)
         self.assertGreater(preview.json['history_count'], 0)
-        payload = {'expected_name': 'Historical archive', 'confirmation': 'Historical archive',
+        payload = {'expected_name': 'Historical archive', 'confirmed': True,
                    'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
         response = self.client.delete(url, json=payload, headers=self.headers)
         self.assertEqual(response.status_code, 409, response.json)
@@ -376,3 +376,33 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(response.status_code,200,response.json)
         self.assertIn('4 unidades',response.json['response']['outputSpeech']['text'])
         for entity,rows in snapshot.items():self.assertEqual(self.instance.http('GET','objects/'+entity),rows)
+
+    def test_direct_active_deletion_cascades_only_the_selected_stock_and_history(self):
+        import barcode_stock
+        piece = next(u['id'] for u in self.instance.http('GET', 'objects/quantity_units') if u['name'] == 'Piece')
+        pid = barcode_stock.create_catalog_product('Direct delete stock contract', unit_id=piece, initial_stock='2')['product_id']
+        others = {entity: [row for row in self.instance.http('GET', 'objects/' + entity) if int(row['product_id']) != pid] for entity in ('stock', 'stock_log')}
+        preview = self.client.get(f'/api/v1/catalog/products/{pid}/deletion').json
+        self.assertTrue(preview['allowed'], preview)
+        self.assertEqual(float(preview['stock_amount']), 2)
+        response = self.client.delete(f'/api/v1/catalog/products/{pid}', json={'confirmed': True, 'expected_name': 'Direct delete stock contract', 'token': preview['token'], 'delete_history': True, 'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        for entity, rows in others.items():
+            self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
+
+    def test_absolute_shopping_amount_and_stock_steps_do_not_cross_mutate(self):
+        import barcode_stock
+        kg = next(u['id'] for u in self.instance.http('GET', 'objects/quantity_units') if u['name'] == 'Kilogram')
+        pid = barcode_stock.create_catalog_product('Weight step contract', unit_id=kg, initial_stock='1')['product_id']
+        rid = int(self.instance.http('POST', 'objects/shopping_list', {'product_id': pid, 'shopping_list_id': 1, 'amount': 0.1, 'note': 'keep weight note'})['created_object_id'])
+        result = self.client.put(f'/api/v1/shopping/{rid}/quantity', json={'amount': '2.75', 'expected_amount': '0.1', 'product_id': pid, 'expected_done': False, 'operation_id': str(uuid.uuid4())}, headers=self.headers)
+        self.assertEqual(result.status_code, 200, result.json)
+        self.assertEqual(float(self.instance.http('GET', f'stock/products/{pid}')['stock_amount']), 1)
+        shopping = self.instance.http('GET', f'objects/shopping_list/{rid}')
+        payload = {'desired_amount': '1.5', 'expected_amount': '1', 'step': True, 'operation_id': str(uuid.uuid4())}
+        for _ in range(2):
+            result = self.client.post(f'/api/v1/catalog/products/{pid}/stock', json=payload, headers=self.headers)
+            self.assertEqual(result.status_code, 200, result.json)
+        self.assertEqual(float(self.instance.http('GET', f'stock/products/{pid}')['stock_amount']), 1.5)
+        self.assertEqual(self.instance.http('GET', f'objects/shopping_list/{rid}'), shopping)
+        self.instance.http('DELETE', f'objects/shopping_list/{rid}')

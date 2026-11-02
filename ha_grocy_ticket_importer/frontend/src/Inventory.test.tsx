@@ -50,41 +50,12 @@ beforeEach(() => {
   vi.mocked(api.getInventory).mockResolvedValue({ items: rows });
 });
 describe("inventory interactions", () => {
-  it("changes cart to stepper and back in place after successful writes", async () => {
-    let added = false;
-    vi.mocked(api.getInventory).mockImplementation(async () => ({
-      items: [
-        {
-          ...rows[0],
-          shopping_amount: added ? "0.1" : "0",
-          shopping_can_subtract: added,
-        },
-      ],
-    }));
-    vi.mocked(api.stepShopping).mockImplementation(async (_id, direction) => {
-      added = direction === "plus";
-    });
+  it("keeps shopping membership separate from stock controls", async () => {
     mount();
-    const user = userEvent.setup();
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Añadir a compra: " + rows[0].name,
-      }),
-    );
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Quitar de compra: " + rows[0].name,
-      }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", {
-          name: "Quitar de compra: " + rows[0].name,
-        }),
-      ).toBeNull(),
-    );
-    expect(api.stepShopping).toHaveBeenNthCalledWith(1, 1, "plus");
-    expect(api.stepShopping).toHaveBeenNthCalledWith(2, 1, "minus");
+    await screen.findByText("Leche");
+    expect(screen.getByRole("button", { name: "Aumentar stock: Leche" })).toBeTruthy();
+    expect(screen.getByText("En la compra")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Quitar de compra: Leche" })).toBeNull();
   });
   it("filters by typed barcode automatically without opening a product sheet", async () => {
     vi.mocked(api.lookupBarcode).mockResolvedValue(2);
@@ -237,20 +208,4 @@ it("combines shopping status with name and barcode search and clears only the st
   await user.selectOptions(filter, "shopping");
   expect(screen.getByText("Sin resultados")).toBeTruthy();
   expect(screen.queryByRole("dialog")).toBeNull();
-});
-
-it("refreshes the active shopping filter after removing the last shopping quantity", async () => {
-  let removed = false;
-  vi.mocked(api.getInventory).mockImplementation(async () => ({ items: [
-    { ...rows[1], shopping_amount: removed ? "0" : "1" },
-  ] }));
-  vi.mocked(api.stepShopping).mockImplementation(async () => { removed = true; });
-  mount();
-  await screen.findByText("Leche");
-  const user = userEvent.setup();
-  await user.selectOptions(screen.getByRole("combobox", { name: "Filtrar productos" }), "shopping");
-  await user.click(screen.getByRole("button", { name: "Quitar de compra: Leche" }));
-  expect(await screen.findByText("Sin resultados")).toBeTruthy();
-  expect(screen.getByRole("combobox", { name: "Filtrar productos" })).toHaveProperty("value", "shopping");
-  expect(api.stepShopping).toHaveBeenCalledExactlyOnceWith(2, "minus");
 });

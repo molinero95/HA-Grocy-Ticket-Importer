@@ -1029,3 +1029,12 @@ select:focus-visible {
 .discovery-candidate img { width: 110px; height: 110px; object-fit: contain; border-radius: 8px; }
 .discovery-candidate p { margin: 0; }
 .discovery-candidate a { display: inline-flex; align-items: center; min-height: 44px; color: #176d4b; }
+
+.confirmation-panel { max-width: 480px; }
+.pantry-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.stock-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.shopping-badge { color: #176d4b; padding: 5px; }
+
+.sync-notice summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 650; }
+.item.sync-review-item { background: #fff0e9; border-color: #ce8257; }
+.sync-review-reason { grid-column: 1 / -1; color: #7c3c1b; margin: 0; font-size: 13px; }

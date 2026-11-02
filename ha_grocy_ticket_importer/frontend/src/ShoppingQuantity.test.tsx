@@ -1,0 +1,22 @@
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, expect, it, vi } from "vitest";
+import { ShoppingQuantity } from "./ShoppingQuantity";
+import * as api from "./api";
+import { renderWithClient } from "./test/helpers";
+vi.mock("./api", () => ({ setShoppingQuantity: vi.fn() }));
+beforeEach(() => vi.resetAllMocks());
+it("sets the requested kg quantity once and updates the cached row without waiting for Alexa", async () => {
+  vi.mocked(api.setShoppingQuantity).mockResolvedValue({ id: 4, amount: "2.75" });
+  const item = { id: 4, name: "Tomate", amount: 0.1, unit: "kg", done: false, product_id: 7, image_url: null };
+  const close = vi.fn();
+  const { client } = renderWithClient(<ShoppingQuantity item={item} onClose={close} />);
+  client.setQueryDefaults(["shopping"], { gcTime: Infinity });
+  client.setQueryData(["shopping"], { items: [item], pending_matches: [] });
+  const amount = screen.getByLabelText("Cantidad para comprar (kg)");
+  await userEvent.clear(amount); await userEvent.type(amount, "2.75");
+  await userEvent.dblClick(screen.getByRole("button", { name: "Guardar cantidad" }));
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(api.setShoppingQuantity).toHaveBeenCalledExactlyOnceWith(item, "2.75", expect.any(String));
+  expect(client.getQueryData<{ items: { amount: number }[] }>(["shopping"])!.items[0].amount).toBe(2.75);
+});

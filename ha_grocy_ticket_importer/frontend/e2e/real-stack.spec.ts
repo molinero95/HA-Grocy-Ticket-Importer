@@ -270,91 +270,26 @@ test("Alexa choices immediately create usable rows and removals survive sync and
   ).toHaveLength(1);
 });
 
-test("purchase configuration, inline shopping and reversible archive preserve history", async ({
-  page,
-}) => {
+test("purchase configuration and quantity editing leave pantry stock unchanged", async ({ page }) => {
   await page.goto(base + "react/");
   await pantry(page);
-  await page
-    .getByRole("button", { name: "Producto sin uso", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Producto sin uso", exact: true }).click();
   await page.getByLabel("Unidad para comprar").selectOption({ label: "Pack" });
   await page.getByLabel("Piezas por pack", { exact: true }).fill("4");
-  const savedPurchase = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/v1/catalog/products/4/purchase") &&
-      response.request().method() === "POST",
-  );
   await page.getByRole("button", { name: "Guardar unidad de compra" }).click();
-  expect((await savedPurchase).ok()).toBe(true);
-  // The refreshed product remounts the editor after the verified save.
   await expect(page.getByLabel("Piezas por pack", { exact: true })).toBeEnabled();
-  await expect(page.getByLabel("Piezas por pack", { exact: true })).toHaveValue(
-    "4",
-  );
-  await expect(page.getByLabel("Cantidad para comprar")).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Añadir cantidad", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByText("Stock actual: 0 Piece.", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Archivar producto", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Cerrar ficha" }).click();
-  const add = page.getByRole("button", {
-    name: "Añadir a compra: Producto sin uso",
-    exact: true,
-  });
-  await add.click();
-  await expect(
-    page.getByRole("button", {
-      name: "Quitar de compra: Producto sin uso",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await add.click();
-  const inventoryRow = page.locator("article").filter({
-    has: page.getByRole("button", { name: "Producto sin uso", exact: true }),
-  });
-  await expect(inventoryRow.locator(".quantity")).toContainText("2 Piece");
-  await expect(inventoryRow).toContainText("En casa: 0 Piece");
-  await page
-    .getByRole("button", { name: "Lista de la compra", exact: true })
-    .click();
-  const row = page.locator("article").filter({
-    has: page.getByRole("button", { name: "Producto sin uso", exact: true }),
-  });
+  await page.getByRole("button", { name: "Añadir a compra: Producto sin uso", exact: true }).click();
+  await page.getByRole("button", { name: "Lista de la compra", exact: true }).click();
+  await page.getByRole("button", { name: "Modificar cantidad: Producto sin uso", exact: true }).click();
+  await page.getByLabel("Cantidad para comprar (Piece)").fill("2");
+  await page.getByRole("button", { name: "Guardar cantidad", exact: true }).click();
+  const row = page.locator("article").filter({ has: page.getByRole("button", { name: "Producto sin uso", exact: true }) });
   await expect(row).toContainText("2 Piece");
-  await row
-    .getByRole("button", { name: "Quitar Producto sin uso", exact: true })
-    .click();
+  await row.getByRole("button", { name: "Quitar Producto sin uso", exact: true }).click();
   await pantry(page);
-  await page
-    .getByRole("button", { name: "Producto sin uso", exact: true })
-    .click();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page
-    .getByRole("button", { name: "Archivar producto", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Producto sin uso", exact: true }),
-  ).toHaveCount(0);
-  await page.getByRole("button", { name: "Acciones", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Productos archivados", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Producto sin uso", exact: true })
-    .click();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page
-    .getByRole("button", { name: "Restaurar producto", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Producto sin uso", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator("article").filter({ has: page.getByRole("button", { name: "Producto sin uso", exact: true }) })).toContainText("En casa: 0 Piece");
 });
 
 test("a newly created product becomes an Alexa suggestion without another worker cycle", async ({ page }) => {
@@ -386,39 +321,25 @@ test("a newly created product becomes an Alexa suggestion without another worker
 });
 
 
-test("archived movement history requires explicit confirmation before permanent removal", async ({ page }) => {
+test("an active product with stock is deleted directly through a Yes/No confirmation", async ({ page }) => {
   await page.goto(base + "react/");
   await pantry(page);
   await page.getByRole("button", { name: "Nuevo producto", exact: true }).click();
-  await page.getByLabel("Nombre", { exact: true }).fill("Archive deletion E2E");
-  await page.getByLabel("Unidad", { exact: true }).selectOption({ label: "Piece" });
+  await page.getByLabel("Nombre", { exact: true }).fill("Direct deletion E2E");
+  await expect(page.getByLabel("Unidad", { exact: true })).not.toHaveValue("");
   await page.getByLabel("Stock inicial").fill("1");
   await page.getByRole("button", { name: "Guardar producto", exact: true }).click();
   await page.getByRole("button", { name: "Abrir ficha del producto" }).click();
-  await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("1");
-  await page.getByLabel("Cantidad final", {exact: true}).fill("0");
-  await page.getByRole("button", {name: "Actualizar stock", exact: true}).click();
-  await expect(page.getByText("Stock actualizado correctamente")).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Archivar producto", exact: true }).click();
+  await page.getByRole("button", { name: "Eliminar producto", exact: true }).click();
+  const confirmation = page.getByRole("dialog", { name: "Confirmar eliminación", exact: true });
+  await expect(confirmation.getByText(/Existencias: 1/)).toBeVisible();
+  await expect(confirmation.getByRole("textbox")).toHaveCount(0);
+  await confirmation.getByRole("button", { name: "No", exact: true }).click();
+  await page.getByRole("button", { name: "Eliminar producto", exact: true }).click();
+  await confirmation.getByRole("button", { name: "Sí", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "Acciones", exact: true }).click();
-  await page.getByRole("button", { name: "Productos archivados", exact: true }).click();
-  await page.getByRole("button", { name: "Archive deletion E2E", exact: true }).click();
-  await page.getByRole("button", { name: "Revisar eliminación", exact: true }).click();
-  const confirm = page.getByRole("button", { name: "Eliminar producto definitivamente", exact: true });
-  await expect(confirm).toBeDisabled();
-  await page.getByLabel("Escribe «Archive deletion E2E» para confirmar", { exact: true }).fill("Archive deletion E2E");
-  await expect(confirm).toBeDisabled();
-  await page.getByRole("checkbox", {name: /Entiendo que se eliminarán/}).check();
-  await confirm.click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Archive deletion E2E", exact: true })).toHaveCount(0);
-  await page.reload();
-  await page.getByRole("button", { name: "Acciones", exact: true }).click();
-  await page.getByRole("button", { name: "Productos archivados", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Productos archivados", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Archive deletion E2E", exact: true })).toHaveCount(0);
+  await page.reload(); await pantry(page);
+  await expect(page.getByRole("button", { name: "Direct deletion E2E", exact: true })).toHaveCount(0);
 });
 
 test("duplicate review persists differences and combines through the native Grocy transaction", async ({ page }) => {

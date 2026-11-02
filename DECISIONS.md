@@ -83,3 +83,14 @@ Icono junto a la cámara: Todos los productos / Falta de stock / En la lista de 
 ## Búsqueda IA de imagen/código 1.16.0
 
 Alta con botón explícito a partir del nombre o del nombre de una foto reconocida sin código previo. Web search limitado a los tres catálogos Open Facts existentes; fuentes citadas y consultadas, GTIN con checksum y comprobación API exacta antes de mostrar. Hasta tres candidatos; el usuario revisa marca/variante/formato y elige. No aceptar URLs del modelo/cliente como imagen persistible ni sobrescribir códigos escaneados. La elección limpia la foto anterior y usa el guardado existente por código solo tras alta realmente nueva; sin coincidencias conserva la foto analizada/manual. Sin escrituras de catálogo/stock en la búsqueda, sin reintentos automáticos pagados y sin cambios a Amazon/Cloudflare.
+
+
+## Modelo de interacción 1.17.0 — 2026-11-02 (sustituye decisiones anteriores)
+
+Por petición explícita: retirar Archivar como acción nueva; eliminar desde la ficha con modal Sí/No, sin teclear nombre ni checkbox adicional. Mostrar existencias/historial; permitir su borrado directo en Grocy 4.7.1, preservando referencias activas, token de estado y journal. No ejecutar borrados de producción durante desarrollo.
+
+Los +/− de Mi despensa ajustan stock, agrupando pulsaciones rápidas y conservando precisión de pesos. La compra usa un botón Modificar cantidad y valor absoluto en su propia lista; no espera a Alexa. Mantener carrito para añadir y filtros existentes. Mejorar candidatos de duplicados por palabras/formatos/erratas sin fusionar automáticamente.
+
+Retirar interfaz de foto para IA; buscar imagen por nombre cuando el código no tenga resultados, sin reemplazar un código escaneado. Selección de imagen firmada y guardado solo tras alta nueva; fotos manuales de ficha se mantienen. Piece es la unidad inicial por nombre, nunca por ID fijo; respetar la selección del usuario.
+
+Los avisos de sincronización deben mostrar detalles saneados y fechas, con artículos revisables arriba y color/texto distinto. Un problema de conexión global no identifica por sí mismo una fila culpable; no inventar afectados.
