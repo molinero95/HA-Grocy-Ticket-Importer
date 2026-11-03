@@ -451,3 +451,119 @@ class RealStackTests(unittest.TestCase):
         description = self.instance.http('GET', f'objects/products/{pid}')['description']
         self.assertIn('Notas conservadas', description)
         for entity, before in stock.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)
+
+    def test_resolved_merge_converts_real_lots_prices_references_and_final_stock(self):
+        from decimal import Decimal
+        import barcode_stock
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        for index, (source_unit, target_unit, sf, tf, final_stock) in enumerate([
+                ('Kilogram', 'Piece', '2', '1', '6'),
+                ('Piece', 'Kilogram', '1', '3', '2'),
+                ('Kilogram', 'Piece', '2', '1', '0'),
+                ('Pack', 'Piece', '5', '1', '9.5')]):
+            with self.subTest(index=index):
+                source_name, target_name = f'Resolved source {index}', f'Resolved target {index}'
+                source = barcode_stock.create_catalog_product(source_name, unit_id=units[source_unit])['product_id']
+                target = barcode_stock.create_catalog_product(target_name, unit_id=units[target_unit])['product_id']
+                if source_unit == 'Pack':
+                    self.instance.http('PUT', f'objects/products/{source}', {field: units['Pack'] for field in ('qu_id_stock', 'qu_id_purchase', 'qu_id_consume', 'qu_id_price')})
+                for pid, amount, price in [(source, 1.5, 8), (target, 2, 6)]:
+                    self.instance.http('POST', f'stock/products/{pid}/add', {'amount': amount, 'price': price, 'best_before_date': '2999-12-31', 'location_id': 2, 'note': 'Original cost and note'})
+                shopping_id = self.instance.http('POST', 'objects/shopping_list', {'shopping_list_id': 1, 'product_id': source, 'amount': 2, 'note': 'Keep weighted reference'})['created_object_id']
+                recipe = self.instance.http('POST', 'objects/recipes', {'name': f'Resolved recipe {index}'})['created_object_id']
+                self.instance.http('POST', 'objects/recipes_pos', {'recipe_id': recipe, 'product_id': source, 'amount': 1, 'qu_id': units[source_unit]})
+                self.instance.http('POST', 'objects/meal_plan', {'day': '2026-11-03', 'type': 'product', 'product_id': source, 'product_amount': 1})
+                before = {name: [row for row in self.instance.http('GET', 'objects/' + name) if row.get('product_id') in (source, target)] for name in ('stock', 'stock_log', 'shopping_list', 'meal_plan', 'recipes_pos')}
+                body = {'source_id': source, 'target_id': target, 'resolution': {'final_name': target_name+' final', 'unit_id': units['Piece'], 'purchase_unit_id': units['Piece'], 'pack_size': '1', 'source_factor': sf, 'target_factor': tf, 'final_stock': final_stock}}
+                preview = self.client.post('/api/v1/catalog/merge-resolution-preview', json=body, headers=self.headers)
+                self.assertEqual(preview.status_code, 200, preview.json)
+                self.assertTrue(preview.json['can_merge'], preview.json)
+                payload = {**body, 'expected_source': source_name, 'expected_target': target_name, 'confirmation': body['resolution']['final_name'], 'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
+                for _ in range(2):
+                    response = self.client.post('/api/v1/catalog/products/merge-resolved', json=payload, headers=self.headers)
+                    self.assertEqual(response.status_code, 200, response.json)
+                self.assertEqual(float(self.instance.http('GET', f'stock/products/{target}')['stock_amount']), float(final_stock))
+                self.assertFalse(any(p['id'] == source for p in self.instance.http('GET', 'objects/products')))
+                for name, rows in before.items():
+                    if name == 'stock': continue  # Explicit final correction may consume old lots.
+                    after = {row['id']: row for row in self.instance.http('GET', 'objects/' + name)}
+                    for row in rows:
+                        if name == 'recipes_pos' and row['recipe_id'] != recipe: continue
+                        saved = after[row['id']]
+                        factor = Decimal(sf if row['product_id'] == source else tf)
+                        self.assertEqual(saved['product_id'], target)
+                        for field in ('amount', 'product_amount', 'price', 'note'):
+                            if row.get(field) is None: continue
+                            if field == 'note': self.assertEqual(saved[field], row[field]); continue
+                            expected = Decimal(str(row[field])) / factor if field == 'price' else Decimal(str(row[field])) * factor
+                            self.assertAlmostEqual(float(saved[field]), float(expected), places=7, msg=(name, field))
+                self.instance.http('DELETE', f'objects/shopping_list/{shopping_id}')
+
+    def test_resolved_merge_unifies_pack_factors_and_rejects_stale_preview_without_writes(self):
+        import barcode_stock
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        source = barcode_stock.create_catalog_product('Resolved Pack source', unit_id=units['Pack'], initial_stock='1', pack_size='4')['product_id']
+        target = barcode_stock.create_catalog_product('Resolved Pack target', unit_id=units['Pack'], initial_stock='1', pack_size='6')['product_id']
+        body = {'source_id': source, 'target_id': target, 'resolution': {'final_name': 'Resolved final pack', 'unit_id': units['Piece'], 'purchase_unit_id': units['Pack'], 'pack_size': '8', 'source_factor': '1', 'target_factor': '1', 'final_stock': '10'}}
+        preview = self.client.post('/api/v1/catalog/merge-resolution-preview', json=body, headers=self.headers)
+        self.assertEqual(preview.status_code, 200, preview.json)
+        self.assertTrue(preview.json['can_merge'], preview.json)
+        payload = {**body, 'expected_source': 'Resolved Pack source', 'expected_target': 'Resolved Pack target', 'confirmation': 'Resolved final pack', 'token': preview.json['token'], 'operation_id': str(uuid.uuid4())}
+        self.instance.http('PUT', f'objects/products/{target}', {'description': 'Changed since preview'})
+        before = {name: self.instance.http('GET', 'objects/'+name) for name in ('products', 'stock', 'stock_log', 'quantity_unit_conversions')}
+        response = self.client.post('/api/v1/catalog/products/merge-resolved', json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 409, response.json)
+        for name, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/'+name), rows)
+        preview = self.client.post('/api/v1/catalog/merge-resolution-preview', json=body, headers=self.headers)
+        payload.update(token=preview.json['token'], operation_id=str(uuid.uuid4()))
+        response = self.client.post('/api/v1/catalog/products/merge-resolved', json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        product = self.instance.http('GET', f'objects/products/{target}')
+        self.assertEqual(product['description'], 'Changed since preview')
+        conversions = self.instance.http('GET', 'objects/quantity_unit_conversions_resolved')
+        found = [row for row in conversions if row['product_id'] == target and row['from_qu_id'] == units['Pack'] and row['to_qu_id'] == units['Piece']]
+        self.assertEqual(len(found), 1); self.assertEqual(found[0]['factor'], 8)
+
+    def test_receipt_alias_management_keeps_real_stock_and_imported_ledger(self):
+        import importer
+        import sqlite3
+        from receipt_review import remember, mappings
+        products = self.client.get('/api/v1/receipt-aliases').json['products']
+        first, second = products[:2]
+        with sqlite3.connect(importer.DB_PATH) as db:
+            remember(db, 'Local shop A', {'name': 'OLD TICKET TEXT', 'remember_product': True, 'stock_unit': first['stock_unit'], 'pieces_per_pack': first['pieces_per_pack']}, first['id'])
+            remember(db, 'Local shop B', {'name': 'OLD TICKET TEXT', 'remember_product': True, 'stock_unit': first['stock_unit'], 'pieces_per_pack': first['pieces_per_pack']}, first['id'])
+        before = {name: self.instance.http('GET', 'objects/'+name) for name in ('products', 'stock', 'stock_log')}
+        row = next(row for row in self.client.get('/api/v1/receipt-aliases').json['aliases'] if row['merchant'] == 'local shop a')
+        payload = {'expected': row, 'merchant': row['merchant'], 'source_name': 'CORRECTED TEXT', 'product_id': second['id']}
+        self.assertEqual(self.client.put('/api/v1/receipt-aliases', json=payload, headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.put('/api/v1/receipt-aliases', json=payload, headers=self.headers).status_code, 409)
+        self.assertEqual(mappings(importer.DB_PATH, 'Local shop A')['corrected text']['product_id'], second['id'])
+        self.assertEqual(mappings(importer.DB_PATH, 'Local shop B')['old ticket text']['product_id'], first['id'])
+        row = next(row for row in self.client.get('/api/v1/receipt-aliases').json['aliases'] if row['merchant'] == 'local shop a')
+        self.assertEqual(self.client.delete('/api/v1/receipt-aliases', json={'expected': row}, headers=self.headers).status_code, 200)
+        for name, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/'+name), rows)
+
+    def test_receipt_direct_addition_binds_current_stock_preserves_cost_and_repeats_once(self):
+        import barcode_stock
+        units = {u['name']: u['id'] for u in self.instance.http('GET', 'objects/quantity_units')}
+        pid = barcode_stock.create_catalog_product('Direct receipt canonical', unit_id=units['Pack'], initial_stock='1', pack_size='5')['product_id']
+        uploaded = self.client.post('/api/v1/receipts', data={'ticket': (io.BytesIO(b'direct-addition-disposable-ticket'), 'direct.pdf')}, headers=self.headers)
+        self.assertEqual(uploaded.status_code, 201, uploaded.json)
+        rid = uploaded.json['receipt_id']
+        context = self.client.get(f'/api/v1/receipts/{rid}/review-context').json
+        product = next(row for row in context['products'] if row['id'] == pid)
+        self.assertEqual(float(product['current_stock']), 5)
+        item = {'name': 'Different merchant text', 'purchase_units': '2', 'pieces_per_pack': 5, 'stock_unit': 'piece', 'product_mode': 'existing', 'product_id': pid, 'stock_to_add': '3', 'expected_stock': product['current_stock'], 'remember_product': False}
+        preview = self.client.post(f'/api/v1/receipts/{rid}/preview', json={'items': [item]}, headers=self.headers)
+        self.assertEqual(preview.status_code, 200, preview.json)
+        self.assertTrue(preview.json['ready_to_commit'], preview.json)
+        self.assertIn('3 Piece', preview.json['preview'])
+        committed = self.client.post(f'/api/v1/receipts/{rid}/commit', headers=self.headers)
+        self.assertEqual(committed.status_code, 200, committed.json)
+        self.assertEqual(float(self.instance.http('GET', f'stock/products/{pid}')['stock_amount']), 8)
+        history = [row for row in self.instance.http('GET', 'objects/stock_log') if row['product_id'] == pid]
+        purchase = history[-1]
+        self.assertEqual(float(purchase['amount']), 3);self.assertEqual(float(purchase['price']), 2)
+        self.assertEqual(self.client.post(f'/api/v1/receipts/{rid}/commit', headers=self.headers).status_code, 403)
+        self.assertEqual([row for row in self.instance.http('GET', 'objects/stock_log') if row['product_id'] == pid], history)

@@ -168,7 +168,7 @@ export function Inventory() {
                   {item.name}
                 </button>
                 <small>
-                  En casa: {item.amount} {item.unit}
+                  En casa: {item.amount.trim() !== "" && Number.isFinite(Number(item.amount)) ? Number(Number(item.amount).toFixed(3)) : item.amount} {item.unit}
                 </small>
                 {isLowStock(item) && (
                   <span className="stock-status">{Number(item.amount) <= 0 ? "Sin existencias" : "Stock bajo"}</span>

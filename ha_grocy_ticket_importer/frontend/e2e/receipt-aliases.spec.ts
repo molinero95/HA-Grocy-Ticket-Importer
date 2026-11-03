@@ -1,0 +1,77 @@
+import { expect, test } from "@playwright/test";
+const base = "http://127.0.0.1:8766/api/hassio_ingress/browser-test/react/";
+test("receipt aliases show merchant memory, edit and delete with mobile confirmation", async ({ page }, info) => {
+  let aliases = [
+    { merchant: "supermercado uno", source_name: "LECHE ENT", product_id: 7, stock_unit: "piece", pieces_per_pack: 1, stale: false },
+    { merchant: "supermercado dos", source_name: "LECHE ENT", product_id: 999, stock_unit: "piece", pieces_per_pack: 6, stale: true },
+  ];
+  let writes = 0;
+  await page.route("**/api/v1/receipt-aliases", async route => {
+    const method = route.request().method();
+    if (method !== "GET") {
+      writes++; const body = route.request().postDataJSON();
+      expect(body.expected.merchant).toBe("supermercado uno");
+      if (method === "PUT") aliases[0] = { ...aliases[0], ...body, product_id: body.product_id, stock_unit: "kg", pieces_per_pack: 1 };
+      else aliases = aliases.filter(row => row.merchant !== body.expected.merchant);
+      return route.fulfill({ json: { saved: true } });
+    }
+    return route.fulfill({ json: { aliases, products: [{ id: 7, name: "Leche entera", stock_unit: "piece", pieces_per_pack: 1 }, { id: 8, name: "Tomate con nombre largo para revisar correctamente en móvil", stock_unit: "kg", pieces_per_pack: 1 }] } });
+  });
+  await page.goto(base);
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Administrar alias de tickets" }).click();
+  await expect(page.getByText("2 de 2 asociaciones")).toBeVisible();
+  await expect(page.getByText("Revisar: producto ausente o unidades modificadas")).toBeVisible();
+  for (const width of [320, 390, 1024]) {
+    await page.setViewportSize({ width, height: 850 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByLabel("Producto para LECHE ENT (supermercado uno)")).toBeVisible();
+  }
+  await page.setViewportSize({ width: 390, height: 850 });
+  await page.screenshot({ path: info.outputPath("receipt-aliases-mobile.png"), fullPage: true });
+  await page.getByRole("searchbox").fill("leche entera");
+  await expect(page.getByText("1 de 2 asociaciones")).toBeVisible();expect(writes).toBe(0);
+  await page.getByRole("searchbox").fill("");
+  await page.getByLabel("Producto para LECHE ENT (supermercado uno)").selectOption("8");
+  await page.getByRole("button", { name: "Guardar LECHE ENT (supermercado uno)" }).click();
+  await expect(page.getByText("Asociación de ticket actualizada")).toBeVisible();
+  await page.getByRole("button", { name: "Eliminar LECHE ENT (supermercado uno)" }).click();
+  expect(writes).toBe(1);
+  await page.getByRole("button", { name: "Sí, eliminar" }).click();
+  await expect(page.getByText("1 de 1 asociaciones")).toBeVisible();expect(writes).toBe(2);
+});
+
+test("receipt suggestions keep a manual choice, show direct addition and allow empty pack edits", async ({ page }, info) => {
+  let previews = 0, commits = 0;
+  const products = [{ id: 41, name: "Yogur natural", stock_unit: "piece", pieces_per_pack: 6, current_stock: "5" }, { id: 42, name: "Arroz", stock_unit: "piece", pieces_per_pack: 1, current_stock: "0" }];
+  await page.route("**/api/v1/receipts", route => route.fulfill({ status: 201, json: { receipt_id: "ticket-review", receipt: { items: [{ name: "YOG NAT", quantity: 2, pieces_per_pack: 5 }] } } }));
+  await page.route("**/api/v1/receipts/ticket-review/review-context", route => route.fulfill({ json: { products, mappings: {}, line_suggestions: [[41]] } }));
+  await page.route("**/api/v1/receipts/ticket-review/preview", route => {
+    previews++;const row = route.request().postDataJSON().items[0];
+    expect(row.stock_to_add).toBe("3");expect(row.expected_stock).toBe("5");expect(row.pieces_per_pack).toBe(6);
+    return route.fulfill({ json: { ready_to_commit: true, preview: "3 Piece; final 8 Piece" } });
+  });
+  await page.route("**/api/v1/receipts/ticket-review/commit", route => { commits++;return route.fulfill({ json: { status: "ok" } }); });
+  await page.goto(base);
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Escanear ticket", exact: true }).click();
+  await page.getByLabel("Foto o PDF del ticket").setInputFiles({ name: "review.pdf", mimeType: "application/pdf", buffer: Buffer.from("disposable receipt UI") });
+  const selector = page.getByLabel("Producto de Despensa");
+  await expect(selector).toHaveValue("auto");
+  await expect(page.locator('optgroup[label="Sugeridos por parecido"] option')).toHaveText("Yogur natural");
+  await selector.selectOption("41");
+  await expect(page.getByLabel("Piezas por envase")).toHaveCount(0);
+  await page.getByLabel("Cantidad a añadir", { exact: true }).fill("3");
+  await expect(page.getByLabel("Cantidad final calculada")).toHaveValue("8");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("receipt-direct-addition-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Simular importación" }).click();
+  await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toBeVisible();
+  expect(previews).toBe(1);expect(commits).toBe(0);
+  await selector.selectOption("new");
+  const pack = page.getByLabel("Piezas por envase");
+  await pack.fill("");await expect(pack).toHaveValue("");
+  await pack.fill("05");await expect(pack).toHaveValue("5");
+  await expect(page.getByLabel("Cantidad final calculada")).toHaveValue("10");
+  await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toHaveCount(0);
+});

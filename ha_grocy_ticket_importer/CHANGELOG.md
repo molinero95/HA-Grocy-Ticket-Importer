@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.23.0] — 2026-11-03
+
+### Added
+- Reviewed duplicate resolution: choose final units, explicit equivalence per product, purchase configuration, name, threshold and stock total. Preview converted quantities and inventory correction before a journaled native merge; preserve lots, historical costs and references, retain dependency guards and report interrupted phases without replay.
+- Receipt alias management in Actions: every merchant-scoped remembered association, search and merchant filter, guarded text/product edits and confirmed row deletion. Display stale product/unit bindings; preserve imported ledger and stock.
+- Similar-name receipt suggestions with the complete catalog and new-product option. For an explicitly selected product, edit the direct amount to add and see current and final stock including repeated lines. Bind additions to reviewed stock, preserve canonical purchase conversions and original line cost.
+
+### Fixed
+- Empty/edit receipt pack quantities without a forced leading zero.
+- Send whole pantry stock amounts without decimal padding and retain weighed-receipt precision in inventory reads.
+
+### Validation
+- Local: 397 Python, 135 Vitest with coverage, TypeScript/Vite build, 21 real Grocy contracts and 42 Chromium scenarios passed; mobile screenshots reviewed. Disposable Grocy 4.7.1 unit conversion, historical cost/reference preservation, final inventory, stale previews, receipt additions and alias isolation; authenticated/CSRF routes, unit/frontend regressions, mobile browser flows and final-head CI. No installed data or options changed.
+
 ## [1.22.0] — 2026-11-03
 
 ### Fixed

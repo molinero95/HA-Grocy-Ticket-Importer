@@ -65,3 +65,12 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.22.0 sustituye captura nativa por cámara web directa con fotograma completo/JPEG, vista previa y repetición local; probar permisos en teléfono real. Alias guardados y nombres pendientes en filas iniciales; asociaciones nuevas sustituyen duplicados en transacción. Interfaz y navegación de archivados retiradas, sin borrar datos automáticamente.
+
+
+## Mejoras 1.23.0
+
+- Combinación revisada con equivalencias, unidades, compra y stock final; guardas de referencias y fases parciales sin replay.
+- Alias de tickets visibles por supermercado con búsqueda, edición y eliminación de asociaciones, sin modificar ledger ni stock.
+- Ticket con cantidad directa a añadir y stock final para productos existentes, sugerencias de nombres y creación alternativa; campo envase sin ceros forzados.
+- Stock rápido sin decimales de relleno y sin truncar la precisión usada como estado esperado.
+- Validación aislada y CI final documentadas en la PR; aceptación de actualización real sigue pendiente del usuario.

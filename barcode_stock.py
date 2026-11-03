@@ -97,7 +97,7 @@ def inventory_snapshot(include_archived=False, *, read=None):
             "id": pid,
             "name": str(product["name"]),
             "image_url": saved_photo(product),
-            "amount": format(quantity.quantize(Decimal("0.01")), "f").rstrip("0").rstrip(".") if quantity else "0",
+            "amount": format(quantity.normalize(), "f") if quantity else "0",
             "unit": units.get(int(product.get("qu_id_stock") or 0), "ud. stock"),
         })
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"]))

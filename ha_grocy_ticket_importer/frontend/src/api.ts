@@ -299,14 +299,18 @@ export type ReceiptReviewItem = {
   product_id?: number | null;
   remember_product?: boolean;
   unit_confirmed?: boolean;
+  stock_to_add?: string;
+  expected_stock?: string;
 };
 export type ReceiptReviewProduct = {
+  current_stock?: string;
   id: number;
   name: string;
   stock_unit: "piece" | "kg";
   pieces_per_pack: number;
 };
 export type ReceiptReviewContext = {
+  line_suggestions?: number[][];
   products: ReceiptReviewProduct[];
   line_mappings?: ({ stale?: boolean; product_id: number; stock_unit: "piece" | "kg"; pieces_per_pack: number } | null)[];
   mappings: Record<
@@ -472,3 +476,30 @@ export const setShoppingQuantity = (item: import("./types").ShoppingItem, amount
   });
 
 export const saveNameDiscoveredPhoto = (id: number, token: string, replace?: boolean) => request<{ saved: boolean; image_url?: string; preserved?: boolean }>("catalog/products/" + id + "/photo-discovery", "POST", { token, ...(replace !== undefined ? { replace } : {}) });
+
+export type MergeResolution = {
+  final_name: string; unit_id: number; source_factor: string; target_factor: string;
+  purchase_unit_id: number; pack_size: string; final_stock: string; threshold_amount?: string;
+};
+export type MergeResolutionOptions = MergePreview & {
+  units: { id: number; name: string }[];
+  target_threshold: { amount: string; warning_enabled: boolean };
+};
+export type ResolvedMergePreview = MergePreview & {
+  resolution: MergeResolution; combined_stock: string; stock_correction: string; unit_name: string;
+};
+export const getMergeResolutionOptions = (sourceId: number, targetId: number) => request<MergeResolutionOptions>(
+  "catalog/merge-resolution?" + new URLSearchParams({ source_id: String(sourceId), target_id: String(targetId) }),
+);
+export const previewMergeResolution = (sourceId: number, targetId: number, resolution: MergeResolution) =>
+  request<ResolvedMergePreview>("catalog/merge-resolution-preview", "POST", { source_id: sourceId, target_id: targetId, resolution });
+export const commitResolvedMerge = (review: ResolvedMergePreview, confirmation: string, operationId: string) =>
+  request("catalog/products/merge-resolved", "POST", { source_id: review.source.id, target_id: review.target.id,
+    expected_source: review.source.name, expected_target: review.target.name, resolution: review.resolution,
+    token: review.token, confirmation, operation_id: operationId });
+
+export type ReceiptAlias = { merchant: string; source_name: string; product_id: number; stock_unit: "piece" | "kg"; pieces_per_pack: number; stale?: boolean };
+export type ReceiptAliasCatalog = { aliases: ReceiptAlias[]; products: { id: number; name: string; stock_unit: "piece" | "kg"; pieces_per_pack: number }[] };
+export const getReceiptAliases = () => request<ReceiptAliasCatalog>("receipt-aliases");
+export const updateReceiptAlias = (expected: ReceiptAlias, value: { merchant: string; source_name: string; product_id: number }) => request("receipt-aliases", "PUT", { expected, ...value });
+export const deleteReceiptAlias = (expected: ReceiptAlias) => request("receipt-aliases", "DELETE", { expected });

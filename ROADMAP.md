@@ -152,3 +152,12 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [x] Todas las filas de alias conocidas visibles; al reasignar gana la nueva relación sin duplicados.
 - [x] Retirar vista/navegación/restauración de productos archivados.
 - [ ] Verificar permisos de la cámara directa en el teléfono real después de actualizar.
+
+
+## Mejoras 1.23.0
+
+- Combinación revisada con equivalencias, unidades, compra y stock final; guardas de referencias y fases parciales sin replay.
+- Alias de tickets visibles por supermercado con búsqueda, edición y eliminación de asociaciones, sin modificar ledger ni stock.
+- Ticket con cantidad directa a añadir y stock final para productos existentes, sugerencias de nombres y creación alternativa; campo envase sin ceros forzados.
+- Stock rápido sin decimales de relleno y sin truncar la precisión usada como estado esperado.
+- Validación aislada y CI final documentadas en la PR; aceptación de actualización real sigue pendiente del usuario.

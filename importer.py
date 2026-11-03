@@ -126,6 +126,17 @@ def main():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute('CREATE TABLE IF NOT EXISTS receipt_items (receipt_hash TEXT, line INTEGER, product_id INTEGER, state TEXT NOT NULL, detail TEXT, PRIMARY KEY(receipt_hash,line))')
         conn.commit()
+        # Check all starting totals before any product/stock write; already
+        # journaled lines remain idempotent even after their stock has changed.
+        starting_stock = {}
+        for index, item in enumerate(receipt['items']):
+            old = conn.execute('SELECT state FROM receipt_items WHERE receipt_hash=? AND line=?', (digest, index)).fetchone()
+            if item.get('stock_to_add') is None or old and old[0] in ('imported', 'pending', 'expense'): continue
+            pid = item['product_id']
+            if pid not in starting_stock:
+                starting_stock[pid] = dec(grocy('GET', f'stock/products/{pid}')['stock_amount'])
+            if starting_stock[pid] != dec(item['expected_stock']):
+                raise ValueError('El stock ha cambiado. Actualiza el catálogo y revisa el ticket antes de importar')
         for i, item in enumerate(receipt['items']):
             name = item['name'].strip()
             old = conn.execute('SELECT state FROM receipt_items WHERE receipt_hash=? AND line=?', (digest, i)).fetchone()
@@ -178,9 +189,10 @@ def main():
                 print(f'[{i+1}] REVIEW {name}: {reason}')
                 continue
             existing = len(matches) == 1
-            stock_amount = purchased * pieces if unit == piece_id else purchased
+            stock_amount = dec(item['stock_to_add']) if item.get('stock_to_add') is not None else purchased * pieces if unit == piece_id else purchased
             identity = f'existing id={matches[0]["id"]}' if existing else 'NEW'
-            print(f'[{i+1}] {"WOULD IMPORT" if args.dry_run else "IMPORT"} {name}: {stock_amount} {units[unit]} ({purchased} purchases × {pieces}) ({identity})')
+            final_info = f' | stock {starting_stock[item["product_id"]]} + {stock_amount}' if item.get('stock_to_add') is not None else ''
+            print(f'[{i+1}] {"WOULD IMPORT" if args.dry_run else "IMPORT"} {name}: {stock_amount} {units[unit]} ({purchased} purchases × {pieces}) ({identity}){final_info}')
             if args.dry_run:
                 continue
             if existing:

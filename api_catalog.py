@@ -326,6 +326,63 @@ def register_catalog_routes(app, barcode_stock, lock):
             return jsonify({"error": "catalog_audit_unavailable"}), 503
 
 
+    @app.get('/api/v1/catalog/merge-resolution')
+    def api_v1_merge_resolution_options():
+        from merge_resolution import options
+        try:
+            return jsonify(options(int(request.args.get('source_id', '0')), int(request.args.get('target_id', '0'))))
+        except (ValueError, TypeError, barcode_stock.BarcodeError):
+            return jsonify({'error': 'Selecciona dos productos y actualiza la revisión'}), 400
+        except Exception:
+            return jsonify({'error': 'No se pudieron verificar las unidades y referencias de Grocy'}), 503
+
+    @app.post('/api/v1/catalog/merge-resolution-preview')
+    def api_v1_merge_resolution_preview():
+        from merge_resolution import review
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or any(type(payload.get(key)) is not int or payload[key] <= 0 for key in ('source_id', 'target_id')):
+            return jsonify({'error': 'Revisa los productos y la información final'}), 400
+        try:
+            return jsonify(review(payload['source_id'], payload['target_id'], payload.get('resolution')))
+        except (ValueError, TypeError, barcode_stock.BarcodeError) as exc:
+            return jsonify({'error': str(exc)}), 400
+        except Exception:
+            return jsonify({'error': 'No se pudieron verificar las unidades y referencias de Grocy'}), 503
+
+    @app.post('/api/v1/catalog/products/merge-resolved')
+    def api_v1_merge_resolved():
+        import re
+        from merge_resolution import commit, PartialMerge
+        from shopping_match_queue import mutation_lock, DEFAULT_PATH
+        from stock_commands import execute_once, CommandConflict
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or any(type(payload.get(key)) is not int or payload[key] <= 0 for key in ('source_id', 'target_id'))
+                or payload['source_id'] == payload['target_id'] or not isinstance(payload.get('resolution'), dict)
+                or any(not isinstance(payload.get(key), str) or not payload[key] for key in ('expected_source', 'expected_target'))
+                or payload.get('confirmation') != payload['resolution'].get('final_name')
+                or not isinstance(payload.get('token'), str) or not re.fullmatch('[a-f0-9]{64}', payload['token'])):
+            return jsonify({'error': 'Revisa el resultado y escribe su nombre final para confirmar'}), 400
+        if not lock.acquire(blocking=False): return jsonify({'error': 'operation_in_progress'}), 409
+        try:
+            with mutation_lock(DEFAULT_PATH, blocking=False):
+                def change():
+                    try:
+                        result = commit(payload['source_id'], payload['target_id'], payload['expected_source'], payload['expected_target'], payload['resolution'], payload['token'])
+                        return {'status': 200, 'body': result}
+                    except barcode_stock.BarcodeError as exc:
+                        return {'status': 409, 'body': {'error': str(exc)}}
+                result = execute_once(payload.get('operation_id'), {**payload, 'command': 'merge_resolution'}, change)
+            return jsonify(result['body']), result['status']
+        except BlockingIOError:
+            return jsonify({'error': 'operation_in_progress'}), 409
+        except CommandConflict:
+            return jsonify({'error': 'La combinación no se ha reenviado. Comprueba ambos productos y el stock en Grocy.'}), 409
+        except PartialMerge as exc:
+            return jsonify({'error': str(exc), 'stage': exc.stage}), 502
+        except Exception:
+            return jsonify({'error': 'No se pudo confirmar la operación. Comprueba ambos productos y el stock en Grocy.'}), 502
+        finally: lock.release()
+
     @app.get("/api/v1/catalog/merge-preview")
     def api_v1_catalog_merge_preview():
         from merge_audit import merge_preview

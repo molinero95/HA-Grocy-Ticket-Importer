@@ -21,7 +21,7 @@ def _rows(collection):
     return rows
 
 
-def _audit(source_id, target_id):
+def _audit(source_id, target_id, *, allow_unit_resolution=False):
     source_id, target_id = int(source_id), int(target_id)
     if source_id <= 0 or target_id <= 0 or source_id == target_id:
         raise barcode_stock.BarcodeError('Selecciona dos productos distintos')
@@ -35,7 +35,7 @@ def _audit(source_id, target_id):
     if not all(is_active(p) for p in (source, target)):
         blockers.append('Ambos productos deben estar activos')
     for field in ('qu_id_stock', 'qu_id_purchase', 'qu_id_consume', 'qu_id_price'):
-        if str(source.get(field)) != str(target.get(field)):
+        if not allow_unit_resolution and str(source.get(field)) != str(target.get(field)):
             blockers.append('Las unidades de stock, compra, consumo o precio son distintas')
             break
     # Keep local identities stable; choosing the referenced product as destination
@@ -69,14 +69,14 @@ def _audit(source_id, target_id):
     snapshot['resolved'] = [row for row in resolved if str(row['product_id']) in (str(source_id), str(target_id))]
     for row in snapshot['resolved']:
         if str(row['from_qu_id']) == str(source['qu_id_stock']) and str(row['to_qu_id']) == str(target['qu_id_stock']):
-            if Decimal(str(row['factor'])) != 1:
+            if not allow_unit_resolution and Decimal(str(row['factor'])) != 1:
                 blockers.append('La conversión efectiva entre las unidades debe ser 1')
     factors = {}
     for row in snapshot['quantity_unit_conversions']:
         edge = (int(row['from_qu_id']), int(row['to_qu_id']))
         factor = Decimal(str(row['factor']))
         if not factor.is_finite() or factor <= 0: raise ValueError('Conversión no válida')
-        if edge in factors and factors[edge] != factor:
+        if not allow_unit_resolution and edge in factors and factors[edge] != factor:
             blockers.append('Las conversiones de unidades tienen factores incompatibles')
         factors[edge] = factor
         if edge[0] == edge[1] and factor != 1:

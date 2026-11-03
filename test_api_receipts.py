@@ -116,7 +116,7 @@ class ReceiptSafetyTests(unittest.TestCase):
         self.assertEqual(self.client.get(url).status_code, 404)
         self.authorize()
         reads = {'objects/products': [{'id': 17, 'name': 'Arroz largo', 'qu_id_stock': 2}],
-                 'objects/quantity_units': [{'id': 2, 'name': 'Piece'}], 'objects/quantity_unit_conversions': []}
+                 'objects/quantity_units': [{'id': 2, 'name': 'Piece'}], 'objects/quantity_unit_conversions': [], 'stock': []}
         with patch('api_receipts.importer.grocy', side_effect=lambda method, route: reads[route]) as remote, patch('api_receipts.mappings', return_value={'arroz': {'product_id': 17, 'stock_unit': 'kg', 'pieces_per_pack': 1}}):
             result = self.client.get(url)
         self.assertEqual(result.status_code, 200, result.json)

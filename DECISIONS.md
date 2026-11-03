@@ -125,3 +125,14 @@ El selector nativo no abrió la cámara en el teléfono del usuario. Sustituirlo
 Mostrar todas las filas guardadas y nombres pendientes conocidos. Por petición explícita, gana la nueva asociación de un alias: upsert por clave normalizada y sustitución de destino en transacción; mantener guardas de origen esperado/borrado obsoleto y los demás productos. Pendientes se pueden ocultar en la vista sin eliminar datos de Alexa.
 
 Retirar Productos archivados de toda la interfaz y navegación: el usuario indica que ya ha eliminado todos. Mantener solo compatibilidad/guardas de backend; no realizar limpieza de datos de producción.
+
+
+## Revisión explícita 1.23.0 — 2026-11-03
+
+Solicitud del usuario: resolver unidades/stock en combinación mediante datos finales. Mantener combinación directa; modo adicional con equivalencias explícitas, unidad y compra finales, nombre, cantidad total y umbral visual. Normalizar con triggers nativos 4.7.1 antes de merge para convertir precios inversamente y conservar costes; reconstruir recetas derivadas mediante PUT del mismo product_amount del plan tras normalizar. Auditar referencias y totales entre fases, journal at-most-once, locks comunes, sin escritura SQL remota ni reintento incierto. Variantes, tickets y enlaces locales del origen siguen bloqueando; no inventar una migración distribuida. Una operación multifase puede quedar parcialmente aplicada y debe indicarlo.
+
+Solicitud posterior: ver y corregir lo recordado de tickets. Vista separada por supermercado/texto, búsqueda y filtro, edición de texto/producto con conversión actual, borrar asociación Sí/No. Guardas de fila esperada y colisión explícita; nunca borrar ledger/importaciones ni stock. Solo sugerencias futuras.
+
+Ticket: campo de envase como texto controlado mientras se edita; admite vacío sin introducir cero automáticamente. Al seleccionar producto existente sustituir ese campo por cantidad directa a añadir, stock actual y final agregado de sus líneas. Stock inicial esperado revisado y comprobado antes de cualquier escritura; coste total del ticket inalterado, conversión de compra actual conservada, precisión kg de tres decimales y piezas enteras. Sugerencias por parecido orientativas sin asociación automática; selector completo y crear nuevo siempre disponibles. No retirar la simulación/confirmación ni la deduplicación del ledger.
+
++/-: serializar enteros sin .000; lectura de inventario conserva milésimas para no truncar el stock esperado de tickets pesados. Mantener paso kg 0.1 y Piece 1.

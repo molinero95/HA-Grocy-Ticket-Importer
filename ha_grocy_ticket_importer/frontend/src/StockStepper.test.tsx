@@ -33,3 +33,10 @@ it("commits an already requested burst after navigation without making another s
   unmount();
   await waitFor(() => expect(api.adjustCatalogStock).toHaveBeenCalledOnce());
 });
+it("sends Piece totals as integers without adding decimal zeroes", async () => {
+  vi.mocked(api.adjustCatalogStock).mockResolvedValue({ before: "2.000", after: "3" });
+  renderWithClient(<StockStepper id={7} name="Leche" amount="2.000" unit="Piece" />);
+  await userEvent.click(screen.getByRole("button", { name: "Aumentar stock: Leche" }));
+  expect(screen.getByText("3 Piece")).toBeTruthy();
+  await waitFor(() => expect(api.adjustCatalogStock).toHaveBeenCalledExactlyOnceWith(7, "3", "2.000", expect.any(String), true));
+});
