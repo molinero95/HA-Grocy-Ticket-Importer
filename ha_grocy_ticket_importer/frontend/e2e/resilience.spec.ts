@@ -238,61 +238,17 @@ test("a saved suggestion immediately offers bought/remove controls, including af
   expect(counts).toEqual({ choose: 1, toggle: 1, remove: 1 });
 });
 
-test("archives live in Actions without a duplicate product-creation shortcut", async ({
-  page,
-}, testInfo) => {
-  await page.route("**/api/v1/catalog/archived", (route) =>
-    route.fulfill({
-      json: {
-        items: [
-          {
-            id: 99,
-            name: "Producto archivado de prueba",
-            amount: "0",
-            unit: "Piece",
-            image_url: null,
-            shopping_amount: "0",
-            shopping_step: "1",
-            shopping_unit: "Piece",
-            shopping_can_subtract: false,
-          },
-        ],
-      },
-    }),
-  );
+test("Actions no longer exposes archived products and creation remains in the pantry", async ({ page }, testInfo) => {
+  let archiveReads = 0;
+  await page.route("**/api/v1/catalog/archived", route => { archiveReads++; return route.fulfill({ json: { items: [] } }); });
   await page.goto(ingress);
   await page.getByRole("button", { name: "Acciones", exact: true }).click();
-  await expect(
-    page.getByRole("button", {
-      name: /Nuevo producto|Añadir.*producto|Gestionar productos/,
-    }),
-  ).toHaveCount(0);
-  await page.screenshot({
-    path: testInfo.outputPath("actions-mobile.png"),
-    fullPage: true,
-  });
-  await page
-    .getByRole("button", { name: "Productos archivados", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Productos archivados" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Ver producto" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Nuevo producto" }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: /Añadir a compra/ }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Productos archivados", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Nuevo producto|Añadir.*producto|Gestionar productos/ })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("actions-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Nuevo producto" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Producto archivado de prueba", { exact: true }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Nuevo producto", exact: true })).toBeVisible();
+  expect(archiveReads).toBe(0);
 });
 
 for (const width of [360, 768, 1280]) {

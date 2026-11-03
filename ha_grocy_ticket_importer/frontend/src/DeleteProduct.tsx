@@ -15,7 +15,7 @@ export function DeleteProduct({ id, onDeleted, disabled = false }: { id: number;
     retry: false,
     onSuccess: () => {
       onDeleted();
-      void Promise.all(["archived", "inventory", "shopping", "duplicates"].map(key => client.invalidateQueries({ queryKey: [key] })));
+      void Promise.all(["inventory", "shopping", "duplicates"].map(key => client.invalidateQueries({ queryKey: [key] })));
       for (const key of ["product", "variants", "catalog-barcodes", "product-deletion"])
         client.removeQueries({ queryKey: [key, id], exact: true });
     },

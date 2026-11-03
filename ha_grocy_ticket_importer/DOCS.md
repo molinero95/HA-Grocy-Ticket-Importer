@@ -90,14 +90,14 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.21.0 — actualización de la instalación existente
+## Despensa 1.22.0 — actualización de la instalación existente
 
-La versión 1.21.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.22.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.21.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.22.0. Publicar el manifiesto no instala automáticamente la actualización.
 
-**Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
+**Nuevo producto** está únicamente en Mi despensa. La vista y los controles de productos archivados están retirados desde 1.22.0.
 
 La búsqueda de Mi despensa es automática por nombre o código, con campo de texto y cámara; no requiere botón Buscar.
 
@@ -140,7 +140,7 @@ Exact barcode lookup starts at the Open Facts universal v3 endpoint (`product_ty
 
 ## Alexa recovery and alias management (1.6.0)
 
-Actions → Alias de Alexa now uses the 1.21 editable table: alias selector left, product selector right, search over either column and per-row save/discard/delete. Saved aliases and active cached review names populate the alias selector; an explicit custom-name option remains. Missing/archived targets remain removable or can be explicitly reassigned. PUT uses expected name/product under the worker lock and an atomic SQLite transaction; collisions or stale rows preserve both records. POST/delete compatibility remains. No extra HA calls are made for selectors.
+Actions → Alias de Alexa now uses the 1.21 editable table: alias selector left, product selector right, search over either column and per-row save/discard/delete. Saved aliases and active cached review names populate the alias selector; an explicit custom-name option remains. Missing/archived targets remain removable or can be explicitly reassigned. PUT uses expected source name/product under the worker lock and an atomic SQLite transaction. Since 1.22, a colliding destination is replaced by the new association; stale source edits still fail closed. POST also upserts the newest explicit association under the unique normalized key. POST/delete compatibility remains. No extra HA calls are made for selectors.
 
 The shopping view reports sanitized worker health and refreshes periodically. An exact-name free-text note is shown for explicit association: choose the matching product to preserve row ID, quantity and note, or remove only that list item. No automatic conversion, duplicate merge or stock change occurs. Existing duplicate product/note rows still need explicit review. The worker keeps its verified checkpoint after failures and does not write remotes with sync disabled. Updating requires preserving the existing queue, aliases, command journal and checkpoints.
 
@@ -217,7 +217,7 @@ Pantry +/− adjusts actual stock: 1 stock unit or 0.10 kg. The UI batches a rap
 
 Shopping rows offer **Editar cantidad**, a pencil text action aligned under the displayed amount. On mobile, purchase/removal buttons use a fixed, stacked column; wider layouts keep both actions side by side. PUT `/api/v1/shopping/<id>/quantity` checks row ID, default list, expected amount, product and done status; updates only amount and verifies preserved metadata. It is journaled and holds the worker lock only for the short row operation. It never calls Alexa or changes stock. The UI updates the cached row instead of awaiting full synchronization. Zero is removed via the separate Quitar action.
 
-The archive action is retired. **Eliminar producto** opens a focus-trapped Yes/No dialog with stock/history counts and irreversible consequences. Confirmed deletion of active or legacy archived products uses a fresh snapshot token and at-most-once journal. Grocy 4.7.1 cascades remove the selected stock/history/codes/conversions; readbacks verify absence. Active shopping/recipe/parent/variant/Alexa dependencies and pending/uncertain receipt imports remain blockers. Existing local ledgers, photos and metadata are preserved. Legacy archives remain accessible/restorable; the compatibility active endpoint remains for existing clients.
+The archive action is retired. **Eliminar producto** opens a focus-trapped Yes/No dialog with stock/history counts and irreversible consequences. Confirmed deletion of active or legacy archived products uses a fresh snapshot token and at-most-once journal. Grocy 4.7.1 cascades remove the selected stock/history/codes/conversions; readbacks verify absence. Active shopping/recipe/parent/variant/Alexa dependencies and pending/uncertain receipt imports remain blockers. Existing local ledgers, photos and metadata are preserved. Legacy records retain backend compatibility; the frontend archive/restore controls were removed in 1.22.
 
 New-product forms select the real Piece ID by name when available, preserving any explicitly chosen unit. There is no AI photo capture/upload UI. Public photo lookup by barcode remains first; explicit **Buscar imagen y código con IA** searches by name even if the scanned code is not in the catalogs. Search only the existing Open Facts domains and verify cited GTINs through exact-code catalog APIs. Picking an image never replaces an existing scanned code. `/photos/discover` issues a signed, session-bound choice token; `/catalog/products/<id>/photo-discovery` validates its expiry, current name/code, source and trusted image host before saving after genuinely-new creation. A name/code edit invalidates the selection. Existing photos are preserved and failures do not replay creation. Manual sanitized image uploads remain available in product details. The old photo-identification endpoint is kept for compatibility; the current UI does not call it.
 
@@ -246,4 +246,13 @@ Identity-conflict exceptions can carry positive product IDs only. Sanitized heal
 
 Product details reuse the explicit OpenAI/catalog search with a product-bound token. Search uses the saved name and does not require or assign a barcode. Tokens bind session, product ID, saved name and current local/remote photo snapshot, expire after 30 minutes and are revalidated before saving. The selected source/code is verified again against a trusted exact-code catalog API; browser image URLs are never accepted. An existing photo requires explicit replacement. Legacy creation tokens cannot replace existing images. Previous local bytes are retained as a private version only after the remote photo URL persists; a failed write keeps the active local image. No stock, barcode or name write occurs. Mocked-provider tests and a real Grocy metadata contract cover this path; real paid-provider acceptance remains separate.
 
-Receipt capture has a separate native file input with image-only accept and capture=environment, triggered by “Tomar foto del ticket”. The existing image/PDF picker has no capture hint. Selection resets allow retaking the same file; cancellation keeps the current review. Duplicate uploads are suppressed while in flight. A returned photo goes through the existing extraction, reviewed simulation and explicit import guards. Native camera UI is browser/WebView dependent; Chromium tests verify the picker contract, not physical Android camera behavior.
+The native capture picker introduced in 1.21 is superseded by the live camera implementation below because the installed WebView opened the gallery instead. The existing image/PDF picker remains available.
+
+
+## Direct camera and alias replacement (1.22.0)
+
+ReceiptCamera requests getUserMedia only after the user opens it, with audio=false and a preferred environment camera. No BarcodeDetector is required. Capture draws the complete video frame without cropping, limits the longest side to 2560 px and encodes a JPEG (quality 0.92, maximum 8 MiB). The local preview can be discarded/retaken; only “Usar esta foto” calls the existing receipt upload/review flow. Close, Back, unmount, capture and late permission results release tracks; discarded previews revoke blob URLs and late encodings are ignored. Stage buttons have distinct keys so a rapid capture double click cannot reuse the capture element for another action. Missing/denied camera access gives an explicit file/PDF fallback, never an automatic picker or permission retry. Physical Android/WebView permission acceptance remains a deployment check. No ingress policy or installed option is changed.
+
+Alias rows include every saved alias and normalized/deduplicated cached active review name, with unassigned product selectors shown immediately. Pending names can be assigned with POST or hidden for the current view; hiding/deleting aliases never deletes remote list items or products. A new normalized alias assignment atomically replaces its old product. Renaming a reviewed alias onto an existing destination deletes that older destination and renames the source in the same SQLite transaction. Stale source name/product and stale delete guards remain. Refresh removes superseded rows and clears their obsolete drafts; unrelated aliases are preserved.
+
+Archived-product frontend navigation, inventory mode, restore controls and unused frontend API helpers have been removed at the user's request. Backend compatibility/data-integrity helpers remain for existing callers and deletion audits; no production archive records, stock or history are erased by this release.

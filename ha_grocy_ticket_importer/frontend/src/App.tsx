@@ -13,7 +13,6 @@ import {
   Package,
   ScanBarcode,
   RefreshCw,
-  Archive,
   Tags,
   Copy,
   Search,
@@ -242,7 +241,7 @@ function AuthenticatedApp() {
         </button>
         <button
           className={
-            ["actions", "receipts", "duplicates", "archived", "aliases"].includes(view)
+            ["actions", "receipts", "duplicates", "aliases"].includes(view)
               ? "active"
               : ""
           }
@@ -281,19 +280,6 @@ function AuthenticatedApp() {
                 </small>
               </span>
             </button>
-            <button
-              aria-label="Productos archivados"
-              aria-describedby="archive-action-description"
-              onClick={() => setView("archived")}
-            >
-              <Archive size={24} aria-hidden="true" />
-              <span>
-                Productos archivados
-                <small id="archive-action-description">
-                  Consultar, restaurar o eliminar productos
-                </small>
-              </span>
-            </button>
             <button aria-label="Administrar alias de Alexa" onClick={() => setView("aliases")}>
               <Tags size={24} aria-hidden="true" />
               <span>Alias de Alexa<small>Administrar nombres asociados a productos</small></span>
@@ -302,8 +288,8 @@ function AuthenticatedApp() {
         </main>
       ) : view === "aliases" ? (
         <AlexaAliases />
-      ) : view === "inventory" || view === "archived" ? (
-        <Inventory key={view} archived={view === "archived"} />
+      ) : view === "inventory" ? (
+        <Inventory />
       ) : view === "receipts" ? (
         <Receipts />
       ) : view === "duplicates" ? (
@@ -548,7 +534,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.21.0</footer>
+      <footer>Despensa 1.22.0</footer>
     </div>
     </NavigationContext.Provider>
   );

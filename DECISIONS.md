@@ -116,3 +116,12 @@ La compra usa «Editar cantidad» con lápiz y aspecto de enlace, bajo la cantid
 Tabla de selectores alias/producto con buscador común y guardado por fila; papelera elimina solo alias. Conservar borradores al filtrar, nombres conocidos de revisiones activas y entrada explícita de nombre nuevo. Editar alias exige estado esperado y transacción, sin borrar/crear en dos peticiones.
 
 Buscar foto por nombre desde la ficha es explícito y no exige añadir un código. Vincular elección firmada a producto/sesión/nombre/foto actual; sustituir solo tras elección explícita, sin cambiar stock/códigos. Conservar bytes locales anteriores al aplicar URL verificada. Cámara de tickets mediante selector nativo image-only con capture=environment; mantener archivos/PDF y revisión antes de importar. La UI física depende del navegador/WebView.
+
+
+## Cámara directa, alias únicos y retirada de archivados 1.22.0 — 2026-11-03
+
+El selector nativo no abrió la cámara en el teléfono del usuario. Sustituirlo por getUserMedia con cámara trasera preferida, sin audio: capturar, previsualizar y aceptar antes de enviar. Liberar streams/URLs y descartar resultados tardíos. Archivo/PDF solo como alternativa explícita; no debilitar ingress ni cambiar permisos/configuración automáticamente.
+
+Mostrar todas las filas guardadas y nombres pendientes conocidos. Por petición explícita, gana la nueva asociación de un alias: upsert por clave normalizada y sustitución de destino en transacción; mantener guardas de origen esperado/borrado obsoleto y los demás productos. Pendientes se pueden ocultar en la vista sin eliminar datos de Alexa.
+
+Retirar Productos archivados de toda la interfaz y navegación: el usuario indica que ya ha eliminado todos. Mantener solo compatibilidad/guardas de backend; no realizar limpieza de datos de producción.

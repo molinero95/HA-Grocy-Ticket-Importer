@@ -144,3 +144,11 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 - [x] Buscar/elegir foto por nombre desde producto existente, con sustitución explícita y código/stock conservados.
 - [x] Botón para cámara nativa de tickets, conservando selector de archivos y revisión.
 - [ ] Aceptación instalada de cámara nativa Android y búsqueda pagada real.
+
+
+## Mejora 1.22.0
+
+- [x] Cámara directa con vista previa, repetición, aceptación y cierre/liberación; archivos/PDF alternativos.
+- [x] Todas las filas de alias conocidas visibles; al reasignar gana la nueva relación sin duplicados.
+- [x] Retirar vista/navegación/restauración de productos archivados.
+- [ ] Verificar permisos de la cámara directa en el teléfono real después de actualizar.

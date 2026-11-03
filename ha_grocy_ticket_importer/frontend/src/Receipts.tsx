@@ -8,12 +8,12 @@ import {
 } from "./api";
 import type { ReceiptUpload, ReceiptReviewItem } from "./api";
 
-import { Camera } from "lucide-react";
+import { ReceiptCamera } from "./ReceiptCamera";
 
 type EditableItem = ReceiptReviewItem & { mapping_stale?: boolean };
 export function Receipts() {
   const client = useQueryClient();
-  const cameraInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const uploadPending = useRef(false);
   const [receipt, setReceipt] = useState<ReceiptUpload | null>(null);
   const [items, setItems] = useState<EditableItem[]>([]);
@@ -164,17 +164,11 @@ export function Receipts() {
           <p>Revisa los artículos antes de simular su entrada en Grocy.</p>
         </div>
       </div>
-      <button className="primary-button receipt-camera-button" type="button" disabled={busy} onClick={() => cameraInput.current?.click()}>
-        <Camera size={20} aria-hidden="true" />Tomar foto del ticket
-      </button>
-      <input ref={cameraInput} hidden type="file" aria-label="Foto tomada del ticket" accept="image/jpeg,image/png" capture="environment" disabled={busy} onChange={event => {
-        const file = event.target.files?.[0];
-        event.target.value = "";
-        if (file) void upload(file);
-      }} />
+      <ReceiptCamera disabled={busy} onCapture={file => void upload(file)} onChooseFile={() => fileInput.current?.click()} />
       <label className="variant-field">
         Foto o PDF del ticket
         <input
+          ref={fileInput}
           type="file"
           accept="image/jpeg,image/png,application/pdf"
           disabled={busy}

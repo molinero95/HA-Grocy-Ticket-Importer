@@ -62,3 +62,6 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.21.0: alias en tabla de selectores, búsqueda y guardar/descartar/eliminar por fila; PUT atómico con estado esperado. Búsqueda de foto desde ficha por nombre, sin código obligatorio ni cambios de stock. Captura nativa de tickets separada del selector PDF; revisar antes de importar. Pruebas API, Vitest, Chromium y contrato de metadatos Grocy real; cámara física pendiente.
+
+
+1.22.0 sustituye captura nativa por cámara web directa con fotograma completo/JPEG, vista previa y repetición local; probar permisos en teléfono real. Alias guardados y nombres pendientes en filas iniciales; asociaciones nuevas sustituyen duplicados en transacción. Interfaz y navegación de archivados retiradas, sin borrar datos automáticamente.

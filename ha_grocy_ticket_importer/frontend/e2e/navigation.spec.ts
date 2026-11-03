@@ -3,7 +3,7 @@ const ingress = "http://127.0.0.1:8766/api/hassio_ingress/browser-test/react/";
 
 test("Back closes nested dialogs, returns through sections and leaves the root normally", async ({ page }) => {
   await page.route("**/api/v1/catalog/units", (route) => route.fulfill({ json: { units: [{ id: 2, name: "Piece" }] } }));
-  await page.route("**/api/v1/catalog/archived", (route) => route.fulfill({ json: { items: [] } }));
+  await page.route("**/api/v1/alexa/aliases", (route) => route.fulfill({ json: { aliases: [] } }));
   const host = ingress.replace("/react/", "/basic");
   await page.goto(host);
   await page.goto(ingress);
@@ -20,8 +20,8 @@ test("Back closes nested dialogs, returns through sections and leaves the root n
   await expect(parent).toHaveCount(0);
   await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
   await page.getByRole("button", { name: "Acciones", exact: true }).click();
-  await page.getByRole("button", { name: "Productos archivados", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Productos archivados" })).toBeVisible();
+  await page.getByRole("button", { name: "Administrar alias de Alexa", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Alias de Alexa" })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Acciones", exact: true })).toBeVisible();
   await page.goBack();

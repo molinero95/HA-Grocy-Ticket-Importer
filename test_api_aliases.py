@@ -72,12 +72,20 @@ class AliasApiTests(unittest.TestCase):
         self.assertEqual({a['key']: a['product_id'] for a in list_aliases(self.path)}, {'leche normal': 8, 'bebida blanca': 7})
         remote.assert_called_once_with('GET', 'objects/products')
 
-    def test_conflicting_destination_even_same_product_rolls_back_both_fields(self):
-        set_alias(self.path, 'Leche', 7); set_alias(self.path, 'Leche normal', 8)
-        before = list_aliases(self.path)
+    def test_renaming_over_an_existing_alias_keeps_only_the_new_association(self):
+        set_alias(self.path, 'Leche', 7); set_alias(self.path, 'Leche normal', 9)
+        set_alias(self.path, 'Otro', 9)
         with patch.object(api_aliases, 'grocy', return_value=[{'id': 8}]):
-            self.assertEqual(self.update().status_code, 409)
-        self.assertEqual(list_aliases(self.path), before)
+            self.assertEqual(self.update().status_code, 200)
+        self.assertEqual({a['key']: a['product_id'] for a in list_aliases(self.path)}, {'leche normal': 8, 'otro': 9})
+
+    def test_new_assignment_replaces_same_normalized_alias_without_duplicates(self):
+        set_alias(self.path, 'Léche', 7)
+        with patch.object(api_aliases, 'grocy', return_value=[{'id': 8}]):
+            response = self.client.post('/api/v1/alexa/aliases', json={'name': ' LECHE ', 'product_id': 8}, headers=self.headers)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(list_aliases(self.path), [dict(key='leche', name='LECHE', product_id=8)])
+        self.assertEqual(self.client.delete('/api/v1/alexa/aliases/leche', json={'product_id': 7}, headers=self.headers).status_code, 409)
 
     def test_stale_name_product_and_missing_source_never_overwrite(self):
         with patch.object(api_aliases, 'grocy', return_value=[{'id': 8}]):

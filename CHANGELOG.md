@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.22.0] — 2026-11-03
+
+### Fixed
+- Open a live receipt camera inside Despensa instead of relying on the native capture hint that opened the gallery. Capture the full frame, preview/retake locally and upload only on explicit acceptance; release tracks and previews on close, Back and late results. Keep explicit file/PDF fallback and reviewed import.
+- Show saved aliases and known active review names directly as rows. The newest explicit association wins an alias collision, leaving one normalized alias/product binding and preserving unrelated aliases and products. Stale source edits and deletes remain guarded.
+
+### Removed
+- Archived products from Actions, navigation, pantry mode and product restore controls, plus unused frontend helpers. No installed data is deleted or migrated.
+
+### Validation
+- Camera lifecycle/permission/encoding tests, real JPEG browser capture without a picker, retake/Back cleanup, atomic alias replacement and removal of archive navigation.
+
 ## [1.21.0] — 2026-11-03
 
 ### Added

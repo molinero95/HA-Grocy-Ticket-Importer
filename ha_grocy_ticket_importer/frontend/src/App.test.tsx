@@ -17,7 +17,6 @@ vi.mock("./api", async (original) => ({
   chooseAlexaMatch: vi.fn(),
   logoutStandalone: vi.fn(),
   getInventory: vi.fn(),
-  getArchivedProducts: vi.fn(),
 }));
 const shopping: ShoppingResponse = {
   items: [
@@ -44,17 +43,15 @@ beforeEach(() => {
   });
   vi.mocked(api.getShopping).mockResolvedValue(shopping);
   vi.mocked(api.getInventory).mockResolvedValue({ items: [] });
-  vi.mocked(api.getArchivedProducts).mockResolvedValue({ items: [] });
 });
 
-it("keeps creation only in the pantry and loads archives only through Actions", async () => {
+it("keeps creation in the pantry and removes archived-product actions", async () => {
   renderWithClient(<App />);
   await userEvent.click(
     await screen.findByRole("button", { name: "Mi despensa" }),
   );
   expect(screen.getByRole("button", { name: "Nuevo producto" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Ver archivados" })).toBeNull();
-  expect(api.getArchivedProducts).not.toHaveBeenCalled();
   await userEvent.click(screen.getByRole("button", { name: "Acciones" }));
   expect(screen.queryByRole("button", { name: "Pantalla completa" })).toBeNull();
   expect(
@@ -62,12 +59,8 @@ it("keeps creation only in the pantry and loads archives only through Actions", 
       name: /Nuevo producto|Añadir.*producto|Gestionar productos/,
     }),
   ).toBeNull();
-  await userEvent.click(
-    screen.getByRole("button", { name: "Productos archivados" }),
-  );
-  await screen.findByRole("heading", { name: "Productos archivados" });
-  await waitFor(() => expect(api.getArchivedProducts).toHaveBeenCalledOnce());
-  expect(screen.queryByRole("button", { name: "Nuevo producto" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Productos archivados" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Administrar alias de Alexa" })).toBeTruthy();
   await userEvent.click(screen.getByRole("button", { name: "Mi despensa" }));
   await screen.findByRole("heading", { name: "Mi despensa" });
   expect(screen.getByRole("button", { name: "Nuevo producto" })).toBeTruthy();
