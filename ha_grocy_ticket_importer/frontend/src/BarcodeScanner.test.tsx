@@ -71,8 +71,10 @@ it("ignores invalid detections then returns one valid code and stops camera trac
     expect(onDetect).toHaveBeenCalledExactlyOnceWith("8412345678901"),
   );
   expect(detect).toHaveBeenCalledTimes(2);
-  expect(stop).toHaveBeenCalledOnce();
-  expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => {
+    expect(stop).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 it("offers manual entry when BarcodeDetector is unavailable", async () => {
   vi.stubGlobal("BarcodeDetector", undefined);
