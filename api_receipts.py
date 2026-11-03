@@ -8,7 +8,7 @@ from decimal import InvalidOperation
 from pathlib import Path
 from flask import jsonify, request, session
 from werkzeug.utils import secure_filename
-from receipt_review import validate_review, mappings, has_review, key, suggestions
+from receipt_review import validate_review, mappings, has_review, key, suggestions, review_issues
 import importer
 
 
@@ -172,6 +172,7 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
                 if not isinstance(edited, dict):
                     raise ValueError("invalid_item")
                 name = edited.get("name")
+                if edited.get("product_mode") == "skip" and (not isinstance(name, str) or not name.strip()): name = "Artículo omitido"
                 if not isinstance(name, str) or not 0 < len(name.strip()) <= 200:
                     raise ValueError("invalid_name")
                 reviewed = {**original, **{key: edited[key] for key in ('purchase_units', 'pieces_per_pack', 'stock_unit', 'product_mode', 'product_id', 'remember_product', 'unit_confirmed', 'stock_to_add', 'expected_stock') if key in edited}}
@@ -197,11 +198,11 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
         if result.returncode:
             return jsonify({"error": "receipt_preview_rejected", "details": result.stderr[-1200:]}), 400
         if has_review(result.stdout):
-            return jsonify({"receipt_id": receipt_id, "preview": result.stdout, "ready_to_commit": False})
+            return jsonify({"receipt_id": receipt_id, "preview": result.stdout, "ready_to_commit": False, "line_issues": review_issues(result.stdout)})
         session["previewed"] = receipt_id
         session["previewed_digest"] = hashlib.sha256(path.read_bytes()).hexdigest()
         session["previewed_plan"] = hashlib.sha256(result.stdout.encode()).hexdigest()
-        return jsonify({"receipt_id": receipt_id, "preview": result.stdout, "ready_to_commit": True})
+        return jsonify({"receipt_id": receipt_id, "preview": result.stdout, "ready_to_commit": True, "line_issues": []})
 
     @app.post("/api/v1/receipts/<receipt_id>/commit")
     @exclusive_preview

@@ -53,3 +53,12 @@ it("passes an existing code as a search constraint and keeps empty results and f
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", expect.stringContaining("Sin conexión"));
   expect(api.discoverProduct).toHaveBeenCalledTimes(2);
 });
+it("keeps quota/configuration failures visible without encouraging retries or applying a candidate", async () => {
+  vi.mocked(api.discoverProduct).mockRejectedValue(new Error("OpenAI indica que no queda cuota o saldo disponible. Revisa la facturación."));
+  const use = vi.fn();
+  renderWithClient(<ProductDiscovery name="Crema Example" barcode="" onUse={use} />);
+  await userEvent.click(screen.getByRole("button", { name: "Buscar imagen y código con IA" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("no queda cuota");
+  expect(screen.getByRole("alert").textContent).not.toContain("pulsar para reintentar");
+  expect(api.discoverProduct).toHaveBeenCalledOnce();expect(use).not.toHaveBeenCalled();
+});

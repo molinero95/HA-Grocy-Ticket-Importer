@@ -395,3 +395,32 @@ it("aggregates all explicitly associated lines into the same final product stock
   await userEvent.clear(inputs[1]);await userEvent.type(inputs[1], "4");
   for (const total of screen.getAllByLabelText("Cantidad final calculada")) expect(total).toHaveProperty("value", "12");
 });
+
+it("explains blocked simulation on the yellow row and can omit it instead of creating or stocking", async () => {
+  renderWithClient(<Receipts />);await upload();
+  await userEvent.clear(screen.getByLabelText("Piezas por envase"));
+  expect(screen.getByRole("button", { name: "Simular importación" })).toHaveProperty("disabled", true);
+  expect(screen.getByText(/Indica entre 1 y 1.000 piezas/)).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Línea 1: Leche" }).className).toContain("receipt-line-invalid");
+  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "skip");
+  expect(screen.getByRole("group", { name: "Línea 1: Leche" }).className).toContain("receipt-line-skipped");
+  expect(screen.queryByLabelText("Piezas por envase")).toBeNull();
+  expect(screen.getByRole("button", { name: "Simular importación" })).toHaveProperty("disabled", false);
+  await userEvent.click(screen.getByRole("button", { name: "Simular importación" }));
+  expect(api.previewReceipt).toHaveBeenCalledExactlyOnceWith("ticket-1", [expect.objectContaining({ product_mode: "skip", remember_product: false, product_id: null, pieces_per_pack: 1, purchase_units: "2" })]);
+  expect(api.commitReceipt).not.toHaveBeenCalled();
+});
+it("colors a server REVIEW row and explains the reason without enabling import", async () => {
+  vi.mocked(api.previewReceipt).mockResolvedValue({ preview: "[1] REVIEW Leche: Stock changed since receipt review", ready_to_commit: false, line_issues: [{ index: 0, message: "El stock ha cambiado. Actualiza el catálogo." }] });
+  renderWithClient(<Receipts />);await upload();
+  await userEvent.click(screen.getByRole("button", { name: "Simular importación" }));
+  await screen.findByText("El stock ha cambiado. Actualiza el catálogo.");
+  expect(screen.getByRole("group", { name: "Línea 1: Leche" }).className).toContain("receipt-line-invalid");
+  expect(screen.queryByRole("button", { name: "Confirmar e importar a Grocy" })).toBeNull();
+});
+it("can explicitly confirm the already displayed unit without changing it to a different unit first", async () => {
+  renderWithClient(<Receipts />);await upload();
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar unidad elegida" }));
+  await userEvent.click(screen.getByRole("button", { name: "Simular importación" }));
+  expect(api.previewReceipt).toHaveBeenCalledWith("ticket-1", [expect.objectContaining({ stock_unit: "piece", unit_confirmed: true })]);
+});

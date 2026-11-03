@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.23.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.24.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -292,3 +292,17 @@ Al revisar un ticket, **Producto de Despensa** ofrece sugerencias por parecido, 
 En **Revisar duplicados → Revisar combinación → Definir unidades y stock finales** elige el producto conservado, nombre y unidades finales, equivalencia de cada unidad actual, stock total real y configuración de compra. Revisa la suma convertida, el ajuste de inventario y las dependencias antes de confirmar. En Grocy 4.7.1 se convierten cantidades y precios históricos con las reglas nativas antes de combinar. Las referencias locales no migrables siguen bloqueadas; a veces basta conservar el otro producto. Una interrupción puede dejar fases aplicadas: consulta ambos productos y stock antes de otra operación, sin reenviar el comando incierto.
 
 Los controles de stock envían enteros sin decimales de relleno y conservan la precisión de los pesos del ticket. No se han combinado productos ni cambiado datos de la instalación real durante la validación.
+
+
+## Búsqueda de fotos con IA — 1.24.0
+
+La búsqueda espera hasta 90 segundos y limita a una invocación web por solicitud explícita. No reintenta automáticamente ni cambia el modelo configurado. Si falla, el aviso distingue cuota/saldo, clave, permisos/modelo, rechazo de petición, límite temporal, conexión y tiempo de espera. Los errores de la clave de OpenAI no cierran tu sesión de Despensa. Puedes continuar sin imagen o subir una foto desde la ficha.
+
+En los logs se registra `product_discovery_failed code=... provider_status=... parameter=...`, con categorías fijas y sin claves, nombres buscados ni texto del proveedor. `ai_quota_exceeded`: revisar facturación y límites del proyecto de la API; `ai_authentication_failed`: revisar la clave de OpenAI configurada; `ai_model_unavailable`/`ai_permission_denied`: revisar acceso del proyecto; `ai_request_rejected`: compartir solo ese diagnóstico y el estado/categoría del parámetro; `ai_search_timeout`: esperar o usar una búsqueda más concreta. La incidencia original no queda diagnosticada por actualizar: el manejador anterior ocultaba su causa. Una nueva búsqueda explícita permitirá identificarla.
+
+
+## Líneas de ticket omitidas y pendientes — 1.24.0
+
+En el selector **Producto de Despensa**, elige **Omitir: no crear producto ni añadir stock** para excluir una línea del inventario. Se conserva su importe original para comprobar el total del ticket, y no se aprende una asociación. Tras confirmar, la omisión queda registrada para que volver a subir ese mismo ticket no importe esa línea. Una importación anterior incierta sigue requiriendo revisión: omitir no permite saltarse esa protección.
+
+Las filas amarillas muestran por qué no están listas: cantidad o envase inválidos, unidad incorrecta, producto ausente, asociación desactualizada o stock desconocido. El resumen indica cuántas filas revisar y **Revisar primer artículo pendiente** lleva a la primera. La simulación también resalta sus propios REVIEW por línea; un stock que cambió obliga a **Actualizar stock y catálogo**, revisar la cantidad final y simular de nuevo. Las líneas omitidas aparecen con fondo gris. Si falta el catálogo, se explica junto al botón de simulación.

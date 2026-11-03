@@ -267,3 +267,17 @@ Al revisar un ticket, **Producto de Despensa** ofrece sugerencias por parecido, 
 En **Revisar duplicados → Revisar combinación → Definir unidades y stock finales** elige el producto conservado, nombre y unidades finales, equivalencia de cada unidad actual, stock total real y configuración de compra. Revisa la suma convertida, el ajuste de inventario y las dependencias antes de confirmar. En Grocy 4.7.1 se convierten cantidades y precios históricos con las reglas nativas antes de combinar. Las referencias locales no migrables siguen bloqueadas; a veces basta conservar el otro producto. Una interrupción puede dejar fases aplicadas: consulta ambos productos y stock antes de otra operación, sin reenviar el comando incierto.
 
 Los controles de stock envían enteros sin decimales de relleno y conservan la precisión de los pesos del ticket. No se han combinado productos ni cambiado datos de la instalación real durante la validación.
+
+
+## Búsqueda de fotos con IA — 1.24.0
+
+La búsqueda espera hasta 90 segundos y limita a una invocación web por solicitud explícita. No reintenta automáticamente ni cambia el modelo configurado. Si falla, el aviso distingue cuota/saldo, clave, permisos/modelo, rechazo de petición, límite temporal, conexión y tiempo de espera. Los errores de la clave de OpenAI no cierran tu sesión de Despensa. Puedes continuar sin imagen o subir una foto desde la ficha.
+
+En los logs se registra `product_discovery_failed code=... provider_status=... parameter=...`, con categorías fijas y sin claves, nombres buscados ni texto del proveedor. `ai_quota_exceeded`: revisar facturación y límites del proyecto de la API; `ai_authentication_failed`: revisar la clave de OpenAI configurada; `ai_model_unavailable`/`ai_permission_denied`: revisar acceso del proyecto; `ai_request_rejected`: compartir solo ese diagnóstico y el estado/categoría del parámetro; `ai_search_timeout`: esperar o usar una búsqueda más concreta. La incidencia original no queda diagnosticada por actualizar: el manejador anterior ocultaba su causa. Una nueva búsqueda explícita permitirá identificarla.
+
+
+## Líneas de ticket omitidas y pendientes — 1.24.0
+
+En el selector **Producto de Despensa**, elige **Omitir: no crear producto ni añadir stock** para excluir una línea del inventario. Se conserva su importe original para comprobar el total del ticket, y no se aprende una asociación. Tras confirmar, la omisión queda registrada para que volver a subir ese mismo ticket no importe esa línea. Una importación anterior incierta sigue requiriendo revisión: omitir no permite saltarse esa protección.
+
+Las filas amarillas muestran por qué no están listas: cantidad o envase inválidos, unidad incorrecta, producto ausente, asociación desactualizada o stock desconocido. El resumen indica cuántas filas revisar y **Revisar primer artículo pendiente** lleva a la primera. La simulación también resalta sus propios REVIEW por línea; un stock que cambió obliga a **Actualizar stock y catálogo**, revisar la cantidad final y simular de nuevo. Las líneas omitidas aparecen con fondo gris. Si falta el catálogo, se explica junto al botón de simulación.

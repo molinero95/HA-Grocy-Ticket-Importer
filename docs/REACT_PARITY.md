@@ -74,3 +74,11 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 - Ticket con cantidad directa a añadir y stock final para productos existentes, sugerencias de nombres y creación alternativa; campo envase sin ceros forzados.
 - Stock rápido sin decimales de relleno y sin truncar la precisión usada como estado esperado.
 - Validación aislada y CI final documentadas en la PR; aceptación de actualización real sigue pendiente del usuario.
+
+
+## Diagnóstico de búsqueda IA 1.24.0
+
+Una petición explícita, espera 90s y una invocación web; sin cambio automático de modelo ni reintentos pagados. Errores de proveedor clasificados y saneados, cuerpo de error acotado solo para reconocer códigos conocidos, logs de categorías fijas/estado/parámetro permitido. No exponer mensajes del proveedor, nombres o claves. Errores de credenciales OpenAI no caducan la sesión de Despensa. Conservar selección explícita, firma de candidatos, catálogos confiables, verificación GTIN y foto manual. Causa real del aviso genérico anterior y aceptación instalada siguen sin confirmar.
+
+
+Ticket 1.24.0: omisión explícita por línea (sin producto/stock/alias) con total original conservado y estado terminal omitted contra reimportación. Pendientes inciertos no se pueden omitir para saltar sus guardas. Filas amarillas y motivos concretos sustituyen la simulación deshabilitada sin explicación; resumen y acceso a primera fila, motivos REVIEW del servidor por índice y stock desfasado comprobado antes de escribir. Omitidas diferenciadas en gris; catálogo ausente explicado globalmente.

@@ -1070,3 +1070,10 @@ select:focus-visible {
   .receipt-alias-table td:nth-child(2)::before { content: "Texto del ticket"; }
   .receipt-alias-table td:nth-child(3)::before { content: "Producto y unidades"; }
 }
+
+.receipt-line-invalid { background: #fff6df; border: 1px solid #e4b64b; border-left: 5px solid #c28a17; border-radius: 12px; padding: 14px; scroll-margin-top: 1rem; }
+.receipt-line-problems { color: #72500c; grid-column: 1 / -1; overflow-wrap: anywhere; }
+.receipt-line-problems ul { padding-left: 1.2rem; margin: .5rem 0; }
+.receipt-line-skipped { background: #edf1ee; border: 1px dashed #9baa9e; border-radius: 12px; padding: 14px; }
+.receipt-line-omitted { color: #526357; grid-column: 1 / -1; }
+.receipt-review-summary { background: #fff6df; color: #72500c; border: 1px solid #e4b64b; margin: 1rem 0; padding: 14px; border-radius: 12px; }
