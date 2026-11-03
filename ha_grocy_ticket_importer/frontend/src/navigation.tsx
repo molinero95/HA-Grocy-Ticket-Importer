@@ -1,9 +1,9 @@
 import { createContext, useContext, useLayoutEffect, useState } from "react";
 
-export type View = "shopping" | "inventory" | "actions" | "receipts" | "duplicates" | "aliases" | "archived";
+export type View = "shopping" | "inventory" | "actions" | "receipts" | "duplicates" | "aliases";
 type Entry = { session: string; view: View; layers: string[] };
 type Layer = { id: string; close: () => void };
-const views = new Set<View>(["shopping", "inventory", "actions", "receipts", "duplicates", "aliases", "archived"]);
+const views = new Set<View>(["shopping", "inventory", "actions", "receipts", "duplicates", "aliases"]);
 
 /** Same-document history only: preserve the ingress URL and the host's state. */
 export class AppNavigation {

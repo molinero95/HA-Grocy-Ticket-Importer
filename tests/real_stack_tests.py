@@ -426,10 +426,13 @@ class RealStackTests(unittest.TestCase):
         stock = {entity: self.instance.http('GET', 'objects/' + entity) for entity in ('stock', 'stock_log', 'product_barcodes')}
         response = self.client.post('/api/v1/alexa/aliases', json={'name': 'Alias contrato foto', 'product_id': pid}, headers=self.headers)
         self.assertEqual(response.status_code, 201, response.json)
+        self.assertEqual(self.client.post('/api/v1/alexa/aliases', json={'name': 'Alias contrato editado', 'product_id': pid}, headers=self.headers).status_code, 201)
         response = self.client.put('/api/v1/alexa/aliases/alias contrato foto', json={
             'name': 'Alias contrato editado', 'product_id': pid, 'expected_name': 'Alias contrato foto', 'expected_product_id': pid}, headers=self.headers)
         self.assertEqual(response.status_code, 200, response.json)
         self.assertEqual(response.json['alias']['key'], 'alias contrato editado')
+        alias_rows = self.client.get('/api/v1/alexa/aliases').json['aliases']
+        self.assertEqual([a['key'] for a in alias_rows if a['key'].startswith('alias contrato')], ['alias contrato editado'])
         self.assertEqual(self.client.delete('/api/v1/alexa/aliases/alias contrato editado', json={'product_id': pid}, headers=self.headers).status_code, 200)
         code = '3017620422003'
         image = 'https://images.openfoodfacts.org/images/products/contract.jpg'

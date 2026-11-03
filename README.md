@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.21.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.22.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.21.0
+## Despensa 1.22.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.21.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.22.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -269,8 +269,15 @@ En **Lista de la compra**, el buscador filtra al escribir por nombre, sin distin
 
 ## Alias, fotos y cámara de tickets (1.21.0)
 
-En la tabla de alias, cada guardado aplica el cambio de nombre/producto de una fila y rechaza cambios concurrentes o alias duplicados. Filtrar la tabla conserva los cambios sin guardar.
+En la tabla de alias, cada guardado aplica el cambio de nombre/producto de una fila. Un alias normalizado pertenece a un único producto: la nueva asociación sustituye a la anterior. Las ediciones de una fila que haya cambiado desde que se mostró siguen exigiendo actualizarla. Filtrar la tabla conserva los cambios sin guardar.
 
 En la ficha del producto → **Fotografía → Buscar foto con IA**, se busca por el nombre guardado, incluso sin código de barras. Revisa la imagen y pulsa **Usar esta foto** o **Sustituir foto por esta imagen**. Solo se cambia la fotografía; el nombre, los códigos y el stock se conservan. Si has editado el nombre, guárdalo antes de buscar.
 
-En **Escanear ticket**, **Tomar foto del ticket** solicita la cámara trasera nativa del teléfono. Al aceptar la fotografía, vuelve al flujo de revisión; no importa stock automáticamente. Se mantiene **Foto o PDF del ticket** para archivos existentes. La apertura directa depende del navegador o WebView; la aceptación en Android/Home Assistant se verifica en el dispositivo.
+En **Escanear ticket**, **Tomar foto del ticket** abre una cámara integrada con vista previa, preferencia por la cámara trasera y sin micrófono. Pulsa **Capturar foto**, comprueba el resultado y elige **Repetir foto** o **Usar esta foto**. Solo al usarla empieza la extracción; el stock requiere revisar, simular y confirmar. Se mantiene **Foto o PDF del ticket** como alternativa. Si no hay permiso o el navegador bloquea la cámara, se explica cómo continuar; la aceptación en el teléfono real sigue pendiente.
+
+
+## Cámara directa, alias únicos y retirada de archivados (1.22.0)
+
+La tabla muestra de entrada todos los alias guardados y los nombres de revisiones activas conocidos por Despensa, incluidos los **Pendientes de asociar**. El buscador filtra por nombre o producto. Al guardar un nombre ya asociado se conserva únicamente la nueva asociación; no se duplica el alias ni se borra ninguno de los productos. Eliminar un alias quita su asociación; ocultar una fila pendiente solo la retira de la vista actual, sin borrar artículos de Alexa.
+
+**Productos archivados** ya no aparece en Acciones, en la navegación ni en la ficha. No se borran ni migran datos al actualizar. El borrado directo sigue disponible desde las fichas de productos.

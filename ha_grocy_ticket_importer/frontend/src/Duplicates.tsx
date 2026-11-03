@@ -12,7 +12,7 @@ export function Duplicates() {
   const client = useQueryClient();
   const [message, setMessage] = useState("");
   const differences = useQuery({ queryKey: ["duplicate-differences"], queryFn: getDuplicateDifferences });
-  const refresh = () => Promise.all(["duplicates", "duplicate-differences", "inventory", "archived", "shopping", "catalog-audit", "alexa-aliases", "product", "variants", "catalog-barcodes"].map(key => client.invalidateQueries({ queryKey: [key] })));
+  const refresh = () => Promise.all(["duplicates", "duplicate-differences", "inventory", "shopping", "catalog-audit", "alexa-aliases", "product", "variants", "catalog-barcodes"].map(key => client.invalidateQueries({ queryKey: [key] })));
   const different = useMutation({ mutationFn: ([left, right]: DuplicateCandidate[]) => markProductsDifferent(left, right), retry: false, onSuccess: async () => { setMessage("Marcados como diferentes. Esta pareja no volverá a sugerirse hasta que deshagas la decisión."); setPair(null); await refresh(); } });
   const undo = useMutation({ mutationFn: ({left_id, right_id}: {left_id: number; right_id: number}) => undoProductDifference(left_id, right_id), retry: false, onSuccess: async () => { setMessage("Diferencia deshecha. Se volverán a comprobar las coincidencias."); await refresh(); } });
   const { data, isLoading, isError, refetch } = useQuery({

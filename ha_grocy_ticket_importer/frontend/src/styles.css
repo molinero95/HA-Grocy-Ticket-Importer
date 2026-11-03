@@ -1041,3 +1041,9 @@ select:focus-visible {
 .receipt-camera-button { margin-bottom: 18px; }
 
 .alias-custom-name { margin-top: 8px; }
+
+.receipt-camera-panel { max-height: 92dvh; overflow-y: auto; }
+.receipt-camera-panel video, .receipt-camera-photo { display: block; width: 100%; max-height: 55dvh; height: auto; aspect-ratio: auto; object-fit: contain; border-radius: 12px; background: #17231d; }
+.receipt-camera-panel video[hidden] { display: none; }
+.receipt-camera-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.receipt-camera-actions > button { flex: 1 1 140px; }

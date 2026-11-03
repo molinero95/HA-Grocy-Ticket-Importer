@@ -13,7 +13,6 @@ vi.mock("./api", async (original) => ({
   adjustCatalogStock: vi.fn(),
   stepShopping: vi.fn(),
   saveProductVariant: vi.fn(),
-  setCatalogProductActive: vi.fn(),
   saveCatalogBarcode: vi.fn(),
   saveDiscoveredPhoto: vi.fn(),
   lookupPhoto: vi.fn(),
@@ -116,7 +115,7 @@ it("disables stock writes and deletion when the product cannot be verified", asy
   expect(
     screen.getByRole("button", { name: "Eliminar producto" }),
   ).toHaveProperty("disabled", true);
-  expect(api.setCatalogProductActive).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Restaurar producto" })).toBeNull();
 });
 
 it("rejects invalid variants and retains their details when barcode ownership conflicts", async () => {

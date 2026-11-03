@@ -25,7 +25,7 @@ async function token(): Promise<string> {
 
 const errorMessages: Record<string, string> = {
   aliases_unavailable: "No se pudieron guardar o consultar los alias. Actualiza antes de reintentar.",
-  alias_conflict: "El alias ya pertenece a otro producto o ha cambiado. Actualiza los alias.",
+  alias_conflict: "La fila de alias ha cambiado. Actualiza los alias antes de guardar.",
   product_not_found: "El producto ya no está disponible. Elige otro producto.",
   catalog_unavailable: "No se pudo verificar el catálogo de Grocy.",
   operation_in_progress:
@@ -409,20 +409,6 @@ export const consumeCatalogProduct = (
       operation_id: operationId,
     },
   );
-
-export const getArchivedProducts = () =>
-  request<InventoryResponse>("catalog/archived");
-export const setCatalogProductActive = (
-  id: number,
-  name: string,
-  active: boolean,
-  operationId: string,
-) =>
-  request("catalog/products/" + id + "/active", "POST", {
-    expected_name: name,
-    active,
-    operation_id: operationId,
-  });
 
 export const savePurchaseConfiguration = (
   id: number,

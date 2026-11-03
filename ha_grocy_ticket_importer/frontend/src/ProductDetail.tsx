@@ -12,7 +12,6 @@ import { X } from "lucide-react";
 import {
   getCatalogProduct,
   saveDiscoveredPhoto,
-  setCatalogProductActive,
   adjustCatalogStock,
   editCatalogProduct,
   getCatalogBarcodes,
@@ -94,20 +93,6 @@ export function ProductDetail({
       await refreshProduct();
       void client.invalidateQueries({ queryKey: ["catalog-barcodes", id] });
       void client.invalidateQueries({ queryKey: ["variants", id] });
-    },
-  });
-  const lifecycle = useMutation({
-    mutationFn: (active: boolean) =>
-      setCatalogProductActive(
-        id,
-        product.data!.name,
-        active,
-        crypto.randomUUID(),
-      ),
-    onSuccess: async () => {
-      await refreshProduct();
-      await client.invalidateQueries({ queryKey: ["archived"] });
-      onClose();
     },
   });
   const [photo, setPhoto] = useState<File | null>(null);
@@ -474,7 +459,6 @@ export function ProductDetail({
               {stockMessage && <p role="status">{stockMessage}</p>}
             </form>
             {product.data && <ProductThreshold id={id} threshold={product.data.stock_threshold ?? "0"} unit={currentUnit} warningEnabled={product.data.stock_warning_enabled !== false} />}
-            {product.data?.active === false && <button type="button" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate(true)}>Restaurar producto</button>}
             <DeleteProduct id={id} disabled={!product.data || product.isError} onDeleted={onClose} />
             <h3>Variantes por supermercado</h3>
             {data.variants.length === 0 ? (

@@ -84,3 +84,34 @@ it("distinguishes an empty catalog of aliases, no matches and read failure", asy
   expect(screen.getByText("No hay alias ni productos que coincidan con la búsqueda.")).toBeTruthy();
   expect(screen.getByLabelText("Nuevo alias")).toBeTruthy();
 });
+
+it("shows every known pending name as its own editable row before assigning a product", async () => {
+  vi.mocked(api.saveAlexaAlias).mockImplementation(async () => {
+    vi.mocked(api.getAlexaAliases).mockResolvedValue({ aliases: [...aliases, { key: "pan", name: "Pan", product_id: 7 }], suggestions: ["Pan", "Leche normal"] });
+    return {};
+  });
+  renderWithClient(<AlexaAliases />);
+  expect(await screen.findByLabelText("Alias: Pan")).toBeTruthy();
+  expect(screen.getByLabelText("Producto para Pan")).toHaveProperty("value", "0");
+  await userEvent.selectOptions(screen.getByLabelText("Producto para Pan"), "7");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar alias Pan" }));
+  await waitFor(() => expect(screen.getByLabelText("Producto para Pan")).toHaveProperty("value", "7"));
+  expect(api.saveAlexaAlias).toHaveBeenCalledExactlyOnceWith("Pan", 7);
+  expect(screen.getAllByLabelText("Alias: Pan")).toHaveLength(1);
+});
+it("a renamed row replaces the older alias and clears the superseded row draft", async () => {
+  vi.mocked(api.updateAlexaAlias).mockImplementation(async () => {
+    vi.mocked(api.getAlexaAliases).mockResolvedValue({ aliases: aliases.slice(0, 2) });
+    return { alias: aliases[0] };
+  });
+  renderWithClient(<AlexaAliases />);
+  await screen.findByLabelText("Alias: Leche");
+  await userEvent.selectOptions(screen.getByLabelText("Producto para Leche"), "8");
+  await userEvent.selectOptions(screen.getByLabelText("Alias: Rojo"), "Leche");
+  await userEvent.selectOptions(screen.getByLabelText("Producto para Rojo"), "7");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar alias Rojo" }));
+  await waitFor(() => expect(screen.queryByLabelText("Alias: Rojo")).toBeNull());
+  expect(api.updateAlexaAlias).toHaveBeenCalledExactlyOnceWith(aliases[2], "Leche", 7);
+  expect(screen.getAllByLabelText("Alias: Leche")).toHaveLength(1);
+  expect(screen.getByLabelText("Producto para Leche")).toHaveProperty("value", "7");
+});

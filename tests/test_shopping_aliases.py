@@ -22,9 +22,8 @@ class AlexaAliasRegistryTests(unittest.TestCase):
 
     def test_alias_cannot_point_to_two_products(self):
         set_alias(self.path, "Leche", 42)
-        with self.assertRaises(ValueError):
-            set_alias(self.path, " LECHE ", 43)
-        self.assertEqual(len(list_aliases(self.path)), 1)
+        set_alias(self.path, " LECHE ", 43)
+        self.assertEqual(list_aliases(self.path), [{"key": "leche", "name": "LECHE", "product_id": 43}])
 
     def test_remove_one_alias_preserves_other_aliases(self):
         set_alias(self.path, "Leche", 42)
