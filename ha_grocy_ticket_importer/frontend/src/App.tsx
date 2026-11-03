@@ -7,6 +7,7 @@ import { ShoppingQuantity } from "./ShoppingQuantity";
 import { Inventory } from "./Inventory";
 import { Receipts } from "./Receipts";
 import { Duplicates } from "./Duplicates";
+import { ReceiptAliases } from "./ReceiptAliases";
 import { AlexaAliases } from "./AlexaAliases";
 import {
   ShoppingBasket,
@@ -241,7 +242,7 @@ function AuthenticatedApp() {
         </button>
         <button
           className={
-            ["actions", "receipts", "duplicates", "aliases"].includes(view)
+            ["actions", "receipts", "duplicates", "aliases", "receipt-aliases"].includes(view)
               ? "active"
               : ""
           }
@@ -284,8 +285,13 @@ function AuthenticatedApp() {
               <Tags size={24} aria-hidden="true" />
               <span>Alias de Alexa<small>Administrar nombres asociados a productos</small></span>
             </button>
+            <button aria-label="Administrar alias de tickets" onClick={() => setView("receipt-aliases")}>
+              <Tags size={24} aria-hidden="true" /><span>Alias de tickets<small>Revisar lo recordado por supermercado</small></span>
+            </button>
           </div>
         </main>
+      ) : view === "receipt-aliases" ? (
+        <ReceiptAliases />
       ) : view === "aliases" ? (
         <AlexaAliases />
       ) : view === "inventory" ? (
@@ -534,7 +540,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.22.0</footer>
+      <footer>Despensa 1.23.0</footer>
     </div>
     </NavigationContext.Provider>
   );

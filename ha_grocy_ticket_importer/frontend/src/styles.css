@@ -1047,3 +1047,26 @@ select:focus-visible {
 .receipt-camera-panel video[hidden] { display: none; }
 .receipt-camera-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .receipt-camera-actions > button { flex: 1 1 140px; }
+
+.merge-resolution { display: block; }
+.merge-resolution .variant-form { margin-top: 16px; }
+.merge-result { margin-top: 20px; padding: 16px; border: 1px solid #c5d8cb; border-radius: 12px; background: #f0f6f1; }
+.merge-result dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+.merge-result dt { color: #60756a; }
+.merge-result dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+
+.receipt-shop-filter { max-width: 28rem; margin: 1rem 0; }
+.receipt-alias-table-wrap { overflow-x: auto; margin-top: 1rem; }
+.receipt-alias-table tr { grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.2fr) 156px; }
+.receipt-alias-table td small { display: block; margin: .35rem 0; }
+.receipt-alias-confirm { max-width: 20rem; }
+@media (max-width: 700px) {
+  .receipt-alias-table thead { display: none; }
+  .receipt-alias-table, .receipt-alias-table tbody, .receipt-alias-table tr, .receipt-alias-table td { display: block; width: 100%; min-width: 0; }
+  .receipt-alias-table tr { padding: .8rem; margin-bottom: 1rem; border: 1px solid #d2dfd5; border-radius: 14px; }
+  .receipt-alias-table td { border: 0; padding: .4rem 0; }
+  .receipt-alias-table td::before { display: block; font-weight: 600; margin-bottom: .3rem; }
+  .receipt-alias-table td:nth-child(1)::before { content: "Supermercado"; }
+  .receipt-alias-table td:nth-child(2)::before { content: "Texto del ticket"; }
+  .receipt-alias-table td:nth-child(3)::before { content: "Producto y unidades"; }
+}

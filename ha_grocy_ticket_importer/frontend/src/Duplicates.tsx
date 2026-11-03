@@ -1,3 +1,4 @@
+import { ResolvedMergeReview } from "./ResolvedMergeReview";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -24,6 +25,7 @@ export function Duplicates() {
     queryFn: getCatalogAudit,
     enabled: false,
   });
+  const [resolutionMode, setResolutionMode] = useState(false);
   const [pair, setPair] = useState<[number, number] | null>(null);
   return (
     <main>
@@ -101,7 +103,7 @@ export function Duplicates() {
         </p>
       )}
       {data?.length === 0 && <p>No se han detectado posibles duplicados.</p>}
-      {pair && <MergeReview key={pair.join(":")} pair={pair} onSwap={() => setPair([pair[1], pair[0]])} onClose={() => setPair(null)} onMerged={() => { setPair(null); setMessage("Productos combinados. Se ha conservado el producto elegido."); void refresh(); }} />}
+      {pair && <MergeReview key={pair.join(":")} pair={pair} resolutionMode={resolutionMode} setResolutionMode={setResolutionMode} onSwap={() => setPair([pair[1], pair[0]])} onClose={() => setPair(null)} onMerged={() => { setPair(null); setMessage("Productos combinados. Se ha conservado el producto elegido."); void refresh(); }} />}
       <div className="items">
         {data?.map((group, index) => (
           <article className="item duplicate-group" key={index}>
@@ -121,7 +123,7 @@ export function Duplicates() {
                 <button
                   className="secondary-button"
                   onClick={() =>
-                    setPair([group.items[0].id, group.items[1].id])
+                    { setResolutionMode(false); setPair([group.items[0].id, group.items[1].id]); }
                   }
                 >
                   Revisar combinación
@@ -137,11 +139,12 @@ export function Duplicates() {
 }
 
 
-function MergeReview({ pair, onSwap, onClose, onMerged }: { pair: [number, number]; onSwap: () => void; onClose: () => void; onMerged: () => void }) {
+function MergeReview({ pair, onSwap, onClose, onMerged, resolutionMode, setResolutionMode }: { resolutionMode: boolean; setResolutionMode: (value: boolean) => void; pair: [number, number]; onSwap: () => void; onClose: () => void; onMerged: () => void }) {
   const preview = useQuery({ queryKey: ["merge-preview", pair], queryFn: () => getMergePreview(...pair), retry: false, staleTime: 0 });
   const [confirmation, setConfirmation] = useState("");
   const [attempted, setAttempted] = useState(false);
   const merge = useMutation({ mutationFn: () => mergeCatalogProducts(preview.data!, confirmation, crypto.randomUUID()), retry: false, onMutate: () => setAttempted(true), onSuccess: onMerged });
+  if (resolutionMode) return <ResolvedMergeReview pair={pair} onSwap={onSwap} onClose={onClose} onBack={() => setResolutionMode(false)} onMerged={onMerged} />;
   return <section className="item audit-panel merge-review" aria-label="Revisar combinación">
     <h3>Combinar productos</h3>
     <button className="secondary-button" disabled={merge.isPending} onClick={onClose}>Cerrar revisión</button>
@@ -155,6 +158,7 @@ function MergeReview({ pair, onSwap, onClose, onMerged }: { pair: [number, numbe
       </label>
       <p><strong>Se conserva:</strong> {preview.data.target.name} (ID {preview.data.target.id}) · {preview.data.target.stock_amount} unidades.</p>
       <p><strong>Se integra y desaparece:</strong> {preview.data.source.name} (ID {preview.data.source.id}) · {preview.data.source.stock_amount} unidades.</p>
+      <button className="secondary-button" type="button" disabled={attempted} onClick={() => { setConfirmation(""); setResolutionMode(true); }}>Definir unidades y stock finales</button>
       <p>Se conservan el nombre, descripción, foto y configuración del producto elegido. Sus lotes, movimientos, códigos y referencias de Grocy se reúnen sin consumir stock. Esta combinación no se puede deshacer.</p>
       {preview.data.audit && <ul>{preview.data.audit.collections.map(row => <li key={row.collection}>{row.label}: {row.status === "ok" ? row.count + " registro(s)" : "No disponible"}</li>)}</ul>}
       {preview.data.blockers.length > 0 && <div role="alert"><strong>No se pueden combinar:</strong><ul>{preview.data.blockers.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Puedes cambiar el producto que conservarás o marcar esta pareja como diferente.</p></div>}

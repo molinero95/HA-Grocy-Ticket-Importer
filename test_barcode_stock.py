@@ -249,12 +249,12 @@ class BarcodeTests(unittest.TestCase):
             if path == "objects/quantity_units":
                 return [{"id": 2, "name": "Unidad"}]
             if path == "stock":
-                return [{"product_id": 5, "amount": 3}, {"product_id": 8, "amount": "1.5"}]
+                return [{"product_id": 5, "amount": 3}, {"product_id": 8, "amount": "1.095"}]
             raise AssertionError(f"Unexpected API call: {path}")
         api.side_effect = fake
         result = barcode_stock.inventory_snapshot()
         self.assertEqual([(p["name"], p["amount"], p["unit"]) for p in result],
-                         [("Leche", "3", "Unidad"), ("Pasta", "1.5", "Unidad"),
+                         [("Leche", "3", "Unidad"), ("Pasta", "1.095", "Unidad"),
                           ("Sin stock", "0", "Unidad")])
         self.assertEqual(api.call_count, 3)
         self.assertFalse(any(c.args[0] != "GET" for c in api.call_args_list))

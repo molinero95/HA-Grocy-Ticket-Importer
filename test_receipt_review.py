@@ -83,3 +83,44 @@ class ReviewedPurchaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'repeated'):
             self.run_import('--commit')
         self.assertEqual(self.writes, [])
+
+    def test_explicit_existing_addition_preserves_original_cost_and_purchase_conversion(self):
+        self.products = [{'id': 17, 'name': 'Yogur natural', 'qu_id_stock': 2, 'qu_id_purchase': 3}]
+        self.conversions = [{'product_id': 17, 'from_qu_id': 3, 'to_qu_id': 2, 'factor': 5}]
+        self.amount = 5
+        self.edit(product_id=17, stock_to_add='3', expected_stock='5')
+        receipt = json.loads(self.receipt.read_text());receipt['items'][0]['product_mode'] = 'existing';self.receipt.write_text(json.dumps(receipt))
+        self.assertIn('3 Piece', self.run_import('--dry-run'))
+        self.assertEqual(self.writes, [])
+        self.run_import('--commit');self.assertEqual(self.amount, 8)
+        self.assertEqual(self.writes, [('stock/products/17/add', {'amount': 3.0, 'price': 2.0, 'best_before_date': '2999-12-31', 'location_id': int(__import__('os').environ.get('GROCY_LOCATION_ID','2')), 'note': self.writes[0][1]['note']})])
+        self.assertEqual(self.conversions[0]['factor'], 5)
+        self.assertIn('SKIP imported', self.run_import('--commit'));self.assertEqual(self.amount, 8)
+
+    def test_explicit_addition_rejects_stale_stock_before_any_write(self):
+        self.products = [{'id': 17, 'name': 'Yogur natural', 'qu_id_stock': 2, 'qu_id_purchase': 3}]
+        self.conversions = [{'product_id': 17, 'from_qu_id': 3, 'to_qu_id': 2, 'factor': 5}]
+        self.edit(product_id=17, stock_to_add='3', expected_stock='5')
+        receipt = json.loads(self.receipt.read_text());receipt['items'][0]['product_mode'] = 'existing';self.receipt.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, 'stock ha cambiado'): self.run_import('--commit')
+        self.assertEqual(self.writes, [])
+
+    def test_direct_addition_validation_and_advisory_ranking(self):
+        from receipt_review import suggestions
+        base = {'name': 'Yogur', 'quantity': 1, 'stock_unit': 'piece', 'product_mode': 'existing', 'product_id': 17, 'stock_to_add': '3', 'expected_stock': '5'}
+        for value in ('0', 'NaN', '1.5', '-1', '1000001'):
+            with self.subTest(value=value), self.assertRaises(ValueError): validate_review({**base, 'stock_to_add': value})
+        self.assertEqual(suggestions('YOGUR NAT', [{'id': 1, 'name': 'Lejia'}, {'id': 2, 'name': 'Yogur natural'}]), [2])
+        self.assertEqual(suggestions('XYZ999', [{'id': 2, 'name': 'Yogur natural'}]), [])
+
+    def test_multiple_explicit_lines_check_same_starting_stock_before_writing(self):
+        self.products = [{'id': 17, 'name': 'Yogur natural', 'qu_id_stock': 2, 'qu_id_purchase': 3}]
+        self.conversions = [{'product_id': 17, 'from_qu_id': 3, 'to_qu_id': 2, 'factor': 5}]
+        self.amount = 5
+        self.edit(product_id=17, stock_to_add='3', expected_stock='5')
+        receipt = json.loads(self.receipt.read_text());receipt['items'][0]['product_mode'] = 'existing'
+        receipt['items'].append({**receipt['items'][0], 'stock_to_add': '4'});receipt['total'] = 12
+        self.receipt.write_text(json.dumps(receipt))
+        self.run_import('--commit');self.assertEqual(self.amount, 12)
+        self.assertEqual(len(self.writes), 2)
+        self.assertIn('SKIP imported', self.run_import('--commit'));self.assertEqual(self.amount, 12)

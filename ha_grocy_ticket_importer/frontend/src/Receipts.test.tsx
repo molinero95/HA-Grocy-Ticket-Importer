@@ -33,7 +33,7 @@ async function upload() {
     screen.getByLabelText("Foto o PDF del ticket"),
     new File(["fixture"], "ticket.png", { type: "image/png" }),
   );
-  await screen.findByLabelText("Artículo");
+  await screen.findAllByLabelText("Artículo");
 }
 async function preview() {
   await upload();
@@ -224,7 +224,7 @@ it("selects a canonical product by ID and applies its current purchase units", a
     products: [
       {
         id: 41,
-        name: "Yogur natural",
+        name: "Yogur natural", current_stock: "0",
         stock_unit: "piece",
         pieces_per_pack: 6,
       },
@@ -262,7 +262,7 @@ it("selects a canonical product by ID and applies its current purchase units", a
 it("loads a remembered merchant mapping while retaining the original receipt text", async () => {
   vi.mocked(api.getReceiptReviewContext).mockResolvedValue({
     products: [
-      { id: 41, name: "Leche entera", stock_unit: "piece", pieces_per_pack: 1 },
+      { id: 41, name: "Leche entera", current_stock: "0", stock_unit: "piece", pieces_per_pack: 1 },
     ],
     mappings: {
       leche: { product_id: 41, stock_unit: "piece", pieces_per_pack: 1 },
@@ -315,7 +315,7 @@ it("shows fractional kilogram amounts exactly and never multiplies kilograms by 
 it("requires an explicit replacement when a remembered product or conversion is stale", async () => {
   vi.mocked(api.getReceiptReviewContext).mockResolvedValue({
     products: [
-      { id: 41, name: "Leche entera", stock_unit: "piece", pieces_per_pack: 6 },
+      { id: 41, name: "Leche entera", current_stock: "0", stock_unit: "piece", pieces_per_pack: 6 },
     ],
     mappings: {
       leche: {
@@ -355,4 +355,43 @@ it("cancelling live camera keeps the current receipt review and never imports st
   expect(screen.getByLabelText("Artículo")).toHaveProperty("value", "Leche");
   expect(api.commitReceipt).not.toHaveBeenCalled();
   expect(screen.getByLabelText("Foto o PDF del ticket")).toBeTruthy();
+});
+
+it("lets pack input be empty and replaces a leading zero while typing", async () => {
+  renderWithClient(<Receipts />);await upload();
+  const input = screen.getByLabelText("Piezas por envase");
+  await userEvent.clear(input);expect(input).toHaveProperty("value", "");
+  await userEvent.type(input, "05");expect(input).toHaveProperty("value", "5");
+  expect(screen.getByLabelText("Cantidad final calculada")).toHaveProperty("value", "10");
+});
+it("selected products accept a direct addition and show current plus final stock instead of pack editing", async () => {
+  vi.mocked(api.getReceiptReviewContext).mockResolvedValue({ products: [{ id: 41, name: "Leche entera", current_stock: "5", stock_unit: "piece", pieces_per_pack: 6 }], mappings: {}, line_suggestions: [[41]] });
+  renderWithClient(<Receipts />);await upload();
+  expect(screen.getByRole("group", { name: "Sugeridos por parecido" })).toBeTruthy();
+  expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty("value", "auto");
+  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "41");
+  expect(screen.queryByLabelText("Piezas por envase")).toBeNull();
+  expect(screen.getByText("Stock actual: 5 Piece")).toBeTruthy();
+  const input = screen.getByLabelText("Cantidad a añadir");
+  await userEvent.clear(input);await userEvent.type(input, "3");
+  expect(screen.getByLabelText("Cantidad final calculada")).toHaveProperty("value", "8");
+  await userEvent.click(screen.getByRole("button", { name: "Simular importación" }));
+  expect(api.previewReceipt).toHaveBeenLastCalledWith("ticket-1", [expect.objectContaining({ stock_to_add: "3", expected_stock: "5", pieces_per_pack: 6, product_id: 41 })]);
+});
+it("offers complete catalog and new creation when no similar suggestion exists", async () => {
+  vi.mocked(api.getReceiptReviewContext).mockResolvedValue({ products: [{ id: 41, name: "Arroz", current_stock: "0", stock_unit: "piece", pieces_per_pack: 1 }], mappings: {}, line_suggestions: [[]] });
+  renderWithClient(<Receipts />);await upload();
+  await screen.findByText("Sin sugerencias por parecido. Puedes elegir cualquier producto o crear uno nuevo.");
+  expect(screen.getByRole("option", { name: "Arroz" })).toBeTruthy();
+  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "new");
+  expect(screen.getByLabelText("Piezas por envase")).toHaveProperty("disabled", false);
+});
+it("aggregates all explicitly associated lines into the same final product stock", async () => {
+  vi.mocked(api.uploadReceipt).mockResolvedValue({ receipt_id: "repeated-lines", receipt: { items: [{ name: "Leche", quantity: 1 }, { name: "Leche", quantity: 1 }] } });
+  vi.mocked(api.getReceiptReviewContext).mockResolvedValue({ products: [{ id: 41, name: "Leche entera", current_stock: "5", stock_unit: "piece", pieces_per_pack: 1 }], mappings: { leche: { product_id: 41, stock_unit: "piece", pieces_per_pack: 1 } } });
+  renderWithClient(<Receipts />);await upload();
+  const inputs = await screen.findAllByLabelText("Cantidad a añadir");
+  await userEvent.clear(inputs[0]);await userEvent.type(inputs[0], "3");
+  await userEvent.clear(inputs[1]);await userEvent.type(inputs[1], "4");
+  for (const total of screen.getAllByLabelText("Cantidad final calculada")) expect(total).toHaveProperty("value", "12");
 });

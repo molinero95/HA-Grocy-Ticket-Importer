@@ -32,7 +32,7 @@ export function StockStepper({ id, name, amount, unit }: { id: number; name: str
       if (target.current === Math.round(Number(baseline.current) * 1000)) { if (mounted.current) setDraft(null); return; }
       pending.current = true;
       if (mounted.current) setBusy(true);
-      const desired = (target.current / 1000).toFixed(3);
+      const desired = String(target.current / 1000);
       try {
         await client.cancelQueries({ queryKey: ["inventory"] });
         const result = await adjustCatalogStock(id, desired, baseline.current, crypto.randomUUID(), true);

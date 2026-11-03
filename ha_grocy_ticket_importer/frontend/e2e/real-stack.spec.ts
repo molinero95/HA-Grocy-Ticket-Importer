@@ -415,3 +415,34 @@ test("unknown Alexa arrival creates a zero-stock product and a manageable associ
   await row.getByRole("button", {name: "Jabon canonico e2e", exact: true}).click();
   await expect(page.getByLabel("Cantidad final", {exact: true})).toHaveValue("0");
 });
+
+test("reviewed duplicate resolution converts stock units and commits the explicit final total", async ({ page }, info) => {
+  await page.goto(base + "react/");
+  const units = (await (await page.request.get(base + "api/v1/catalog/units")).json()).units as { id: number; name: string }[];
+  const kg = units.find(u => u.name === "Kilogram")!.id, piece = units.find(u => u.name === "Piece")!.id;
+  const names = ["Tomate combinación revisada", "Tomates combinación revisada"];
+  const first = await command(page, "api/v1/catalog/products", { name: names[0], unit_id: kg, initial_stock: "1.5" });
+  expect(first.status()).toBe(201);
+  const second = await command(page, "api/v1/catalog/products", { name: names[1], unit_id: piece, initial_stock: "2" });
+  expect(second.status()).toBe(201);
+  const source = (await first.json()).product_id, target = (await second.json()).product_id;
+  await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar duplicados y auditoría" }).click();
+  const group = page.locator(".duplicate-group").filter({ hasText: names[0] }).filter({ hasText: names[1] }).first();
+  await group.getByRole("button", { name: "Revisar combinación" }).click();
+  await page.getByRole("button", { name: "Definir unidades y stock finales" }).click();
+  // Always retain the Piece product, regardless of candidate ordering.
+  await page.getByLabel("Producto que conservarás").selectOption(String(target));
+  await expect(page.getByLabel("Producto que conservarás")).toHaveValue(String(target));
+  await page.getByLabel(`Equivalencia de ${names[0]}`, { exact: true }).fill("2");
+  await page.getByLabel("Stock final que debe quedar").fill("4");
+  await page.getByRole("button", { name: "Revisar resultado final" }).click();
+  await expect(page.getByLabel("Resultado final revisado")).toContainText("-1 Piece");
+  await page.screenshot({ path: info.outputPath("resolved-merge-mobile.png"), fullPage: true });
+  await page.getByLabel(`Escribe «${names[1]}» para confirmar combinación`).fill(names[1]);
+  await page.getByRole("button", { name: "Combinar con estos datos finales" }).click();
+  await expect(page.getByText("Productos combinados. Se ha conservado el producto elegido.")).toBeVisible();
+  const final = await (await page.request.get(base + `api/v1/catalog/products/${target}`)).json();
+  expect(Number(final.stock_amount)).toBe(4);
+  expect((await page.request.get(base + `api/v1/catalog/products/${source}`)).ok()).toBe(false);
+});

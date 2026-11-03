@@ -8,8 +8,34 @@ from decimal import InvalidOperation
 from pathlib import Path
 from flask import jsonify, request, session
 from werkzeug.utils import secure_filename
-from receipt_review import validate_review, mappings, has_review, key
+from receipt_review import validate_review, mappings, has_review, key, suggestions
 import importer
+
+
+def receipt_catalog():
+    products = importer.grocy('GET', 'objects/products')
+    units = {int(u['id']): u['name'].casefold() for u in importer.grocy('GET', 'objects/quantity_units')}
+    conversions = importer.grocy('GET', 'objects/quantity_unit_conversions')
+    catalog = []
+    for p in products:
+        if str(p.get('active', 1)).lower() not in ('1', 'true'):
+            continue
+        label = units.get(int(p['qu_id_stock']), '')
+        unit = 'piece' if label in ('piece', 'pieces', 'unidad', 'unidades') else 'kg' if label in ('kg', 'kilogram', 'kilograms', 'kilogramo', 'kilogramos') else None
+        if unit is None:
+            continue
+        stock_id, purchase_id = int(p['qu_id_stock']), int(p.get('qu_id_purchase') or p['qu_id_stock'])
+        if purchase_id != stock_id and (unit != 'piece' or units.get(purchase_id) not in ('pack', 'paquete', 'envase')):
+            continue
+        try:
+            from purchase_units import purchase_factor
+            factor = purchase_factor(lambda method, route: conversions, int(p['id']), purchase_id, stock_id)
+            if factor != factor.to_integral_value() or not 1 <= factor <= 1000:
+                continue
+        except (ValueError, ArithmeticError):
+            continue
+        catalog.append({'id': int(p['id']), 'name': p['name'], 'stock_unit': unit, 'pieces_per_pack': int(factor)})
+    return sorted(catalog, key=lambda p: p["name"].casefold())
 
 
 def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, lock):
@@ -27,6 +53,36 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
             finally:
                 lock.release()
         return wrapped
+
+    @app.get("/api/v1/receipt-aliases")
+    def api_receipt_aliases():
+        try:
+            from receipt_review import list_aliases
+            products = receipt_catalog()
+            active = {p['id']: p for p in products}
+            rows = list_aliases(importer.DB_PATH)
+            for row in rows:
+                product = active.get(row['product_id'])
+                row['stale'] = not product or any(product[field] != row[field] for field in ('stock_unit', 'pieces_per_pack'))
+            return jsonify({'aliases': rows, 'products': products})
+        except Exception:
+            return jsonify({'error': 'No se pudieron consultar los alias de tickets'}), 503
+
+    @app.route("/api/v1/receipt-aliases", methods=['PUT', 'DELETE'])
+    @exclusive_preview
+    def api_change_receipt_alias():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict): return jsonify({'error': 'invalid_payload'}), 400
+        try:
+            from receipt_review import change_alias
+            # Edits only change local future suggestions, never stock or receipt history.
+            products = receipt_catalog() if request.method == 'PUT' else []
+            change_alias(importer.DB_PATH, payload, products, delete=request.method == 'DELETE')
+            return jsonify({'saved': True})
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 409
+        except Exception:
+            return jsonify({'error': 'No se pudo confirmar el cambio. Actualiza los alias antes de reintentar.'}), 503
 
     @app.post("/api/v1/receipts")
     def api_v1_upload_receipt():
@@ -72,34 +128,23 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
             return jsonify({"error": "receipt_not_found"}), 404
         try:
             receipt = json.loads(path.read_text(encoding="utf-8"))
-            products = importer.grocy('GET', 'objects/products')
-            units = {int(u['id']): u['name'].casefold() for u in importer.grocy('GET', 'objects/quantity_units')}
-            conversions = importer.grocy('GET', 'objects/quantity_unit_conversions')
-            catalog = []
-            for p in products:
-                if str(p.get('active', 1)).lower() not in ('1', 'true'):
-                    continue
-                label = units.get(int(p['qu_id_stock']), '')
-                unit = 'piece' if label in ('piece', 'pieces', 'unidad', 'unidades') else 'kg' if label in ('kg', 'kilogram', 'kilograms', 'kilogramo', 'kilogramos') else None
-                if unit is None:
-                    continue
-                stock_id, purchase_id = int(p['qu_id_stock']), int(p.get('qu_id_purchase') or p['qu_id_stock'])
-                if purchase_id != stock_id and (unit != 'piece' or units.get(purchase_id) not in ('pack', 'paquete', 'envase')):
-                    continue
-                try:
-                    from purchase_units import purchase_factor
-                    factor = purchase_factor(lambda method, route: conversions, int(p['id']), purchase_id, stock_id)
-                    if factor != factor.to_integral_value() or not 1 <= factor <= 1000:
-                        continue
-                except (ValueError, ArithmeticError):
-                    continue
-                catalog.append({'id': int(p['id']), 'name': p['name'], 'stock_unit': unit, 'pieces_per_pack': int(factor)})
+            catalog = receipt_catalog()
+            from decimal import Decimal
+            stocks = importer.grocy('GET', 'stock')
+            if not isinstance(stocks, list): raise ValueError('Stock unavailable')
+            amounts = {}
+            for row in stocks:
+                pid, amount = int(row['product_id']), Decimal(str(row['amount']))
+                if not amount.is_finite() or amount < 0: raise ValueError('Stock unknown')
+                if pid in amounts: raise ValueError('Duplicated stock summary')
+                amounts[pid] = str(amount)
+            for product in catalog: product['current_stock'] = amounts.get(product['id'], '0')
             saved = mappings(importer.DB_PATH, receipt.get('merchant', ''))
             active = {p['id']: p for p in catalog}
             for value in saved.values():
                 current = active.get(value['product_id'])
                 value['stale'] = not current or current['stock_unit'] != value['stock_unit'] or current['pieces_per_pack'] != value['pieces_per_pack']
-            return jsonify({'products': sorted(catalog, key=lambda p: p['name'].casefold()), 'mappings': saved, 'line_mappings': [saved.get(key(item.get('original_name', item['name']))) for item in receipt['items']]})
+            return jsonify({'products': sorted(catalog, key=lambda p: p['name'].casefold()), 'mappings': saved, 'line_suggestions': [suggestions(item.get('original_name', item['name']), catalog) for item in receipt['items']], 'line_mappings': [saved.get(key(item.get('original_name', item['name']))) for item in receipt['items']]})
         except Exception:
             app.logger.exception('receipt_review_context_failed')
             return jsonify({'error': 'No se pudo consultar el catálogo del ticket'}), 503
@@ -129,13 +174,16 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
                 name = edited.get("name")
                 if not isinstance(name, str) or not 0 < len(name.strip()) <= 200:
                     raise ValueError("invalid_name")
-                reviewed = {**original, **{key: edited[key] for key in ('purchase_units', 'pieces_per_pack', 'stock_unit', 'product_mode', 'product_id', 'remember_product', 'unit_confirmed') if key in edited}}
+                reviewed = {**original, **{key: edited[key] for key in ('purchase_units', 'pieces_per_pack', 'stock_unit', 'product_mode', 'product_id', 'remember_product', 'unit_confirmed', 'stock_to_add', 'expected_stock') if key in edited}}
+                if reviewed.get('product_mode') != 'existing':
+                    reviewed.pop('stock_to_add', None); reviewed.pop('expected_stock', None)
+                    original.pop('stock_to_add', None); original.pop('expected_stock', None)
                 qty, factor = validate_review(reviewed)
                 original.setdefault("original_name", original["name"])
                 original["name"] = name.strip()
                 original["purchase_units"] = str(qty)
                 original["pieces_per_pack"] = factor
-                for key in ('stock_unit', 'product_mode', 'product_id', 'remember_product', 'unit_confirmed'):
+                for key in ('stock_unit', 'product_mode', 'product_id', 'remember_product', 'unit_confirmed', 'stock_to_add', 'expected_stock'):
                     if key in edited:
                         original[key] = edited[key]
         except (ValueError, InvalidOperation, TypeError, KeyError):
