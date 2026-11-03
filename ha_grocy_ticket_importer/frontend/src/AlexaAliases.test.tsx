@@ -4,59 +4,83 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { AlexaAliases } from "./AlexaAliases";
 import * as api from "./api";
 import { deferred, renderWithClient } from "./test/helpers";
-
-vi.mock("./api", () => ({
-  getInventory: vi.fn(), getAlexaAliases: vi.fn(), saveAlexaAlias: vi.fn(), deleteAlexaAlias: vi.fn(),
-}));
-const item = (id: number, name: string) => ({
-  id, name, amount: "0", unit: "Piece", image_url: null, shopping_amount: "0",
-  shopping_step: "1", shopping_unit: "Piece", shopping_can_subtract: false,
-});
-const aliases = [
-  { key: "leche", name: "Leche", product_id: 7 },
-  { key: "bebida blanca", name: "Bebida blanca", product_id: 7 },
-  { key: "rojo", name: "Rojo", product_id: 8 },
-];
+vi.mock("./api", () => ({ getInventory: vi.fn(), getAlexaAliases: vi.fn(), saveAlexaAlias: vi.fn(), updateAlexaAlias: vi.fn(), deleteAlexaAlias: vi.fn() }));
+const item = (id: number, name: string) => ({ id, name, amount: "0", unit: "Piece", image_url: null, shopping_amount: "0", shopping_step: "1", shopping_unit: "Piece", shopping_can_subtract: false });
+const aliases = [{ key: "leche", name: "Leche", product_id: 7 }, { key: "bebida blanca", name: "Bebida blanca", product_id: 7 }, { key: "rojo", name: "Rojo", product_id: 8 }];
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(api.getInventory).mockResolvedValue({ items: [item(7, "Leche entera"), item(8, "Tomate")] });
-  vi.mocked(api.getAlexaAliases).mockResolvedValue({ aliases });
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [item(7, "Leche entera"), item(8, "Tomáte")] });
+  vi.mocked(api.getAlexaAliases).mockResolvedValue({ aliases, suggestions: ["Leche normal", "Pan"] });
 });
-
-it("lists every alias for the selected product and guards deletion with its product ID", async () => {
+it("lists all editable aliases immediately and deletes only the reviewed identity", async () => {
   vi.mocked(api.deleteAlexaAlias).mockResolvedValue({});
   renderWithClient(<AlexaAliases />);
-  await screen.findByRole("option", { name: "Leche entera" });
-  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "7");
-  expect(await screen.findByRole("button", { name: "Eliminar alias Leche" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Eliminar alias Bebida blanca" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Eliminar alias Rojo" })).toBeNull();
+  expect(await screen.findByLabelText("Alias: Leche")).toHaveProperty("value", "Leche");
+  expect(screen.getByLabelText("Alias: Rojo")).toBeTruthy();
   await userEvent.click(screen.getByRole("button", { name: "Eliminar alias Leche" }));
   expect(api.deleteAlexaAlias).toHaveBeenCalledExactlyOnceWith("leche", 7);
 });
-
-it("locks the product and editor during save, then preserves errors without losing the name", async () => {
-  const save = deferred<unknown>();
-  vi.mocked(api.saveAlexaAlias).mockReturnValue(save.promise);
+it("searches alias and product without accents/case and retains hidden drafts", async () => {
   renderWithClient(<AlexaAliases />);
-  await screen.findByRole("option", { name: "Leche entera" });
-  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "7");
-  await userEvent.click(screen.getByRole("button", { name: "Añadir nuevo alias" }));
-  await userEvent.type(screen.getByLabelText("Nuevo nombre en Alexa"), "Leche normal");
-  await userEvent.click(screen.getByRole("button", { name: "Guardar alias" }));
-  expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty("disabled", true);
-  expect(screen.getByRole("button", { name: "Cancelar" })).toHaveProperty("disabled", true);
-  await act(async () => save.reject(new Error("El alias pertenece a otro producto")));
-  await screen.findByRole("alert");
-  expect(screen.getByLabelText("Nuevo nombre en Alexa")).toHaveProperty("value", "Leche normal");
-  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "8");
-  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  const milk = await screen.findByLabelText("Alias: Leche");
+  await userEvent.selectOptions(milk, "__write_alias__");
+  await userEvent.type(screen.getByLabelText("Escribir alias: leche"), " normal");
+  const search = screen.getByRole("searchbox", { name: "Buscar alias o producto" });
+  await userEvent.type(search, "TOMATE");
+  expect(screen.getByLabelText("Alias: Rojo")).toBeTruthy();
+  expect(screen.queryByRole("combobox", { name: "Alias: Leche" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Borrar búsqueda de alias" }));
+  expect(screen.getByLabelText("Escribir alias: leche")).toHaveProperty("value", "Leche normal");
+  await userEvent.type(search, "BEBIDA");
+  expect(screen.getByLabelText("Alias: Bebida blanca")).toBeTruthy();
+  expect(screen.queryByRole("combobox", { name: "Alias: Rojo" })).toBeNull();
 });
-
-it("allows removing stale aliases even when their product is absent from the selector", async () => {
+it("atomically saves both edited fields with the original expected identity, once", async () => {
+  const pending = deferred<Awaited<ReturnType<typeof api.updateAlexaAlias>>>();
+  vi.mocked(api.updateAlexaAlias).mockReturnValue(pending.promise);
+  renderWithClient(<AlexaAliases />);
+  const input = await screen.findByLabelText("Alias: Leche");
+  await userEvent.selectOptions(input, "Leche normal");
+  await userEvent.selectOptions(screen.getByLabelText("Producto para Leche"), "8");
+  await userEvent.dblClick(screen.getByRole("button", { name: "Guardar alias Leche" }));
+  expect(api.updateAlexaAlias).toHaveBeenCalledExactlyOnceWith(aliases[0], "Leche normal", 8);
+  expect(input).toHaveProperty("disabled", true);
+  await act(async () => pending.reject(new Error("La asociación ha cambiado")));
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "La asociación ha cambiado");
+  expect(input).toHaveProperty("value", "Leche normal");
+  expect(screen.getByLabelText("Producto para Leche")).toHaveProperty("value", "8");
+  await userEvent.click(screen.getByRole("button", { name: "Descartar cambios de Leche" }));
+  expect(input).toHaveProperty("value", "Leche");
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+it("adds a new alias with both fields, keeps errors and locks writes during save", async () => {
+  const pending = deferred<unknown>(); vi.mocked(api.saveAlexaAlias).mockReturnValue(pending.promise);
+  renderWithClient(<AlexaAliases />);
+  await screen.findByRole("table");
+  await userEvent.selectOptions(screen.getByLabelText("Nuevo alias"), "__write_alias__");
+  await userEvent.type(screen.getByLabelText("Escribir nuevo alias"), "Leche normal");
+  await waitFor(() => expect(screen.getByLabelText("Producto del nuevo alias")).not.toHaveProperty("disabled", true));
+  await userEvent.selectOptions(screen.getByLabelText("Producto del nuevo alias"), "7");
+  await userEvent.dblClick(screen.getByRole("button", { name: "Añadir alias" }));
+  expect(api.saveAlexaAlias).toHaveBeenCalledExactlyOnceWith("Leche normal", 7);
+  expect(screen.getByLabelText("Producto del nuevo alias")).toHaveProperty("disabled", true);
+  await act(async () => pending.reject(new Error("El alias pertenece a otro producto")));
+  await screen.findByRole("alert");
+  expect(screen.getByLabelText("Escribir nuevo alias")).toHaveProperty("value", "Leche normal");
+});
+it("keeps unavailable-product aliases visible for guarded removal or reassignment", async () => {
   vi.mocked(api.getAlexaAliases).mockResolvedValue({ aliases: [{ key: "antiguo", name: "Antiguo", product_id: 99 }] });
   vi.mocked(api.deleteAlexaAlias).mockResolvedValue({});
   renderWithClient(<AlexaAliases />);
-  await userEvent.click(await screen.findByRole("button", { name: "Eliminar alias Antiguo" }));
+  expect(await screen.findByText("Producto no disponible")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Guardar alias Antiguo" })).toHaveProperty("disabled", true);
+  await userEvent.click(screen.getByRole("button", { name: "Eliminar alias Antiguo" }));
   expect(api.deleteAlexaAlias).toHaveBeenCalledExactlyOnceWith("antiguo", 99);
+});
+it("distinguishes an empty catalog of aliases, no matches and read failure", async () => {
+  renderWithClient(<AlexaAliases />);
+  await screen.findByRole("table");
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar alias o producto" }), "inexistente");
+  expect(screen.getByText("No hay alias ni productos que coincidan con la búsqueda.")).toBeTruthy();
+  expect(screen.getByLabelText("Nuevo alias")).toBeTruthy();
 });

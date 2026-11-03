@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Receipts } from "./Receipts";
@@ -343,4 +343,23 @@ it("requires an explicit replacement when a remembered product or conversion is 
     "value",
     "12",
   );
+});
+
+it("opens the native camera picker and cancellation leaves the current review untouched", async () => {
+  renderWithClient(<Receipts />);
+  await upload();
+  const camera = screen.getByLabelText("Foto tomada del ticket") as HTMLInputElement;
+  const click = vi.spyOn(camera, "click");
+  await userEvent.click(screen.getByRole("button", { name: "Tomar foto del ticket" }));
+  expect(click).toHaveBeenCalledOnce();
+  expect(camera.getAttribute("capture")).toBe("environment");
+  expect(camera.accept).not.toContain("pdf");
+  expect(screen.getByLabelText("Foto o PDF del ticket").getAttribute("capture")).toBeNull();
+  fireEvent.change(camera, { target: { files: [] } });
+  expect(api.uploadReceipt).toHaveBeenCalledTimes(1);
+  expect(screen.getByLabelText("Artículo")).toHaveProperty("value", "Leche");
+  const photo = new File(["camera fixture"], "capture.jpg", { type: "image/jpeg" });
+  await userEvent.upload(camera, photo);
+  expect(api.uploadReceipt).toHaveBeenLastCalledWith(photo);
+  expect(api.commitReceipt).not.toHaveBeenCalled();
 });

@@ -90,12 +90,12 @@ configuration controls receipt conversion. Barcode association and restart
 persistence are tested against isolated Grocy 4.7.1. Physical camera and
 Supervisor upgrade acceptance remain deployment checks.
 
-## Despensa 1.20.0 — actualización de la instalación existente
+## Despensa 1.21.0 — actualización de la instalación existente
 
-La versión 1.20.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
+La versión 1.21.0 sirve React en `/`, conserva `/react/` como alias y ofrece compras
 sin JavaScript en `/basic`. El frontend completo anterior está retirado.
 En la tienda de complementos, selecciona **Buscar actualizaciones** y actualiza
-la instalación existente a 1.20.0. Publicar el manifiesto no instala automáticamente la actualización.
+la instalación existente a 1.21.0. Publicar el manifiesto no instala automáticamente la actualización.
 
 **Nuevo producto** está únicamente en Mi despensa. Los productos archivados se consultan y restauran desde **Acciones → Productos archivados**.
 
@@ -140,7 +140,7 @@ Exact barcode lookup starts at the Open Facts universal v3 endpoint (`product_ty
 
 ## Alexa recovery and alias management (1.6.0)
 
-Actions → Alias de Alexa manages multiple names per selected product. Missing/archived product aliases can also be removed. Stale delete requests cannot remove an alias since reassigned to another product.
+Actions → Alias de Alexa now uses the 1.21 editable table: alias selector left, product selector right, search over either column and per-row save/discard/delete. Saved aliases and active cached review names populate the alias selector; an explicit custom-name option remains. Missing/archived targets remain removable or can be explicitly reassigned. PUT uses expected name/product under the worker lock and an atomic SQLite transaction; collisions or stale rows preserve both records. POST/delete compatibility remains. No extra HA calls are made for selectors.
 
 The shopping view reports sanitized worker health and refreshes periodically. An exact-name free-text note is shown for explicit association: choose the matching product to preserve row ID, quantity and note, or remove only that list item. No automatic conversion, duplicate merge or stock change occurs. Existing duplicate product/note rows still need explicit review. The worker keeps its verified checkpoint after failures and does not write remotes with sync disabled. Updating requires preserving the existing queue, aliases, command journal and checkpoints.
 
@@ -240,3 +240,10 @@ The shopping list has instant case/accent-insensitive name search over both pers
 The previous UI/API creation tests stopped at materializing a shopping row, leaving the next worker identity pass untested. New regressions run the complete worker through sync, purchase removal and another cycle without re-import; the real Grocy contract also validates both canonical identities after contextual creation. No production list/stock or checkpoint reset is performed.
 
 Identity-conflict exceptions can carry positive product IDs only. Sanitized health stores/exposes these IDs without names, keys or raw remote exception bodies. The shopping read includes dismissed choices named by the worker, and the UI highlights their product rows even when bought. Generic connection errors still identify no individual product. Existing installations recover their intentional contextual bindings after updating; a new sync cycle verifies the real result.
+
+
+## Name photo search from product details and native receipt capture (1.21.0)
+
+Product details reuse the explicit OpenAI/catalog search with a product-bound token. Search uses the saved name and does not require or assign a barcode. Tokens bind session, product ID, saved name and current local/remote photo snapshot, expire after 30 minutes and are revalidated before saving. The selected source/code is verified again against a trusted exact-code catalog API; browser image URLs are never accepted. An existing photo requires explicit replacement. Legacy creation tokens cannot replace existing images. Previous local bytes are retained as a private version only after the remote photo URL persists; a failed write keeps the active local image. No stock, barcode or name write occurs. Mocked-provider tests and a real Grocy metadata contract cover this path; real paid-provider acceptance remains separate.
+
+Receipt capture has a separate native file input with image-only accept and capture=environment, triggered by “Tomar foto del ticket”. The existing image/PDF picker has no capture hint. Selection resets allow retaking the same file; cancellation keeps the current review. Duplicate uploads are suppressed while in flight. A returned photo goes through the existing extraction, reviewed simulation and explicit import guards. Native camera UI is browser/WebView dependent; Chromium tests verify the picker contract, not physical Android camera behavior.

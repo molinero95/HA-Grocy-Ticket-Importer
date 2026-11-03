@@ -548,7 +548,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.20.0</footer>
+      <footer>Despensa 1.21.0</footer>
     </div>
     </NavigationContext.Provider>
   );

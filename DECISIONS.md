@@ -109,3 +109,10 @@ La creación/asociación explícita desde una nota Alexa es evidencia por ID de 
 ## Edición de cantidad 1.20.0
 
 La compra usa «Editar cantidad» con lápiz y aspecto de enlace, bajo la cantidad y alineado con el nombre. Mantener botón semántico, foco visible y objetivo táctil de 44 px. Acciones Comprado/Pendiente y Quitar en columna fija móvil y fila común en ancho amplio; no dependen del largo del nombre o de la presencia de foto.
+
+
+## Alias, fotos y captura 1.21.0 — 2026-11-03
+
+Tabla de selectores alias/producto con buscador común y guardado por fila; papelera elimina solo alias. Conservar borradores al filtrar, nombres conocidos de revisiones activas y entrada explícita de nombre nuevo. Editar alias exige estado esperado y transacción, sin borrar/crear en dos peticiones.
+
+Buscar foto por nombre desde la ficha es explícito y no exige añadir un código. Vincular elección firmada a producto/sesión/nombre/foto actual; sustituir solo tras elección explícita, sin cambiar stock/códigos. Conservar bytes locales anteriores al aplicar URL verificada. Cámara de tickets mediante selector nativo image-only con capture=environment; mantener archivos/PDF y revisión antes de importar. La UI física depende del navegador/WebView.

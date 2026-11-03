@@ -67,15 +67,25 @@ def register_photo_routes(app, barcode_stock, lock):
             code = barcode_stock.validate_barcode(code) if code.strip() else ""
         except (ValueError, barcode_stock.BarcodeError):
             return jsonify({"error": "Revisa el código de barras"}), 400
+        product_id = payload.get('product_id')
+        if product_id is not None and (type(product_id) is not int or product_id <= 0 or code):
+            return jsonify({'error': 'invalid_payload'}), 400
         if not IDENTIFY_LOCK.acquire(blocking=False):
             return jsonify({"error": "Hay otra búsqueda o análisis de IA en curso"}), 409
         try:
             from itsdangerous import URLSafeTimedSerializer
+            binding = {}
+            if product_id is not None:
+                product = barcode_stock.product_detail(product_id)
+                if product['name'] != name.strip():
+                    return jsonify({'error': 'El nombre ha cambiado. Actualiza la ficha antes de buscar.'}), 409
+                binding = {'product_id': product_id,
+                           'expected_image_url': local_image_url(product_id) or product.get('image_url')}
             result = product_recognition.discover(name, code)
             signer = URLSafeTimedSerializer(app.secret_key, salt="product-name-photo-v1")
             for candidate in result['candidates']:
                 candidate['discovery_token'] = signer.dumps({'name': name.strip(), 'context_code': code,
-                    'candidate_code': candidate['barcode'], 'source_url': candidate['search_source_url'], 'session': session.get('csrf')})
+                    'candidate_code': candidate['barcode'], 'source_url': candidate['search_source_url'], 'session': session.get('csrf'), **binding})
             return jsonify(result)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
@@ -99,7 +109,8 @@ def register_photo_routes(app, barcode_stock, lock):
     def api_v1_save_name_photo(product_id):
         from itsdangerous import URLSafeTimedSerializer, BadData
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not isinstance(payload.get('token'), str) or len(payload['token']) > 8192:
+        if (not isinstance(payload, dict) or not isinstance(payload.get('token'), str) or len(payload['token']) > 8192
+                or type(payload.get('replace', False)) is not bool):
             return jsonify({'error': 'Vuelve a elegir una imagen de la búsqueda'}), 400
         try:
             choice = URLSafeTimedSerializer(app.secret_key, salt="product-name-photo-v1").loads(payload['token'], max_age=1800)
@@ -109,15 +120,29 @@ def register_photo_routes(app, barcode_stock, lock):
         if not lock.acquire(blocking=False): return jsonify({'error': 'operation_in_progress'}), 409
         try:
             product = barcode_stock.product_detail(product_id)
-            code = choice['context_code'] or choice['candidate_code']
-            if product['name'] != choice['name'] or code not in product['barcodes']:
-                return jsonify({'error': 'El nombre o el código han cambiado. Vuelve a elegir la imagen.'}), 409
             existing = local_image_url(product_id) or product.get('image_url')
-            if existing: return jsonify({'saved': False, 'preserved': True})
+            editing = choice.get('product_id') is not None
+            if editing:
+                if (choice['product_id'] != product_id or product['name'] != choice['name']
+                        or existing != choice.get('expected_image_url')):
+                    return jsonify({'error': 'La ficha o su fotografía han cambiado. Actualiza y vuelve a buscar.'}), 409
+                if existing and not payload.get('replace', False):
+                    return jsonify({'saved': False, 'preserved': True})
+            else:
+                code = choice['context_code'] or choice['candidate_code']
+                if product['name'] != choice['name'] or code not in product['barcodes']:
+                    return jsonify({'error': 'El nombre o el código han cambiado. Vuelve a elegir la imagen.'}), 409
+                if existing: return jsonify({'saved': False, 'preserved': True})
             found = product_images.verify_discovered_product(choice['source_url'])
             image = product_images.safe_image_url(found.get('image_url')) if found and found['barcode'] == choice['candidate_code'] else None
             if not image: return jsonify({'saved': False})
             barcode_stock.save_product_photo(product_id, image)
+            if editing:
+                # Keep the previous local image privately; only retire it after URL persistence succeeds.
+                local = image_directory() / f"{product_id}.jpg"
+                if local.exists():
+                    import time
+                    local.rename(image_directory() / f"{product_id}.previous-{time.time_ns()}.jpg")
             return jsonify({'saved': True, 'image_url': image})
         except Exception:
             return jsonify({'error': 'El producto se conserva. No se pudo guardar la imagen seleccionada.'}), 503

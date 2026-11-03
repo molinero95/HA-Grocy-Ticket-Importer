@@ -133,6 +133,83 @@ class PhotoApiTests(unittest.TestCase):
             save.assert_called_once_with(7, URL)
         self.assertEqual(self.product['barcodes'], [CODE])
 
+    def edit_photo_token(self, **overrides):
+        from itsdangerous import URLSafeTimedSerializer
+        import api_photos
+        choice = dict(name='Producto', context_code='', candidate_code=CODE,
+                      source_url='https://world.openfoodfacts.org/product/' + CODE,
+                      session=self.token, product_id=7, expected_image_url=api_photos.local_image_url(7) or self.product['image_url'])
+        choice.update(overrides)
+        return URLSafeTimedSerializer(web.app.secret_key, salt='product-name-photo-v1').dumps(choice)
+
+    def test_edit_photo_works_by_name_without_associating_a_barcode(self):
+        self.product['barcodes'] = []
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), \
+             patch('product_images.verify_discovered_product', return_value={'barcode': CODE, 'image_url': URL}), \
+             patch.object(web.barcode_stock, 'save_product_photo') as save:
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': self.edit_photo_token()}, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertTrue(response.json['saved'])
+        save.assert_called_once_with(7, URL)
+        self.assertEqual(self.product['barcodes'], [])
+
+    def test_edit_photo_rejects_other_product_renames_and_newer_photo(self):
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), patch.object(web.barcode_stock, 'save_product_photo') as save:
+            for change in ({'product_id': 8}, {'name': 'Nombre anterior'}, {'expected_image_url': URL}):
+                response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': self.edit_photo_token(**change), 'replace': True}, headers=self.headers)
+                self.assertEqual(response.status_code, 409, response.json)
+            save.assert_not_called()
+
+    def test_local_photo_replacement_requires_explicit_choice_and_preserves_old_bytes(self):
+        local = Path(self.temp.name, '7.jpg'); local.write_bytes(b'previous-local')
+        token = self.edit_photo_token()
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), \
+             patch('product_images.verify_discovered_product', return_value={'barcode': CODE, 'image_url': URL}), \
+             patch.object(web.barcode_stock, 'save_product_photo') as save:
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token}, headers=self.headers)
+            self.assertTrue(response.json['preserved']); save.assert_not_called()
+            save.side_effect = ConnectionError('private')
+            self.assertEqual(self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token, 'replace': True}, headers=self.headers).status_code, 503)
+            self.assertEqual(local.read_bytes(), b'previous-local')
+            save.side_effect = None
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token, 'replace': True}, headers=self.headers)
+        self.assertTrue(response.json['saved'])
+        self.assertFalse(local.exists())
+        backups = list(Path(self.temp.name).glob('7.previous-*.jpg'))
+        self.assertEqual(len(backups), 1); self.assertEqual(backups[0].read_bytes(), b'previous-local')
+
+    def test_edit_search_binds_saved_name_product_and_photo_before_provider(self):
+        import copy
+        candidate = dict(barcode=CODE, image_url=URL, search_source_url='https://world.openfoodfacts.org/product/' + CODE)
+        payload = dict(name='Producto', barcode='', product_id=7, consent=True)
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), \
+             patch('product_recognition.discover', return_value={'candidates': [copy.deepcopy(candidate)]}) as discover:
+            self.assertEqual(self.client.post('/api/v1/photos/discover', json={**payload, 'name': 'Anterior'}, headers=self.headers).status_code, 409)
+            discover.assert_not_called()
+            response = self.client.post('/api/v1/photos/discover', json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        discover.assert_called_once_with('Producto', '')
+        from itsdangerous import URLSafeTimedSerializer
+        choice = URLSafeTimedSerializer(web.app.secret_key, salt='product-name-photo-v1').loads(response.json['candidates'][0]['discovery_token'])
+        self.assertEqual(choice['product_id'], 7); self.assertIsNone(choice['expected_image_url'])
+
+    def test_legacy_creation_token_cannot_replace_existing_image(self):
+        from itsdangerous import URLSafeTimedSerializer
+        self.product['image_url'] = URL
+        token = URLSafeTimedSerializer(web.app.secret_key, salt='product-name-photo-v1').dumps({
+            'name': 'Producto', 'context_code': CODE, 'candidate_code': CODE,
+            'source_url': 'https://world.openfoodfacts.org/product/' + CODE, 'session': self.token})
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), patch.object(web.barcode_stock, 'save_product_photo') as save:
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token, 'replace': True}, headers=self.headers)
+        self.assertTrue(response.json['preserved']); save.assert_not_called()
+
+    def test_invalid_edit_target_never_reaches_paid_provider(self):
+        with patch('product_recognition.discover') as discover:
+            for pid in (True, -1, '7'):
+                response = self.client.post('/api/v1/photos/discover', json={'name': 'Producto', 'product_id': pid, 'consent': True}, headers=self.headers)
+                self.assertEqual(response.status_code, 400, response.json)
+            discover.assert_not_called()
+
 
 class StandaloneAuthTests(unittest.TestCase):
     def test_anonymous_bootstrap_login_rotation_and_logout(self):

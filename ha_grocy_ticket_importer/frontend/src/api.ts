@@ -117,9 +117,13 @@ export const chooseAlexaMatch = (
 export const removeAlexaMatch = (key: string) =>
   request("alexa/matches/" + encodeURIComponent(key), "DELETE");
 export type AlexaAlias = { key: string; name: string; product_id: number };
-export const getAlexaAliases = () => request<{ aliases: AlexaAlias[] }>("alexa/aliases");
+export const getAlexaAliases = () => request<{ aliases: AlexaAlias[]; suggestions?: string[] }>("alexa/aliases");
 export const saveAlexaAlias = (name: string, product_id: number) =>
   request("alexa/aliases", "POST", { name, product_id });
+export const updateAlexaAlias = (original: AlexaAlias, name: string, product_id: number) =>
+  request<{ alias: AlexaAlias }>("alexa/aliases/" + encodeURIComponent(original.key), "PUT", {
+    name, product_id, expected_name: original.name, expected_product_id: original.product_id,
+  });
 export const deleteAlexaAlias = (key: string, productId: number) =>
   request("alexa/aliases/" + encodeURIComponent(key), "DELETE", { product_id: productId });
 export const getInventory = () => request<InventoryResponse>("inventory");
@@ -469,9 +473,9 @@ export async function identifyProductPhoto(barcode: string, photo: Blob) {
 }
 
 export type ProductDiscoveryCandidate = PhotoLookup & { search_source_url: string; discovery_token?: string };
-export const discoverProduct = (name: string, barcode: string) =>
+export const discoverProduct = (name: string, barcode: string, productId?: number) =>
   request<{ candidates: ProductDiscoveryCandidate[]; advisory: true }>(
-    "photos/discover", "POST", { name, barcode, consent: true },
+    "photos/discover", "POST", { name, barcode, consent: true, ...(productId ? { product_id: productId } : {}) },
   );
 
 
@@ -481,4 +485,4 @@ export const setShoppingQuantity = (item: import("./types").ShoppingItem, amount
     expected_done: item.done, operation_id: operationId,
   });
 
-export const saveNameDiscoveredPhoto = (id: number, token: string) => request("catalog/products/" + id + "/photo-discovery", "POST", { token });
+export const saveNameDiscoveredPhoto = (id: number, token: string, replace?: boolean) => request<{ saved: boolean; image_url?: string; preserved?: boolean }>("catalog/products/" + id + "/photo-discovery", "POST", { token, ...(replace !== undefined ? { replace } : {}) });

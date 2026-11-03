@@ -1,3 +1,4 @@
+import { ProductPhotoSearch } from "./ProductPhotoSearch";
 import { ProductThreshold } from "./ProductThreshold";
 import { ProductPurchase } from "./ProductPurchase";
 import { DeleteProduct } from "./DeleteProduct";
@@ -297,6 +298,8 @@ export function ProductDetail({
               />
             )}
             {photoMessage && <p role="status">{photoMessage}</p>}
+            {product.data && <ProductPhotoSearch key={JSON.stringify([id, product.data.name, product.data.image_url])} id={id} name={product.data.name} imageUrl={product.data.image_url} disabled={editingProduct || updateProduct.isPending || uploadPhoto.isPending} onSaved={refreshProduct} />}
+            {editingProduct && <p>Guarda el nombre antes de buscar una foto con IA.</p>}
             <form
               className="variant-form"
               onSubmit={(event) => {

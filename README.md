@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.20.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.21.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -157,13 +157,13 @@ no modifican todavía la conversión de Grocy ni la importación de tickets.
 No se migran existencias automáticamente. El editor y su persistencia están probados en la suite aislada; verificar
 la actualización de la instalación real al instalar esta versión.
 
-## Despensa 1.20.0
+## Despensa 1.21.0
 
 React 19, TypeScript 7, Vite 7 y Vitest 4. Frontend canónico en
 `ha_grocy_ticket_importer/frontend/`; `frontend/` es un enlace. El contenedor
 compila y sirve React en `/`, con alias `/react/` y compras básicas sin
 JavaScript en `/basic`. El frontend HTML/JS anterior está retirado.
-La versión del manifiesto es 1.20.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
+La versión del manifiesto es 1.21.0; Home Assistant ofrece actualizar la instalación existente al refrescar la tienda. La publicación no instala automáticamente el complemento.
 
 Para desarrollo local, `npm ci`, `npm test` y `npm run build` en `frontend/`.
 Configura `FRONTEND_DIST_DIR` con la ruta absoluta a `frontend/dist` para Flask.
@@ -181,7 +181,7 @@ Consulta la [matriz de paridad](docs/REACT_PARITY.md) y [ROADMAP](ROADMAP.md).
 
 ## Alias y estado de Alexa (1.6.0)
 
-En **Acciones → Alias de Alexa**, selecciona un producto para ver y añadir varios alias. Los productos ausentes o archivados tienen una sección para retirar sus alias. Los alias conservan el nombre original en Alexa; no modifican inventario.
+En **Acciones → Alias de Alexa**, la tabla muestra un selector de alias a la izquierda y un selector de producto a la derecha. Busca por alias o producto, sin distinguir tildes ni mayúsculas. Los nombres conocidos proceden de los alias guardados y de las revisiones activas del sincronizador; **Escribir otro alias…** permite introducir uno nuevo. Cada fila ofrece guardar, descartar cambios y papelera para eliminar el alias conservando su producto. Los alias de productos ausentes o archivados siguen visibles para reasignarlos o retirarlos. Los alias conservan el nombre original en Alexa; no modifican inventario.
 
 La lista muestra si el worker ha fallado o no ha confirmado una sincronización reciente. Si una nota de Grocy coincide exactamente con un producto, abre **Elegir producto** en esa fila y guarda la asociación, o quita únicamente el artículo original. La asociación conserva ID, cantidad y texto. Un producto ya presente o notas duplicadas no se fusionan. La sincronización reanudará su ciclo después de resolver el conflicto; la actualización no modifica automáticamente tus listas.
 
@@ -265,3 +265,12 @@ En **Lista de la compra**, el buscador filtra al escribir por nombre, sin distin
 
 
 **Edición de cantidad 1.20.0:** en la compra, **Editar cantidad** se muestra como enlace con lápiz bajo la cantidad, alineado con el nombre. En móvil, Comprado/Pendiente y Quitar tienen una columna fija común; en pantallas amplias permanecen en la misma línea. El enlace mantiene un área táctil de 44 px y abre el editor existente.
+
+
+## Alias, fotos y cámara de tickets (1.21.0)
+
+En la tabla de alias, cada guardado aplica el cambio de nombre/producto de una fila y rechaza cambios concurrentes o alias duplicados. Filtrar la tabla conserva los cambios sin guardar.
+
+En la ficha del producto → **Fotografía → Buscar foto con IA**, se busca por el nombre guardado, incluso sin código de barras. Revisa la imagen y pulsa **Usar esta foto** o **Sustituir foto por esta imagen**. Solo se cambia la fotografía; el nombre, los códigos y el stock se conservan. Si has editado el nombre, guárdalo antes de buscar.
+
+En **Escanear ticket**, **Tomar foto del ticket** solicita la cámara trasera nativa del teléfono. Al aceptar la fotografía, vuelve al flujo de revisión; no importa stock automáticamente. Se mantiene **Foto o PDF del ticket** para archivos existentes. La apertura directa depende del navegador o WebView; la aceptación en Android/Home Assistant se verifica en el dispositivo.
