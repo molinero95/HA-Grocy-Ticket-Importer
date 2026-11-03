@@ -60,7 +60,7 @@ export function ProductDiscovery({ name, barcode, onUse, productId, currentImage
       <Search size={18} aria-hidden="true" />
       {busy ? "Buscando en catálogos…" : (productId ? "Buscar foto con IA" : "Buscar imagen y código con IA")}
     </button>
-    {error && <p role="alert">{error} Puedes volver a pulsar para reintentar.</p>}
+    {error && <p role="alert">{error} Puedes continuar sin imagen o subir una foto desde la ficha.</p>}
     {result?.identity === identity && <div aria-live="polite">
       {result.candidates.length === 0 ? <p>No se encontraron coincidencias con código verificable. Puedes continuar sin seleccionar una imagen.</p> : <>
         <p>Revisa marca, variante y tamaño. Elige solo el mismo envase y formato.</p>

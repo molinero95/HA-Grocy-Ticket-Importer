@@ -86,7 +86,7 @@ class DiscoveryTests(unittest.TestCase):
             with self.subTest(name=name), patch.object(recognition.urllib.request, "urlopen") as remote, self.assertRaises(ValueError):
                 recognition.discover(name)
             remote.assert_not_called()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(recognition.DiscoveryError):
             self.search(self.result(status="incomplete"))
 
 
@@ -99,7 +99,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(verify.call_count, 3)
 
     def test_oversized_search_response_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "demasiado grande"):
+        with self.assertRaisesRegex(recognition.DiscoveryError, "demasiado grande"):
             self.search({"status": "completed", "output": [], "extra": "x" * 65537})
 
     def test_photo_visible_code_without_prior_code_remains_only_a_suggestion(self):
@@ -168,3 +168,75 @@ class DiscoveryApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(identify.call_args.args[1], "")
         self.assertEqual(response.json["suggestion"]["barcode"], "")
+
+class DiscoveryTransportTests(unittest.TestCase):
+    def test_http_failures_are_actionable_bounded_and_never_retried(self):
+        from urllib.error import HTTPError
+        for status, code, expected in [(401, 'invalid_api_key', 'ai_authentication_failed'), (403, None, 'ai_permission_denied'), (429, 'insufficient_quota', 'ai_quota_exceeded'), (429, 'rate_limit_exceeded', 'ai_rate_limited'), (404, 'model_not_found', 'ai_model_unavailable'), (400, 'invalid_request_error', 'ai_request_rejected'), (503, None, 'ai_service_unavailable')]:
+            with self.subTest(status=status, code=code):
+                body = io.BytesIO(json.dumps({'error': {'code': code, 'message': 'private-key-and-label'}}).encode())
+                error = HTTPError('https://api.openai.com/v1/responses', status, 'private', {}, body)
+                with patch.dict(os.environ, OPENAI_API_KEY='disposable-key'), patch.object(recognition.urllib.request, 'urlopen', side_effect=error) as remote, self.assertRaises(recognition.DiscoveryError) as caught:
+                    recognition.discover('Crema Example 100 ml')
+                self.assertEqual(caught.exception.code, expected)
+                self.assertEqual(caught.exception.provider_status, status)
+                self.assertNotIn('private', str(caught.exception))
+                self.assertTrue(body.closed)
+                remote.assert_called_once()
+
+    def test_wrapped_timeouts_dns_and_tls_failures_are_distinct(self):
+        import ssl
+        from urllib.error import URLError
+        for error, code in [(TimeoutError('private'), 'ai_search_timeout'), (URLError(TimeoutError('private')), 'ai_search_timeout'), (URLError('private DNS'), 'ai_connection_failed'), (URLError(ssl.SSLCertVerificationError('private')), 'ai_tls_error'), (ConnectionResetError('private'), 'ai_connection_failed')]:
+            with self.subTest(code=code), patch.dict(os.environ, OPENAI_API_KEY='disposable-key'), patch.object(recognition.urllib.request, 'urlopen', side_effect=error) as remote, self.assertRaises(recognition.DiscoveryError) as caught:
+                recognition.discover('Crema Example 100 ml')
+            self.assertEqual(caught.exception.code, code)
+            self.assertNotIn('private', str(caught.exception))
+            remote.assert_called_once()
+
+    def test_search_has_one_tool_call_and_a_longer_wait_without_changing_recognition(self):
+        response = unittest.mock.MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps({'status': 'completed', 'output': []}).encode()
+        with patch.dict(os.environ, OPENAI_API_KEY='disposable-key'), patch.object(recognition.urllib.request, 'urlopen', return_value=response) as remote:
+            recognition.discover('Crema Example 100 ml')
+        self.assertEqual(remote.call_args.kwargs['timeout'], 90)
+        payload = json.loads(remote.call_args.args[0].data)
+        self.assertEqual(payload['max_tool_calls'], 1)
+        self.assertFalse(payload['store'])
+        self.assertEqual(payload['model'], os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini'))
+
+    def test_nullable_sources_and_annotations_do_not_become_service_errors(self):
+        result = {'status': 'completed', 'output': [{'type': 'web_search_call', 'status': 'completed', 'action': {'sources': None}}, {'type': 'message', 'content': [{'type': 'output_text', 'annotations': None}]}]}
+        output, _, verify = DiscoveryTests().search(result)
+        self.assertEqual(output['candidates'], []);verify.assert_not_called()
+
+    def test_failed_invalid_and_incomplete_responses_have_safe_diagnostics(self):
+        cases = [(b'invalid private body', 'ai_invalid_response'), (b'[]', 'ai_invalid_response'), (b'{"status":"failed","error":{"code":"insufficient_quota","message":"private"}}', 'ai_quota_exceeded'), (b'{"status":"incomplete"}', 'ai_search_incomplete'), (b'{"status":"completed","output":null}', 'ai_invalid_response')]
+        for body, code in cases:
+            response = unittest.mock.MagicMock();response.__enter__.return_value.read.return_value = body
+            with self.subTest(code=code), patch.dict(os.environ, OPENAI_API_KEY='disposable-key'), patch.object(recognition.urllib.request, 'urlopen', return_value=response), self.assertRaises(recognition.DiscoveryError) as caught:
+                recognition.discover('Crema Example 100 ml')
+            self.assertEqual(caught.exception.code, code)
+            self.assertNotIn('private', str(caught.exception))
+
+    def test_api_reports_classified_cause_without_expiring_user_session_or_leaking_logs(self):
+        with patch.object(web, 'INGRESS_MODE', True), patch.dict(web.app.config, SECRET_KEY='disposable-search-errors'):
+            client = web.app.test_client();headers = {'X-CSRF-Token': client.get('/api/v1/auth/status').json['csrf_token']}
+            for status, body in [(401, b'{"error":{"message":"private key and label"}}'), (429, b'{"error":{"code":"insufficient_quota","message":"private"}}')]:
+                from urllib.error import HTTPError
+                error = HTTPError('https://api.openai.com/v1/responses', status, 'private', {}, io.BytesIO(body))
+                with patch.dict(os.environ, OPENAI_API_KEY='disposable-key'), patch.object(recognition.urllib.request, 'urlopen', side_effect=error), self.assertLogs(web.app.logger, level='WARNING') as logs:
+                    result = client.post('/api/v1/photos/discover', json={'name': 'Crema Example', 'consent': True}, headers=headers)
+                self.assertEqual(result.status_code, 503)
+                self.assertTrue(result.json['code'].startswith('ai_'))
+                self.assertNotIn('private', json.dumps(result.json) + ''.join(logs.output))
+                self.assertNotIn('Crema', ''.join(logs.output))
+                self.assertIn('product_discovery_failed code=', ''.join(logs.output))
+                self.assertFalse(api_photos.IDENTIFY_LOCK.locked())
+
+    def test_only_known_parameter_categories_are_logged_for_rejected_search_requests(self):
+        for parameter, expected in [('tools[0].filters.allowed_domains', 'tools'), ('max_tool_calls', 'max_tool_calls'), ('private-field-and-key', None), ({'private': 'value'}, None)]:
+            with self.subTest(parameter=parameter):
+                error = recognition.discovery_http_error(400, json.dumps({'error': {'param': parameter, 'message': 'private'}}).encode())
+                self.assertEqual(error.provider_parameter, expected)
+                self.assertNotIn('private', str(error))

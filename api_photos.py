@@ -87,10 +87,14 @@ def register_photo_routes(app, barcode_stock, lock):
                 candidate['discovery_token'] = signer.dumps({'name': name.strip(), 'context_code': code,
                     'candidate_code': candidate['barcode'], 'source_url': candidate['search_source_url'], 'session': session.get('csrf'), **binding})
             return jsonify(result)
+        except product_recognition.DiscoveryError as exc:
+            app.logger.warning('product_discovery_failed code=%s provider_status=%s parameter=%s', exc.code, exc.provider_status, exc.provider_parameter)
+            return jsonify({'error': str(exc), 'code': exc.code}), exc.status
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception:
-            return jsonify({"error": "No se pudo buscar con IA. Puedes continuar manualmente."}), 503
+            app.logger.warning('product_discovery_failed code=ai_internal_error')
+            return jsonify({'error': 'No se pudo completar la búsqueda con IA. Consulta el diagnóstico ai_internal_error en los logs de Despensa.', 'code': 'ai_internal_error'}), 503
         finally:
             IDENTIFY_LOCK.release()
 

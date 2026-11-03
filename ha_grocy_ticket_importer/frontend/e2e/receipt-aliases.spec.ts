@@ -75,3 +75,35 @@ test("receipt suggestions keep a manual choice, show direct addition and allow e
   await expect(page.getByLabel("Cantidad final calculada")).toHaveValue("10");
   await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toHaveCount(0);
 });
+
+test("ticket rows explain disabled simulation, allow omission and highlight server review separately", async ({ page }, info) => {
+  let previews = 0;
+  await page.route("**/api/v1/receipts", route => route.fulfill({ status: 201, json: { receipt_id: "skip-ticket", receipt: { items: [{ name: "Bolsa", quantity: 1, pieces_per_pack: 0 }, { name: "Yogur", quantity: 2, pieces_per_pack: 5 }] } } }));
+  await page.route("**/api/v1/receipts/skip-ticket/review-context", route => route.fulfill({ json: { products: [], mappings: {}, line_suggestions: [[], []] } }));
+  await page.route("**/api/v1/receipts/skip-ticket/preview", route => {
+    previews++;
+    const items = route.request().postDataJSON().items;
+    expect(items[0]).toMatchObject({ product_mode: "skip", remember_product: false, product_id: null, pieces_per_pack: 1, purchase_units: "1" });
+    return route.fulfill({ json: previews === 1 ? { ready_to_commit: false, preview: "[2] REVIEW Yogur: Multiple catalog matches", line_issues: [{ index: 1, message: "Hay varios productos con ese nombre. Elige uno concreto." }] } : { ready_to_commit: true, preview: "[1] WOULD OMIT Bolsa\n[2] WOULD IMPORT Yogur", line_issues: [] } });
+  });
+  await page.goto(base);await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Escanear ticket", exact: true }).click();
+  await page.getByLabel("Foto o PDF del ticket").setInputFiles({ name: "skip.pdf", mimeType: "application/pdf", buffer: Buffer.from("disposable skip UI") });
+  const first = page.getByRole("group", { name: "Línea 1: Bolsa" }), second = page.getByRole("group", { name: "Línea 2: Yogur" });
+  await expect(first).toHaveClass(/receipt-line-invalid/);
+  await expect(first).toContainText("Indica entre 1 y 1.000 piezas por envase");
+  await expect(page.getByRole("button", { name: "Simular importación" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Revisar primer artículo pendiente" })).toBeVisible();
+  await first.getByLabel("Producto de Despensa").selectOption("skip");
+  await expect(first).toHaveClass(/receipt-line-skipped/);
+  await page.getByRole("button", { name: "Simular importación" }).click();
+  await expect(second).toHaveClass(/receipt-line-invalid/);
+  await expect(second).toContainText("Hay varios productos con ese nombre");
+  await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("receipt-omitted-and-review-mobile.png"), fullPage: true });
+  await second.getByLabel("Producto de Despensa").selectOption("new");
+  await page.getByRole("button", { name: "Simular importación" }).click();
+  await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toBeVisible();
+  expect(previews).toBe(2);
+});

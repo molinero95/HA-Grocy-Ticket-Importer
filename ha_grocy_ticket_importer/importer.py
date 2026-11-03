@@ -81,7 +81,7 @@ def validate(receipt):
         raise ValueError('No items')
     total = Decimal('0')
     new_names = [norm(item['name']) for item in receipt['items'] if item.get('product_mode') == 'new']
-    names = [norm(item['name']) for item in receipt['items']]
+    names = [norm(item['name']) for item in receipt['items'] if item.get('product_mode') != 'skip']
     if any(names.count(name) > 1 for name in new_names):
         raise ValueError('A new product name is repeated in this receipt; review the lines before import')
     for item in receipt['items']:
@@ -129,19 +129,29 @@ def main():
         # Check all starting totals before any product/stock write; already
         # journaled lines remain idempotent even after their stock has changed.
         starting_stock = {}
+        changed_stock = False
         for index, item in enumerate(receipt['items']):
             old = conn.execute('SELECT state FROM receipt_items WHERE receipt_hash=? AND line=?', (digest, index)).fetchone()
-            if item.get('stock_to_add') is None or old and old[0] in ('imported', 'pending', 'expense'): continue
+            if item.get('stock_to_add') is None or old and old[0] in ('imported', 'pending', 'expense', 'omitted'): continue
             pid = item['product_id']
             if pid not in starting_stock:
                 starting_stock[pid] = dec(grocy('GET', f'stock/products/{pid}')['stock_amount'])
             if starting_stock[pid] != dec(item['expected_stock']):
-                raise ValueError('El stock ha cambiado. Actualiza el catálogo y revisa el ticket antes de importar')
+                print(f'[{index+1}] REVIEW {item["name"]}: Stock changed since receipt review')
+                changed_stock = True
+        if changed_stock:
+            return
         for i, item in enumerate(receipt['items']):
             name = item['name'].strip()
             old = conn.execute('SELECT state FROM receipt_items WHERE receipt_hash=? AND line=?', (digest, i)).fetchone()
-            if old and old[0] in ('imported', 'pending', 'expense'):
+            if old and old[0] in ('imported', 'pending', 'expense', 'omitted'):
                 print(f'[{i+1}] SKIP {old[0]} {name}')
+                continue
+            if item.get('product_mode') == 'skip':
+                print(f'[{i+1}] {"WOULD OMIT" if args.dry_run else "OMIT"} {name}: no product creation or stock change')
+                if not args.dry_run:
+                    conn.execute('INSERT OR REPLACE INTO receipt_items VALUES (?,?,?,?,?)', (digest, i, None, 'omitted', 'Omitted explicitly during receipt review'))
+                    conn.commit()
                 continue
             status, unit, reason = classify(item)
             unit = {2: piece_id, 4: kg_id}.get(unit, unit)

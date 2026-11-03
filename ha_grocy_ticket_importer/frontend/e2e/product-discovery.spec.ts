@@ -55,3 +55,27 @@ test("name-only AI discovery shows sources and requires a choice before creation
   expect(creations).toBe(1);
   expect(photos).toBe(1);
 });
+
+test("provider quota failure explains the cause and preserves the session and manual product form", async ({ page }, info) => {
+  let searches = 0, writes = 0;
+  await page.route("**/api/v1/catalog/units", route => route.fulfill({ json: { units: [{ id: 2, name: "Piece" }] } }));
+  await page.route("**/api/v1/photos/discover", async route => {
+    searches++;
+    await route.fulfill({ status: 503, json: { code: "ai_quota_exceeded", error: "OpenAI indica que no queda cuota o saldo disponible. Revisa la facturación y los límites del proyecto de la API." } });
+  });
+  await page.route("**/api/v1/catalog/products", async route => { writes++;await route.fulfill({ status: 500, json: { error: "Unexpected mutation" } }); });
+  await page.goto(base);
+  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
+  await page.getByRole("button", { name: "Nuevo producto", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Crear producto" });
+  await dialog.getByLabel("Nombre", { exact: true }).fill("Crema Example 100 ml");
+  await dialog.getByRole("button", { name: "Buscar imagen y código con IA" }).dblclick();
+  await expect(dialog.getByRole("alert")).toContainText("no queda cuota o saldo");
+  await expect(dialog.getByRole("alert")).toContainText("Puedes continuar sin imagen");
+  await expect(dialog.getByLabel("Nombre", { exact: true })).toHaveValue("Crema Example 100 ml");
+  await expect(page.getByRole("navigation", { name: "Secciones" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Guardar producto", exact: true })).toBeEnabled();
+  expect(searches).toBe(1);expect(writes).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("ai-search-quota-mobile.png"), fullPage: true });
+});

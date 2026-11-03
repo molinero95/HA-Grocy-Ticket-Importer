@@ -149,7 +149,7 @@ export const previewReceipt = (
   id: string,
   items: ReceiptReviewItem[],
 ) =>
-  request<{ preview: string; ready_to_commit: boolean }>(
+  request<{ preview: string; ready_to_commit: boolean; line_issues?: { index: number; message: string }[] }>(
     "receipts/" + encodeURIComponent(id) + "/preview",
     "POST",
     { items },
@@ -295,7 +295,7 @@ export type ReceiptReviewItem = {
   purchase_units: string;
   pieces_per_pack: number;
   stock_unit?: "piece" | "kg";
-  product_mode?: "auto" | "existing" | "new";
+  product_mode?: "auto" | "existing" | "new" | "skip";
   product_id?: number | null;
   remember_product?: boolean;
   unit_confirmed?: boolean;

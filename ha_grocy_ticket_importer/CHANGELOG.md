@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.24.0] — 2026-11-03
+
+### Added
+- Explicit receipt-line omission: create no product, add no stock and learn no alias while keeping the original line in total validation. A terminal omitted ledger state prevents later re-imports; uncertain pending lines remain blocked.
+- Yellow receipt rows with concrete local validation reasons and server REVIEW diagnostics, a pending-row summary and focus/scroll shortcut. Omitted rows are marked separately. Changed starting stock is reported against the affected lines before any stock write.
+
+### Fixed
+- Give explicit photo searches 90 seconds instead of 45, with one web-search tool invocation and no automatic paid retry. Preserve the configured model, domain filters, source/citation checks and exact-barcode verification.
+- Replace generic AI search errors with safe diagnostics for quota/billing, authentication, model/project access, request rejection, rate limits, timeout, network/TLS and incomplete/invalid responses. Log only fixed categories, HTTP status and an allowlisted parameter category; never keys, queries or provider response text. Provider authentication errors keep the Despensa session active.
+- Handle nullable search sources/citations safely and retain manual-photo fallback instead of suggesting repeated searches for configuration failures.
+
+### Validation
+- Local: 408 Python, 139 Vitest with coverage, TypeScript/Vite build, 22 real Grocy contracts and 44 Chromium scenarios passed, plus five targeted browser repeats; mobile screenshot reviewed.
+- Mocked provider transport and API regressions cover bounded error reads, single dispatch, redaction, lock release, nullable fields and session preservation. Installed provider failure is not confirmed: the old generic handler did not retain its cause. No production options, catalog, photos, stock or private provider requests were changed.
+
 ## [1.23.0] — 2026-11-03
 
 ### Added

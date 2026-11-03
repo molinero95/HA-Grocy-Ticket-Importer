@@ -34,6 +34,14 @@ def remember(db, merchant, item, product_id):
 
 
 def validate_review(item):
+    if item.get('product_mode') == 'skip':
+        if item.get('product_id') is not None or item.get('remember_product') not in (None, False) or item.get('stock_to_add') is not None or item.get('expected_stock') is not None:
+            raise ValueError('Omitted lines cannot select, remember or add a product')
+        # Preserve the original line in total validation; stock-only inputs do
+        # not prevent deliberately omitting this line from inventory.
+        quantity = Decimal(str(item['quantity']))
+        if not quantity.is_finite() or quantity <= 0: raise ValueError('Invalid original quantity')
+        return quantity, 1
     quantity = Decimal(str(item.get('purchase_units', item['quantity'])))
     factor = Decimal(str(item.get('pieces_per_pack', 1)))
     if not quantity.is_finite() or not 0 < quantity <= 1000000 or quantity != quantity.quantize(Decimal('.001')):
@@ -135,3 +143,32 @@ def suggestions(name, products):
         if shared: similarity = max(similarity, .65 + .3 * len(shared) / max(len(left), len(right)))
         if similarity >= .55: ranked.append((similarity, product['name'].casefold(), product['id']))
     return [row[2] for row in sorted(ranked, key=lambda row: (-row[0], row[1], row[2]))[:3]]
+
+
+def review_issues(output):
+    """Map importer REVIEW lines to zero-based UI rows, without parsing names."""
+    reasons = {
+        'Stock changed since receipt review': 'El stock ha cambiado. Pulsa Actualizar stock y catálogo y revisa la cantidad final.',
+        'Select the remembered product explicitly before import': 'Elige el producto de la asociación guardada o crea uno nuevo.',
+        'Selected product is missing or archived': 'El producto elegido ya no está disponible. Selecciona otro.',
+        'Product name already exists; select the existing product': 'Ese nombre ya existe. Selecciona el producto existente.',
+        'Matching product is archived': 'La coincidencia no está disponible. Revisa el producto elegido.',
+        'Multiple catalog matches': 'Hay varios productos con ese nombre. Elige uno concreto.',
+        'Existing product has different stock unit': 'La unidad no coincide con el producto. Vuelve a seleccionarlo.',
+        'Saved purchase conversion differs; review product in Grocy': 'La conversión de compra ha cambiado. Actualiza el catálogo y vuelve a elegir el producto.',
+        'Fractional quantity without reliable weight unit': 'Confirma si la cantidad corresponde a kilogramos o piezas.',
+        'Whole-kg line: could be weighed or packaged': 'Confirma la unidad de stock: peso o producto envasado.',
+        'Kilograms cannot be converted to pieces': 'Para kilogramos, la equivalencia del envase debe ser 1.',
+        'Create a unique Pack quantity unit in Grocy first': 'Falta una unidad Pack válida para crear este envase.',
+    }
+    issues = []
+    for line in output.splitlines():
+        match = re.match(r'^\[(\d+)\] (REVIEW|SKIP pending)\b(.*)$', line)
+        if not match: continue
+        if match[2] == 'SKIP pending':
+            message = 'Esta línea tiene una importación anterior pendiente de comprobar. Revisa Grocy antes de reintentar; omitirla no borra esa protección.'
+        else:
+            reason = match[3].rsplit(': ', 1)[-1].strip()
+            message = reasons.get(reason, 'Esta línea requiere revisión. Consulta su motivo en el resultado de la simulación.')
+        issues.append({'index': int(match[1]) - 1, 'message': message})
+    return issues

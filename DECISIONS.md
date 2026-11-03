@@ -136,3 +136,11 @@ Solicitud posterior: ver y corregir lo recordado de tickets. Vista separada por 
 Ticket: campo de envase como texto controlado mientras se edita; admite vacío sin introducir cero automáticamente. Al seleccionar producto existente sustituir ese campo por cantidad directa a añadir, stock actual y final agregado de sus líneas. Stock inicial esperado revisado y comprobado antes de cualquier escritura; coste total del ticket inalterado, conversión de compra actual conservada, precisión kg de tres decimales y piezas enteras. Sugerencias por parecido orientativas sin asociación automática; selector completo y crear nuevo siempre disponibles. No retirar la simulación/confirmación ni la deduplicación del ledger.
 
 +/-: serializar enteros sin .000; lectura de inventario conserva milésimas para no truncar el stock esperado de tickets pesados. Mantener paso kg 0.1 y Piece 1.
+
+
+## Diagnóstico de búsqueda IA 1.24.0
+
+Una petición explícita, espera 90s y una invocación web; sin cambio automático de modelo ni reintentos pagados. Errores de proveedor clasificados y saneados, cuerpo de error acotado solo para reconocer códigos conocidos, logs de categorías fijas/estado/parámetro permitido. No exponer mensajes del proveedor, nombres o claves. Errores de credenciales OpenAI no caducan la sesión de Despensa. Conservar selección explícita, firma de candidatos, catálogos confiables, verificación GTIN y foto manual. Causa real del aviso genérico anterior y aceptación instalada siguen sin confirmar.
+
+
+Ticket 1.24.0: omisión explícita por línea (sin producto/stock/alias) con total original conservado y estado terminal omitted contra reimportación. Pendientes inciertos no se pueden omitir para saltar sus guardas. Filas amarillas y motivos concretos sustituyen la simulación deshabilitada sin explicación; resumen y acceso a primera fila, motivos REVIEW del servidor por índice y stock desfasado comprobado antes de escribir. Omitidas diferenciadas en gris; catálogo ausente explicado globalmente.

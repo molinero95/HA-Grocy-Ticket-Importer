@@ -102,7 +102,7 @@ class ReviewedPurchaseTests(unittest.TestCase):
         self.conversions = [{'product_id': 17, 'from_qu_id': 3, 'to_qu_id': 2, 'factor': 5}]
         self.edit(product_id=17, stock_to_add='3', expected_stock='5')
         receipt = json.loads(self.receipt.read_text());receipt['items'][0]['product_mode'] = 'existing';self.receipt.write_text(json.dumps(receipt))
-        with self.assertRaisesRegex(ValueError, 'stock ha cambiado'): self.run_import('--commit')
+        self.assertIn('REVIEW', self.run_import('--commit'))
         self.assertEqual(self.writes, [])
 
     def test_direct_addition_validation_and_advisory_ranking(self):
@@ -124,3 +124,37 @@ class ReviewedPurchaseTests(unittest.TestCase):
         self.run_import('--commit');self.assertEqual(self.amount, 12)
         self.assertEqual(len(self.writes), 2)
         self.assertIn('SKIP imported', self.run_import('--commit'));self.assertEqual(self.amount, 12)
+
+    def test_omitted_line_keeps_total_and_never_creates_stock_or_remembered_mapping(self):
+        self.edit(purchase_units='0')
+        receipt = json.loads(self.receipt.read_text());receipt['items'][0].update(product_mode='skip', remember_product=False, pieces_per_pack=0)
+        self.receipt.write_text(json.dumps(receipt))
+        self.assertIn('WOULD OMIT', self.run_import('--dry-run'));self.assertEqual(self.writes, [])
+        self.run_import('--commit');self.assertEqual(self.writes, [])
+        with sqlite3.connect(self.ledger) as db: self.assertEqual(db.execute('SELECT product_id,state FROM receipt_items').fetchall(), [(None, 'omitted')])
+        self.assertEqual(mappings(self.ledger, 'Test shop'), {})
+        receipt['items'][0].update(product_mode='new', remember_product=True, purchase_units='2', pieces_per_pack=5)
+        self.receipt.write_text(json.dumps(receipt))
+        self.assertIn('SKIP omitted', self.run_import('--commit'));self.assertEqual(self.writes, [])
+
+    def test_omission_cannot_bypass_an_uncertain_pending_line(self):
+        from receipt_review import has_review
+        with sqlite3.connect(self.ledger) as db:
+            db.execute('CREATE TABLE receipt_items (receipt_hash TEXT, line INTEGER, product_id INTEGER, state TEXT, detail TEXT, PRIMARY KEY(receipt_hash,line))')
+            db.execute("INSERT INTO receipt_items VALUES ('disposable-pack-fixture',0,17,'pending','uncertain')")
+        receipt = json.loads(self.receipt.read_text());receipt['items'][0].update(product_mode='skip', remember_product=False)
+        self.receipt.write_text(json.dumps(receipt))
+        output = self.run_import('--commit');self.assertTrue(has_review(output));self.assertIn('SKIP pending', output);self.assertEqual(self.writes, [])
+
+    def test_omitted_original_cost_is_still_in_total_validation(self):
+        receipt = json.loads(self.receipt.read_text());receipt['items'][0].update(product_mode='skip', remember_product=False);receipt['total'] = 1
+        self.receipt.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, 'Total mismatch'): self.run_import('--commit')
+        self.assertEqual(self.writes, [])
+
+    def test_review_issues_translate_actual_row_numbers_and_pending_guards(self):
+        from receipt_review import review_issues
+        issues = review_issues('[1] REVIEW Product: Stock changed since receipt review\n[2] WOULD OMIT charge\n[3] SKIP pending Product')
+        self.assertEqual([item['index'] for item in issues], [0, 2])
+        self.assertIn('Actualizar stock y catálogo', issues[0]['message'])
+        self.assertIn('importación anterior pendiente', issues[1]['message'])

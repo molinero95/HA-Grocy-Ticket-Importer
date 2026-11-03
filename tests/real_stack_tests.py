@@ -567,3 +567,26 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(float(purchase['amount']), 3);self.assertEqual(float(purchase['price']), 2)
         self.assertEqual(self.client.post(f'/api/v1/receipts/{rid}/commit', headers=self.headers).status_code, 403)
         self.assertEqual([row for row in self.instance.http('GET', 'objects/stock_log') if row['product_id'] == pid], history)
+
+    def test_receipt_omission_keeps_real_catalog_stock_cost_validation_and_repeat_guard(self):
+        import hashlib
+        import importer
+        import sqlite3
+        fixture = b'explicitly-omitted-disposable-ticket'
+        before = {name: self.instance.http('GET', 'objects/'+name) for name in ('products', 'stock', 'stock_log')}
+        uploaded = self.client.post('/api/v1/receipts', data={'ticket': (io.BytesIO(fixture), 'omitted.pdf')}, headers=self.headers)
+        self.assertEqual(uploaded.status_code, 201, uploaded.json)
+        rid = uploaded.json['receipt_id']
+        item = {'name': 'Omit this line', 'product_mode': 'skip', 'product_id': None, 'remember_product': False, 'purchase_units': '0', 'pieces_per_pack': 0}
+        preview = self.client.post(f'/api/v1/receipts/{rid}/preview', json={'items': [item]}, headers=self.headers)
+        self.assertEqual(preview.status_code, 200, preview.json)
+        self.assertTrue(preview.json['ready_to_commit']);self.assertIn('WOULD OMIT', preview.json['preview'])
+        response = self.client.post(f'/api/v1/receipts/{rid}/commit', headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        with sqlite3.connect(importer.DB_PATH) as db:
+            self.assertEqual(db.execute('SELECT product_id,state FROM receipt_items WHERE receipt_hash=? AND line=0', (hashlib.sha256(fixture).hexdigest(),)).fetchone(), (None, 'omitted'))
+        for name, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/'+name), rows)
+        repeat = self.client.post('/api/v1/receipts', data={'ticket': (io.BytesIO(fixture), 'same.pdf')}, headers=self.headers).json['receipt_id']
+        preview = self.client.post(f'/api/v1/receipts/{repeat}/preview', json={'items': [{'name': 'Yogur de prueba', 'product_mode': 'auto', 'purchase_units': '2', 'pieces_per_pack': 5}]}, headers=self.headers)
+        self.assertEqual(preview.status_code, 200, preview.json);self.assertIn('SKIP omitted', preview.json['preview'])
+        for name, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/'+name), rows)
