@@ -136,3 +136,11 @@ Combinación automática o con dependencias no migrables, eliminación de histor
 ## Mejora 1.20.0
 
 - [x] Editar cantidad como enlace con lápiz, alineado bajo cantidad/nombre y controles estables en móvil.
+
+
+## Mejora 1.21.0
+
+- [x] Tabla de alias con dos selectores, búsqueda, edición protegida y eliminar fila.
+- [x] Buscar/elegir foto por nombre desde producto existente, con sustitución explícita y código/stock conservados.
+- [x] Botón para cámara nativa de tickets, conservando selector de archivos y revisión.
+- [ ] Aceptación instalada de cámara nativa Android y búsqueda pagada real.

@@ -917,76 +917,32 @@ select:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* Alias management follows the same surfaces and controls as product forms. */
-.aliases-page > p {
-  color: #60756a;
-  line-height: 1.5;
-  margin: 10px 0 20px;
-}
-.alias-form {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-  background: #fff;
-  border: 1px solid #d2dfd5;
-  border-radius: 16px;
-}
-.alias-field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 650;
-  color: #1b3029;
-}
-.alias-field input,
-.alias-field select {
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  padding: 11px 12px;
-  border: 1px solid #d2dfd5;
-  border-radius: 10px;
-  background: #fff;
-  color: #1b3029;
-  font: inherit;
-  font-weight: 400;
-}
-.alias-submit { width: 100%; }
-.alias-list {
-  list-style: none;
-  display: grid;
-  gap: 10px;
-  padding: 0;
-  margin: 18px 0 0;
-}
-.alias-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px;
-  background: #fff;
-  border: 1px solid #d2dfd5;
-  border-radius: 14px;
-}
-.alias-item-text { min-width: 0; overflow-wrap: anywhere; }
-.alias-item-text strong, .alias-item-text small { display: block; }
-.alias-item-text small { margin-top: 5px; color: #60756a; }
-.alias-item button { flex-shrink: 0; }
+/* Editable alias rows retain left/right field order on narrow screens. */
+.aliases-page > p { color: #60756a; line-height: 1.5; }
+.alias-search { margin-bottom: 12px; }
+.alias-search input { min-width: 0; }
+.alias-search-clear { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: #176d4b; }
+.alias-table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid #d2dfd5; border-radius: 14px; background: #fff; overflow: hidden; }
+.alias-table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) 156px; align-items: start; gap: 10px; padding: 12px; border-bottom: 1px solid #e3eae2; }
+.alias-table tr[hidden] { display: none; }
+.alias-table tbody tr:last-child { border-bottom: 0; }
+.alias-table th { text-align: left; color: #60756a; font-size: 13px; }
+.alias-table td { min-width: 0; padding: 0; }
+.alias-table input, .alias-table select { width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid #d2dfd5; border-radius: 8px; background: white; color: #1b3029; font: inherit; font-size: 14px; }
+.alias-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.alias-icon-button { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 1px solid #d2dfd5; border-radius: 8px; background: #f0f6f1; color: #176d4b; }
+.alias-icon-button:disabled { opacity: .4; cursor: default; }
+.alias-new-row { background: #f0f6f1; }
+.alias-unavailable { display: block; margin-top: 6px; color: #85533b; font-size: 12px; }
+.alias-empty { padding: 14px 0; }
 @media (max-width: 580px) {
   .action-grid { grid-template-columns: minmax(0, 1fr); }
-  .alias-form { padding: 16px; }
+  .alias-table tr { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 10px; }
+  .alias-table th { font-size: 12px; }
+  .alias-table input, .alias-table select { padding: 8px; font-size: 13px; }
+  .alias-actions-heading { display: none; }
+  .alias-row-actions { grid-column: 1 / -1; }
 }
-
-/* Product-first alias management */
-.alias-product-section { margin-top: 22px; }
-.alias-product-section h3 { margin: 0 0 12px; font-size: 18px; }
-.alias-empty { color: #60756a; padding: 12px 0; }
-.alias-add-button { width: 100%; margin-top: 16px; }
-.alias-add-form { margin-top: 14px; }
-.alias-form-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
-.alias-form-actions button { flex: 1 1 120px; }
 
 .product-deletion {
   margin-top: 24px;
@@ -1081,3 +1037,7 @@ select:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.receipt-camera-button { margin-bottom: 18px; }
+
+.alias-custom-name { margin-top: 8px; }

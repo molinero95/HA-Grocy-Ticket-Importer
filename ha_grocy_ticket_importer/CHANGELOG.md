@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.21.0] — 2026-11-03
+
+### Added
+- Searchable Alexa alias table with alias/product selectors, custom alias entry and row save/discard/delete. Filter by either column without losing drafts; retain missing-product aliases for correction/removal.
+- Atomic expected-state alias rename/reassignment, preserving other aliases and rejecting stale edits or duplicate destinations.
+- Name-based AI photo search from product details, including products without barcodes; explicitly choose or replace a photo with signed, product/session/name/photo-bound verification. Preserve stock, codes, descriptions and previous local photo bytes.
+- “Tomar foto del ticket” opens the native image capture picker when supported, with the existing image/PDF chooser retained. Returned photos enter review, never automatic stock import.
+
+### Validation
+- API, UI and responsive browser regressions cover guarded alias edits/deletion, draft search retention, photo selection/replacement, stale photo contexts and native capture cancellation. A real Grocy contract verifies alias edits and photo metadata without stock/barcode changes.
+
 ## [1.20.0] — 2026-11-02
 
 ### Changed

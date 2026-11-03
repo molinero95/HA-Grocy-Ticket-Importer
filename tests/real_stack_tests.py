@@ -413,3 +413,38 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(float(self.instance.http('GET', f'stock/products/{pid}')['stock_amount']), 1.5)
         self.assertEqual(self.instance.http('GET', f'objects/shopping_list/{rid}'), shopping)
         self.instance.http('DELETE', f'objects/shopping_list/{rid}')
+
+    def test_alias_table_edits_and_name_photo_keep_real_stock_codes_and_description(self):
+        import copy
+        from unittest.mock import patch
+        piece = next(u['id'] for u in self.instance.http('GET', 'objects/quantity_units') if u['name'] == 'Piece')
+        name = 'Foto nominal contrato'
+        response = self.client.post('/api/v1/catalog/products', json={'name': name, 'unit_id': piece}, headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.json)
+        pid = response.json['product_id']
+        self.instance.http('PUT', f'objects/products/{pid}', {'description': 'Notas conservadas'})
+        stock = {entity: self.instance.http('GET', 'objects/' + entity) for entity in ('stock', 'stock_log', 'product_barcodes')}
+        response = self.client.post('/api/v1/alexa/aliases', json={'name': 'Alias contrato foto', 'product_id': pid}, headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.json)
+        response = self.client.put('/api/v1/alexa/aliases/alias contrato foto', json={
+            'name': 'Alias contrato editado', 'product_id': pid, 'expected_name': 'Alias contrato foto', 'expected_product_id': pid}, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual(response.json['alias']['key'], 'alias contrato editado')
+        self.assertEqual(self.client.delete('/api/v1/alexa/aliases/alias contrato editado', json={'product_id': pid}, headers=self.headers).status_code, 200)
+        code = '3017620422003'
+        image = 'https://images.openfoodfacts.org/images/products/contract.jpg'
+        candidate = dict(barcode=code, image_url=image, search_source_url='https://world.openfoodfacts.org/product/' + code)
+        with patch('product_recognition.discover', return_value={'candidates': [copy.deepcopy(candidate)]}), \
+             patch('product_images.verify_discovered_product', return_value=candidate):
+            response = self.client.post('/api/v1/photos/discover', json={'name': name, 'product_id': pid, 'consent': True}, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+            token = response.json['candidates'][0]['discovery_token']
+            response = self.client.post(f'/api/v1/catalog/products/{pid}/photo-discovery', json={'token': token}, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+            self.assertTrue(response.json['saved'])
+        detail = self.client.get(f'/api/v1/catalog/products/{pid}').json
+        self.assertEqual(detail['image_url'], image)
+        self.assertEqual(detail['barcodes'], [])
+        description = self.instance.http('GET', f'objects/products/{pid}')['description']
+        self.assertIn('Notas conservadas', description)
+        for entity, before in stock.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)

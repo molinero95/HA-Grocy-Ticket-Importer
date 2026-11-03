@@ -1,8 +1,8 @@
 # AGENTS.md — Despensa / Grocy Ticket Importer
 
-## Current handoff — 2026-11-02
+## Current handoff — 2026-11-03
 
-Main has 1.19.0 (PR #32, merge 8f0a4c9), verified all seven final-head checks: 369 Python, 110 Vitest, 16 real Grocy contracts, 35 Chromium scenarios, security and both container architectures. Current branch `ui/shopping-edit-quantity-link` prepares 1.20.0: replace the shopping quantity button with a pencil “Editar cantidad” text action under the amount, aligned with product name, with 44 px touch target and existing modal/journal semantics. Mobile shopping actions use a fixed stacked column; desktop keeps purchase/removal side by side. Check long names/photos/purchased rows at 320/360/690 px. Local validation: 110 Vitest tests with coverage, TypeScript/Vite build and three targeted Chromium scenarios pass; mobile screenshot reviewed. No backend/data/config changes. Keep release versions, both changelogs and docs aligned; observe all final-head checks before merging.
+Main has 1.20.0 (PR #33, merge c3ee8ae), all seven final-head checks passed: 369 Python, 110 Vitest, 16 Grocy contracts and 35 Chromium scenarios. Branch `ui/alexa-alias-table` prepares 1.21.0 with three user requests: searchable table of alias/product selectors with explicit custom names and per-row save/discard/delete; AI photo search by saved name in product details; native phone-camera button for receipt capture. Alias edit uses expected display name/product and atomic SQLite rename/reassignment under the worker lock, rejecting destination collisions. Selector suggestions are existing aliases plus active cached review names, never new HA calls. Filtering preserves unsaved drafts. Product-bound signed photo tokens check ID/session/name/current image; no barcode required/assigned, explicit replacement, retain old local bytes after successful URL persistence. Legacy creation tokens still preserve existing photos. Native image-only capture=environment picker returns to normal review/simulate/import; file/PDF picker remains. Do not claim physical Android/WebView camera or paid provider acceptance from mocks. Keep shopping alignment/search, scoped identity guards, ledgers and installed config/data intact. Local 380 Python and 117 Vitest tests, build and three targeted Chromium scenarios pass; mobile table/photo screenshots reviewed. Final-head CI and new real Grocy contract must pass before merge.
 
 Preserve the 1.19 scoped trusted_creation fix and affected-product diagnostics, plus 1.18 search and 1.17 interactions. The real installed sync recovery after updating 1.19 remains unverified; do not claim it from isolated tests. No production lists/stock/config, aliases or checkpoints were reset during read-only diagnosis. The user updates the installed app.
 
@@ -59,7 +59,7 @@ Frontend QA: 91 Vitest tests, 317 Python tests, 12 real Grocy contracts and 27 c
 
 ## Release maintenance
 
-A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Manifest, frontend package/lockfile and visible footer versions must match (1.20.0 for this minor release). Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
+A version bump requires matching entries in BOTH identical `CHANGELOG.md` files and aligned README/DOCS. Manifest, frontend package/lockfile and visible footer versions must match (1.21.0 for this minor release). Home Assistant reads the default-branch manifest; no GitHub Release or new installation is required for update detection. Keep the previous installation and Home Assistant backup until the installed upgrade is accepted.
 
 Permanent deletion is enabled only for the audited Grocy 4.7.1 release; a different version blocks deletion until its cascades have been reviewed.
 

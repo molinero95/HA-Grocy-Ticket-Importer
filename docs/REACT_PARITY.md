@@ -59,3 +59,6 @@ Tickets 1.12.0: edición de compra/unidades/envase, selección por ID y alta al 
 
 
 1.20.0: Editar cantidad con lápiz, sin fondo, bajo la cantidad y con objetivo táctil de 44 px. Columna de acciones uniforme en móvil; comprobaciones de alineación a 320, 360 y 690 px.
+
+
+1.21.0: alias en tabla de selectores, búsqueda y guardar/descartar/eliminar por fila; PUT atómico con estado esperado. Búsqueda de foto desde ficha por nombre, sin código obligatorio ni cambios de stock. Captura nativa de tickets separada del selector PDF; revisar antes de importar. Pruebas API, Vitest, Chromium y contrato de metadatos Grocy real; cámara física pendiente.

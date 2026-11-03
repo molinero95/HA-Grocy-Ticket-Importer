@@ -51,6 +51,31 @@ def set_alias(path, name, product_id):
             (key, str(name).strip(), pid))
 
 
+def update_alias(path, key, *, expected_name, expected_product_id, name, product_id):
+    """Atomically rename/reassign one reviewed alias without replacing another."""
+    if (not isinstance(name, str) or not name.strip() or len(name) > 200
+            or type(product_id) is not int or product_id <= 0
+            or not isinstance(expected_name, str) or len(expected_name) > 200
+            or type(expected_product_id) is not int or expected_product_id <= 0):
+        raise ValueError("Invalid alias")
+    key, new_key = normalize(key), normalize(name)
+    if not new_key or normalize(expected_name) != key:
+        raise ValueError("Invalid alias")
+    with closing(connect(path)) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        previous = db.execute(
+            "SELECT display_name, product_id FROM alexa_aliases WHERE normalized_name=?", (key,)
+        ).fetchone()
+        if previous != (expected_name, expected_product_id):
+            raise ValueError("Alias changed since it was displayed")
+        if new_key != key and db.execute(
+                "SELECT 1 FROM alexa_aliases WHERE normalized_name=?", (new_key,)).fetchone():
+            raise ValueError("Alias already exists")
+        db.execute("UPDATE alexa_aliases SET normalized_name=?, display_name=?, product_id=? WHERE normalized_name=?",
+                   (new_key, name.strip(), product_id, key))
+    return {"key": new_key, "name": name.strip(), "product_id": product_id}
+
+
 def remove_alias(path, name, product_id=None):
     with closing(connect(path)) as db, db:
         row = db.execute("SELECT product_id FROM alexa_aliases WHERE normalized_name=?", (normalize(name),)).fetchone()
