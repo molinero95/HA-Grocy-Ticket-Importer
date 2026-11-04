@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.27.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.28.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -329,3 +329,10 @@ El importe total es informativo: una diferencia por promociones o descuentos mue
 Las bolsas de compra reconocibles aparecen omitidas por defecto. Puedes cambiar su selector para incluir una. No se omiten bolsas de alimentos (hielo, patatas o pan) ni productos de bolsas de basura. Se conserva cada línea y su posición para reconocer repeticiones, sin crear producto ni añadir stock en las omitidas.
 
 Se retira **Detectar por nombre**. Elige un producto de las sugerencias o del catálogo, **Crear producto nuevo al importar**, u omite la línea. Una asociación guardada válida se mantiene seleccionada; las filas sin decisión aparecen pendientes. Las asociaciones no reactivan una bolsa omitida.
+
+
+## Una búsqueda de fotografías con OpenAI — 1.28.0
+
+La ficha tiene un único botón **Buscar foto con IA**, tanto para alimentos genéricos como para productos envasados o de limpieza. OpenAI localiza páginas públicas de fabricantes y tiendas por nombre, sin exigir código de barras ni limitarse a catálogos de códigos. Puedes añadir marca y formato al **Nombre para buscar la foto** sin renombrar el artículo. Las fotos son sugerencias: revisa envase y variante y elige una para guardarla. La búsqueda tiene coste en la cuenta API configurada y nunca se repite automáticamente.
+
+La aplicación comprueba las páginas citadas, recupera una foto publicada, la convierte en una vista previa privada y guarda esos mismos bytes cuando los eliges. Se conserva la fuente y una copia de la imagen anterior. Los códigos, el nombre y el stock no cambian. Las vistas previas caducan a los 30 minutos y una ficha/foto modificada obliga a buscar de nuevo. No se admiten destinos de red privada ni descargas con credenciales de Home Assistant. Algunas webs bloquean descargas o no publican una imagen utilizable: en ese caso se explica y puedes concretar la búsqueda o usar una fotografía propia. Los endpoints antiguos y los créditos de Commons siguen siendo compatibles, pero desaparece el botón de foto genérica.

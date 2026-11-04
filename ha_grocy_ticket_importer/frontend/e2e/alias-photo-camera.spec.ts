@@ -73,8 +73,8 @@ test("product detail searches a name, previews and explicitly replaces a photo w
   });
   await page.route("**/api/v1/catalog/products/1/barcodes", route => { expect(route.request().method()).toBe("GET"); return route.fulfill({ json: { barcodes: [] } }); });
   await page.route("**/api/v1/products/1/variants", route => route.fulfill({ json: { product: { id: 1, name: "Tomate" }, variants: [] } }));
-  await page.route("**/api/v1/photos/discover", route => {
-    searches++; expect(route.request().postDataJSON()).toEqual({ name: "Tomate", barcode: "", product_id: 1, consent: true });
+  await page.route("**/api/v1/photos/web", route => {
+    searches++; expect(route.request().postDataJSON()).toEqual({ name: "Tomate", query: "Tomate", product_id: 1, consent: true });
     return route.fulfill({ json: { advisory: true, candidates: [{ name: "Tomate de prueba", barcode: "3017620422003", image_url: image, source_url: "https://world.openfoodfacts.org/product/3017620422003", search_source_url: "https://world.openfoodfacts.org/product/3017620422003", attribution: "Open Food Facts", discovery_token: "signed" }] } });
   });
   await page.route("**/api/v1/catalog/products/1/photo-discovery", route => {

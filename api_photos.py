@@ -5,7 +5,7 @@ import threading
 import product_recognition
 from pathlib import Path
 
-from flask import jsonify, request, session
+from flask import jsonify, request, session, send_file
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 IDENTIFY_LOCK = threading.Lock()
@@ -27,6 +27,54 @@ def local_image_url(product_id):
 
 def register_photo_routes(app, barcode_stock, lock):
     import product_images
+    import web_product_photos
+
+    @app.post('/api/v1/photos/web')
+    def api_v1_web_photos():
+        from itsdangerous import URLSafeTimedSerializer
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or payload.get('consent') is not True
+                or type(payload.get('product_id')) is not int or payload['product_id'] <= 0
+                or not isinstance(payload.get('name'), str)
+                or not isinstance(payload.get('query'), str) or not 3 <= len(payload['query'].strip()) <= 200):
+            return jsonify({'error': 'Revisa el nombre de búsqueda y confirma el envío a OpenAI'}), 400
+        if not IDENTIFY_LOCK.acquire(blocking=False):
+            return jsonify({'error': 'Hay otra búsqueda de imágenes en curso'}), 409
+        try:
+            product_id, name = payload['product_id'], payload['name'].strip()
+            product = barcode_stock.product_detail(product_id)
+            if product['name'] != name:
+                return jsonify({'error': 'El nombre ha cambiado. Actualiza la ficha antes de buscar.'}), 409
+            existing = local_image_url(product_id) or product.get('image_url')
+            signer = URLSafeTimedSerializer(app.secret_key, salt='product-name-photo-v1')
+            candidates = []
+            for raw, source in web_product_photos.search(payload['query'].strip()):
+                identity, metadata = web_product_photos.cache_photo(image_directory(), raw, source, session.get('csrf'))
+                token = signer.dumps({'kind': 'web', 'candidate_id': identity, 'sha256': metadata['sha256'],
+                                      'session': session.get('csrf'), 'product_id': product_id,
+                                      'name': name, 'expected_image_url': existing})
+                candidates.append({'kind': 'web', 'name': payload['query'].strip(), 'barcode': '',
+                                   'image_url': 'api/v1/photos/web/' + identity, 'source_url': source,
+                                   'search_source_url': source, 'attribution': 'Ver página del producto', 'discovery_token': token})
+            return jsonify({'candidates': candidates, 'advisory': True})
+        except product_recognition.DiscoveryError as exc:
+            app.logger.warning('product_photo_search_failed code=%s provider_status=%s parameter=%s', exc.code, exc.provider_status, exc.provider_parameter)
+            return jsonify({'error': str(exc), 'code': exc.code}), exc.status
+        except Exception:
+            app.logger.warning('product_photo_search_failed code=photo_search_unavailable')
+            return jsonify({'error': 'No se pudo completar la búsqueda de fotografías. Puedes continuar sin imagen.'}), 503
+        finally:
+            IDENTIFY_LOCK.release()
+
+    @app.get('/api/v1/photos/web/<identity>')
+    def api_v1_web_photo_preview(identity):
+        try:
+            raw, _ = web_product_photos.cached_photo(image_directory(), identity, session.get('csrf'))
+            response = send_file(io.BytesIO(raw), mimetype='image/jpeg', max_age=0)
+            response.headers['Cache-Control'] = 'private, no-store'
+            return response
+        except (ValueError, OSError, TypeError):
+            return jsonify({'error': 'La imagen ha caducado. Vuelve a buscar.'}), 404
 
     @app.post("/api/v1/photos/identify")
     def api_v1_identify_product_photo():
@@ -167,6 +215,14 @@ def register_photo_routes(app, barcode_stock, lock):
                 if product['name'] != choice['name'] or code not in product['barcodes']:
                     return jsonify({'error': 'El nombre o el código han cambiado. Vuelve a elegir la imagen.'}), 409
                 if existing: return jsonify({'saved': False, 'preserved': True})
+            if choice.get('kind') == 'web':
+                if not editing:
+                    return jsonify({'error': 'Vuelve a buscar desde la ficha del producto'}), 409
+                raw, metadata = web_product_photos.cached_photo(image_directory(), choice.get('candidate_id'), session.get('csrf'))
+                if metadata['sha256'] != choice.get('sha256'):
+                    return jsonify({'error': 'La imagen ha cambiado. Vuelve a buscar.'}), 409
+                web_product_photos.save_local(image_directory(), product_id, raw, metadata)
+                return jsonify({'saved': True, 'image_url': local_image_url(product_id)})
             if choice.get('kind') == 'generic':
                 # Generic photos are bound to an existing product; never assign a code.
                 if not editing:

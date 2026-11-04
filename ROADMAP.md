@@ -184,3 +184,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Quantity-first receipt review — 1.27.0
 
 1.27 implements advisory monetary totals, default carry-bag omission and removal of frontend automatic-name product selection. Unmapped rows require an explicit choice; saved valid mappings still work. Keep stock/unit/quantity and one-shot import guards. Installed acceptance follows update; no real receipt was committed.
+
+
+## OpenAI photo search — 1.28.0
+
+1.28: one OpenAI photo-only search in product details, editable search text, cited public manufacturer/retailer pages, private sanitized previews and explicit local saving/source attribution. No GTIN prerequisite for photos. Existing source-site protections may make individual pages unavailable; installed provider acceptance remains an explicit user search after updating.

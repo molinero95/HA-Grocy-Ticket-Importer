@@ -80,39 +80,39 @@ test("provider quota failure explains the cause and preserves the session and ma
   await page.screenshot({ path: info.outputPath("ai-search-quota-mobile.png"), fullPage: true });
 });
 
-test("generic garlic photo uses no AI or barcode and retains source/license after selection", async ({ page }, info) => {
-  let image: string | null = null, searches = 0, saves = 0;
-  const url = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Garlic.jpg/480px-Garlic.jpg";
-  const source = "https://commons.wikimedia.org/?curid=123";
-  const credit = { image_url: url, artist: "Example photographer", license: "CC BY-SA 4.0", license_url: "https://creativecommons.org/licenses/by-sa/4.0/", source_url: source };
-  await page.route(url, route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0fYAAAAASUVORK5CYII=", "base64") }));
-  await page.route("**/api/v1/catalog/products/1", route => {
-    expect(route.request().method()).toBe("GET");
-    return route.fulfill({ json: { id: 1, name: "ajo", stock_amount: "2", unit_id: 2, purchase_unit_id: 2, image_url: image, photo_credit: image ? credit : null, is_pack: false, pack_size: 1, active: true, barcodes: [], units: [{ id: 2, name: "Piece" }] } });
+for (const [name, query] of [["Chocoflakes", "Choco Flakes Cuétara"], ["anti cucarachas", "anti cucarachas marca formato"], ["ajo", "ajo"]]) {
+  test("OpenAI photo-only search accepts " + name + " without a verified code", async ({ page }, info) => {
+    let photo: string | null = null, searches = 0, saves = 0;
+    const source = "https://manufacturer.example.com/product";
+    const preview = "api/v1/photos/web/0123456789abcdef0123456789abcdef";
+    await page.route("**/api/v1/catalog/products/1", route => {
+      expect(route.request().method()).toBe("GET");
+      return route.fulfill({ json: { id: 1, name, stock_amount: "2", unit_id: 2, purchase_unit_id: 2, image_url: photo, photo_source_url: photo ? source : null, is_pack: false, pack_size: 1, active: true, barcodes: [], units: [{ id: 2, name: "Piece" }] } });
+    });
+    await page.route("**/api/v1/catalog/products/1/barcodes", route => { expect(route.request().method()).toBe("GET");return route.fulfill({ json: { barcodes: [] } }); });
+    await page.route("**/api/v1/products/1/variants", route => route.fulfill({ json: { product: { id: 1, name }, variants: [] } }));
+    await page.route("**/api/v1/photos/web/*", route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0fYAAAAASUVORK5CYII=", "base64") }));
+    await page.route("**/api/v1/photos/web", route => {
+      searches++;expect(route.request().postDataJSON()).toEqual({ name, query, product_id: 1, consent: true });
+      return route.fulfill({ json: { advisory: true, candidates: [{ kind: "web", name: query, barcode: "", image_url: preview, source_url: source, search_source_url: source, attribution: "Ver página del producto", discovery_token: "web-choice" }] } });
+    });
+    await page.route("**/api/v1/catalog/products/1/photo-discovery", route => {
+      saves++;expect(route.request().postDataJSON()).toEqual({ token: "web-choice", replace: false });photo = preview;
+      return route.fulfill({ json: { saved: true, image_url: photo } });
+    });
+    await page.goto(base);await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
+    await page.locator(".product-name").first().click();
+    await expect(page.getByRole("button", { name: "Buscar foto genérica" })).toHaveCount(0);
+    await page.getByLabel("Nombre para buscar la foto").fill(query);
+    await page.getByRole("button", { name: "Buscar foto con IA", exact: true }).click();
+    await expect(page.getByText("Fotografía sugerida · Sin código de barras", { exact: true })).toBeVisible();
+    expect(saves).toBe(0);
+    await page.getByRole("button", { name: "Usar esta foto", exact: true }).click();
+    await expect(page.getByRole("img", { name: "Fotografía de " + name })).toHaveAttribute("src", preview);
+    await expect(page.getByRole("link", { name: "Fuente de la fotografía" })).toHaveAttribute("href", source);
+    await expect(page.getByLabel("Cantidad final", { exact: true })).toHaveValue("2");
+    expect(searches).toBe(1);expect(saves).toBe(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath("web-photo-mobile.png"), fullPage: true });
   });
-  await page.route("**/api/v1/catalog/products/1/barcodes", route => { expect(route.request().method()).toBe("GET"); return route.fulfill({ json: { barcodes: [] } }); });
-  await page.route("**/api/v1/products/1/variants", route => route.fulfill({ json: { product: { id: 1, name: "ajo" }, variants: [] } }));
-  await page.route("**/api/v1/photos/discover", () => { throw new Error("Generic search must never call AI"); });
-  await page.route("**/api/v1/photos/generic", route => {
-    searches++; expect(route.request().postDataJSON()).toEqual({ name: "ajo", product_id: 1 });
-    return route.fulfill({ json: { advisory: true, candidates: [{ kind: "generic", file_id: 123, name: "Garlic bulbs", barcode: "", image_url: url, source_url: source, search_source_url: source, attribution: "Wikimedia Commons · CC BY-SA 4.0 · Example photographer", discovery_token: "generic-signed" }] } });
-  });
-  await page.route("**/api/v1/catalog/products/1/photo-discovery", route => {
-    saves++; expect(route.request().postDataJSON()).toEqual({ token: "generic-signed", replace: false }); image = url;
-    return route.fulfill({ json: { saved: true, image_url: image } });
-  });
-  await page.goto(base);
-  await page.getByRole("button", { name: "Mi despensa", exact: true }).click();
-  await page.locator(".product-name").first().click();
-  await page.getByRole("button", { name: "Buscar foto genérica", exact: true }).click();
-  await expect(page.getByText("Foto genérica · Sin código de barras", { exact: true })).toBeVisible();
-  expect(saves).toBe(0);
-  await page.getByRole("button", { name: "Usar esta foto", exact: true }).click();
-  await expect(page.getByRole("img", { name: "Fotografía de ajo" })).toHaveAttribute("src", url);
-  await expect(page.getByRole("link", { name: "Fuente de la fotografía" })).toHaveAttribute("href", source);
-  await expect(page.getByRole("link", { name: "CC BY-SA 4.0", exact: true })).toBeVisible();
-  await expect(page.getByLabel("Cantidad final", { exact: true })).toHaveValue("2");
-  expect(searches).toBe(1); expect(saves).toBe(1);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: info.outputPath("generic-garlic-photo-mobile.png"), fullPage: true });
-});
+}
