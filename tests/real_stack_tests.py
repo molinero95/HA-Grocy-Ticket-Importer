@@ -506,6 +506,23 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(detail['barcodes'], [])
         for entity, before in stock.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)
 
+        import web_product_photos
+        from test_web_product_photos import picture
+        public_page = 'https://manufacturer.example.com/product'
+        with patch.object(web_product_photos, 'search', return_value=[(picture(), public_page)]):
+            response = self.client.post('/api/v1/photos/web', json={'name': name, 'query': 'Product brand format', 'product_id': pid, 'consent': True}, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.json)
+        candidate = response.json['candidates'][0]
+        self.assertEqual(candidate['barcode'], '')
+        self.assertEqual(self.client.get('/' + candidate['image_url']).status_code, 200)
+        response = self.client.post(f'/api/v1/catalog/products/{pid}/photo-discovery', json={'token': candidate['discovery_token'], 'replace': True}, headers=self.headers)
+        self.assertTrue(response.json['saved'], response.json)
+        detail = self.client.get(f'/api/v1/catalog/products/{pid}').json
+        self.assertEqual(detail['photo_source_url'], public_page)
+        self.assertEqual(detail['description'], 'Notas conservadas')
+        self.assertEqual(detail['barcodes'], [])
+        for entity, before in stock.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)
+
     def test_resolved_merge_converts_real_lots_prices_references_and_final_stock(self):
         from decimal import Decimal
         import barcode_stock

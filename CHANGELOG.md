@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.28.0] — 2026-11-04
+
+### Changed
+- Product details have one **Buscar foto con IA** action for generic foods and packaged/household products. OpenAI searches public manufacturer/retailer pages without requiring a barcode or limiting photo results to Open Facts. The editable search text can include brand/format without renaming the saved product. Remove the separate generic-photo search button; retain old endpoints and existing Commons credit for compatibility.
+- Retrieve photos from cited page metadata/product images, not model-provided image URLs. Verify public DNS addresses, pin TLS connections to those addresses with the original certificate hostname, revalidate redirects, bound content/time, accept raster formats and sanitize previews to local JPEG. No ambient cookies/auth/proxies are sent to source sites.
+- Previews are private/session-bound and expire after 30 minutes. Explicit selection saves the reviewed bytes locally with source attribution and prior-image backups; product/name/current-photo guards remain. No code/name/stock mutation, automatic paid retry or automatic photo replacement. Exact-code catalog discovery for new-product creation remains separate.
+
+### Validation
+- Local: 434 Python regressions, 142 Vitest tests, TypeScript/Vite build, 23 real Grocy contracts and 48 Chromium flows passed. Mobile views for Chocoflakes/anti cucarachas/ajo show a single search button and photo-only selection; Grocy stock/codes/notes remain unchanged.
+- Read-only public verification found the official Chocoflakes pack image (HTTP 200 PNG). Paid search is mocked; this runtime cannot resolve direct DNS, so pinned TLS/private-address/redirect boundaries are verified with socket mocks. The installed OpenAI/source-site result still requires an explicit post-update search. No paid request or installed data/options changed.
+
 ## [1.27.0] — 2026-11-04
 
 ### Changed

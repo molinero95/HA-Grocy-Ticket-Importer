@@ -78,6 +78,9 @@ def register_catalog_routes(app, barcode_stock, lock):
             from api_photos import local_image_url
             product = barcode_stock.product_detail(product_id)
             product["image_url"] = local_image_url(product_id) or product.get("image_url")
+            from api_photos import image_directory
+            from web_product_photos import saved_source
+            product['photo_source_url'] = saved_source(image_directory(), product_id)
             from stock_thresholds import settings
             warning = settings().get(product_id, {"amount": "0", "warning_enabled": True})
             product["stock_threshold"] = warning["amount"]

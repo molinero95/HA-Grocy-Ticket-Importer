@@ -288,6 +288,7 @@ export function ProductDetail({
               <a href={product.data.photo_credit.source_url} target="_blank" rel="noopener noreferrer">Fuente de la fotografía</a>
             </p>}
             {photoMessage && <p role="status">{photoMessage}</p>}
+            {product.data?.photo_source_url && <p><a href={product.data.photo_source_url} target="_blank" rel="noopener noreferrer">Fuente de la fotografía</a></p>}
             {product.data && <ProductPhotoSearch key={JSON.stringify([id, product.data.name, product.data.image_url])} id={id} name={product.data.name} imageUrl={product.data.image_url} disabled={editingProduct || updateProduct.isPending || uploadPhoto.isPending} onSaved={refreshProduct} />}
             {editingProduct && <p>Guarda el nombre antes de buscar una foto con IA.</p>}
             <form

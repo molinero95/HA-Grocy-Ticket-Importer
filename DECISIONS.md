@@ -159,3 +159,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Quantity-first receipt review — 1.27.0
 
 The user prioritizes inventory quantities over receipt prices. Since 1.27, monetary mismatch is advisory; preserve extracted prices rather than allocating discounts. Ignore only the exact legacy automatic total-mismatch flag, never arbitrary uncertainty. Checkout bags default to indexed skip lines and mappings cannot re-enable them. Frontend removes auto/name detection and requires explicit existing/new/skip unless a valid mapping preselects an identity. Legacy backend auto remains. Preserve ledger, checkpoints and uncertain outcomes.
+
+
+## OpenAI photo search — 1.28.0
+
+Photo-only search must not require product identity/GTIN. The user reports both Chocoflakes and anti cucarachas missing and explicitly requests OpenAI with a single search button. Existing-product details now use one unrestricted web-search request to locate cited manufacturer/retailer pages. The server retrieves and sanitizes an actual page image through public-DNS-pinned TLS (all addresses public, redirects rechecked, no ambient auth/proxies, bounded bytes/deadlines). Private expiring previews bind session/product/name/current image and selected-byte hash. Explicit save is local only with source/hash sidecar and previous-photo backups; never assign codes or update stock. Keep legacy exact-code creation discovery and Commons endpoints/credits compatible; no generic-photo button remains.

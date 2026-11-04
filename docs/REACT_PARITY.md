@@ -97,3 +97,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Quantity-first receipt review — 1.27.0
 
 1.27 removes auto product selection and its unit-confirmation workaround. Unmapped rows show a disabled placeholder and pending reason; suggestions/full catalog/new/skip remain. Carry bags remain skipped across mapping initialization and can be explicitly included. Monetary mismatches are informational while stock review, simulation and confirmation remain mandatory. This user-approved policy supersedes older references to mandatory monetary reconciliation.
+
+
+## OpenAI photo search — 1.28.0
+
+1.28: remove the separate generic search action. One Buscar foto con IA button uses the photo-only endpoint for saved products. Search query may change independently from the saved product name and invalidates old results; late replies/product/photo changes still discard selections. Render local authenticated preview URLs, no invented barcode, explicit save/replace and a source link after refresh. Creation keeps its separate existing exact-code workflow.

@@ -304,3 +304,10 @@ El importe total es informativo: una diferencia por promociones o descuentos mue
 Las bolsas de compra reconocibles aparecen omitidas por defecto. Puedes cambiar su selector para incluir una. No se omiten bolsas de alimentos (hielo, patatas o pan) ni productos de bolsas de basura. Se conserva cada línea y su posición para reconocer repeticiones, sin crear producto ni añadir stock en las omitidas.
 
 Se retira **Detectar por nombre**. Elige un producto de las sugerencias o del catálogo, **Crear producto nuevo al importar**, u omite la línea. Una asociación guardada válida se mantiene seleccionada; las filas sin decisión aparecen pendientes. Las asociaciones no reactivan una bolsa omitida.
+
+
+## Una búsqueda de fotografías con OpenAI — 1.28.0
+
+La ficha tiene un único botón **Buscar foto con IA**, tanto para alimentos genéricos como para productos envasados o de limpieza. OpenAI localiza páginas públicas de fabricantes y tiendas por nombre, sin exigir código de barras ni limitarse a catálogos de códigos. Puedes añadir marca y formato al **Nombre para buscar la foto** sin renombrar el artículo. Las fotos son sugerencias: revisa envase y variante y elige una para guardarla. La búsqueda tiene coste en la cuenta API configurada y nunca se repite automáticamente.
+
+La aplicación comprueba las páginas citadas, recupera una foto publicada, la convierte en una vista previa privada y guarda esos mismos bytes cuando los eliges. Se conserva la fuente y una copia de la imagen anterior. Los códigos, el nombre y el stock no cambian. Las vistas previas caducan a los 30 minutos y una ficha/foto modificada obliga a buscar de nuevo. No se admiten destinos de red privada ni descargas con credenciales de Home Assistant. Algunas webs bloquean descargas o no publican una imagen utilizable: en ese caso se explica y puedes concretar la búsqueda o usar una fotografía propia. Los endpoints antiguos y los créditos de Commons siguen siendo compatibles, pero desaparece el botón de foto genérica.

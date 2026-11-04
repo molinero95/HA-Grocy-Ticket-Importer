@@ -277,6 +277,7 @@ export type CatalogProduct = {
   stock_amount: string;
   image_url: string | null;
   photo_credit?: { artist: string; license: string; source_url: string; license_url: string; image_url: string } | null;
+  photo_source_url?: string | null;
   is_pack: boolean;
   pack_size: number;
   barcodes: string[];
@@ -464,9 +465,9 @@ export async function identifyProductPhoto(barcode: string, photo: Blob) {
   return request<{ suggestion: ProductSuggestion }>("photos/identify", "POST", form);
 }
 
-export type ProductDiscoveryCandidate = PhotoLookup & { search_source_url: string; discovery_token?: string; kind?: "generic"; file_id?: number };
-export const discoverGenericPhotos = (name: string, productId: number) =>
-  request<{ candidates: ProductDiscoveryCandidate[]; advisory: true }>("photos/generic", "POST", { name, product_id: productId });
+export type ProductDiscoveryCandidate = PhotoLookup & { search_source_url: string; discovery_token?: string; kind?: "generic" | "web"; file_id?: number };
+export const discoverWebPhotos = (name: string, query: string, productId: number) =>
+  request<{ candidates: ProductDiscoveryCandidate[]; advisory: true }>("photos/web", "POST", { name, query, product_id: productId, consent: true });
 export const discoverProduct = (name: string, barcode: string, productId?: number) =>
   request<{ candidates: ProductDiscoveryCandidate[]; advisory: true }>(
     "photos/discover", "POST", { name, barcode, consent: true, ...(productId ? { product_id: productId } : {}) },
