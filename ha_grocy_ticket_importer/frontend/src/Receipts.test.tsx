@@ -275,7 +275,7 @@ it("loads a remembered merchant mapping while retaining the original receipt tex
     },
   });
   renderWithClient(<Receipts />);
-  await upload();
+  await upload(false);
   await screen.findByRole("option", { name: "Leche entera" });
   expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty(
     "value",
