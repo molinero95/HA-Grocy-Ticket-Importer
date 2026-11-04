@@ -281,3 +281,10 @@ En los logs se registra `product_discovery_failed code=... provider_status=... p
 En el selector **Producto de Despensa**, elige **Omitir: no crear producto ni añadir stock** para excluir una línea del inventario. Se conserva su importe original para comprobar el total del ticket, y no se aprende una asociación. Tras confirmar, la omisión queda registrada para que volver a subir ese mismo ticket no importe esa línea. Una importación anterior incierta sigue requiriendo revisión: omitir no permite saltarse esa protección.
 
 Las filas amarillas muestran por qué no están listas: cantidad o envase inválidos, unidad incorrecta, producto ausente, asociación desactualizada o stock desconocido. El resumen indica cuántas filas revisar y **Revisar primer artículo pendiente** lleva a la primera. La simulación también resalta sus propios REVIEW por línea; un stock que cambió obliga a **Actualizar stock y catálogo**, revisar la cantidad final y simular de nuevo. Las líneas omitidas aparecen con fondo gris. Si falta el catálogo, se explica junto al botón de simulación.
+
+
+## Compatibilidad de búsqueda de fotos — 1.25.0
+
+Para GPT-4.1/GPT-4o, Despensa usa `web_search_preview` con el formato documentado para esos modelos; las familias nuevas mantienen `web_search` filtrado. No cambia el modelo configurado ni reintenta la búsqueda automáticamente. Preview no admite `filters`: se indican los sitios de catálogo en la búsqueda y el servidor sigue admitiendo únicamente candidatos con fuente/cita de Open Facts, GTIN válido y verificación exacta en el catálogo. No es una garantía de filtrado remoto; ningún enlace arbitrario del modelo se descarga ni se guarda.
+
+El log instalado `ai_request_rejected provider_status=400 parameter=tools` confirmó un rechazo de la configuración del buscador. La 1.25 adapta esa petición; una nueva búsqueda explícita tras actualizar comprobará la aceptación real de OpenAI. No hace falta cambiar la clave por este diagnóstico.

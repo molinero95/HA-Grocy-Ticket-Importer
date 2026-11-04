@@ -82,3 +82,8 @@ Una petición explícita, espera 90s y una invocación web; sin cambio automáti
 
 
 Ticket 1.24.0: omisión explícita por línea (sin producto/stock/alias) con total original conservado y estado terminal omitted contra reimportación. Pendientes inciertos no se pueden omitir para saltar sus guardas. Filas amarillas y motivos concretos sustituyen la simulación deshabilitada sin explicación; resumen y acceso a primera fila, motivos REVIEW del servidor por índice y stock desfasado comprobado antes de escribir. Omitidas diferenciadas en gris; catálogo ausente explicado globalmente.
+
+
+## Compatibilidad de búsqueda 1.25.0
+
+Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT-4o a web_search_preview sin filters; mantener web_search filtrado para familias nuevas. No cambiar modelo ni repetir solicitudes pagadas. La variante preview carece de filtro remoto: sitios en instrucciones y admisión local estricta de fuentes/citas/GTIN/API exacta, sin URLs arbitrarias. El subcampo rechazado y el éxito de una nueva consulta instalada no se deducen del log resumido. Conservar el resto de 1.24 (omisiones, filas amarillas y diagnósticos).

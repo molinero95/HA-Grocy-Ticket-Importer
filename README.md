@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.24.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.25.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -306,3 +306,10 @@ En los logs se registra `product_discovery_failed code=... provider_status=... p
 En el selector **Producto de Despensa**, elige **Omitir: no crear producto ni añadir stock** para excluir una línea del inventario. Se conserva su importe original para comprobar el total del ticket, y no se aprende una asociación. Tras confirmar, la omisión queda registrada para que volver a subir ese mismo ticket no importe esa línea. Una importación anterior incierta sigue requiriendo revisión: omitir no permite saltarse esa protección.
 
 Las filas amarillas muestran por qué no están listas: cantidad o envase inválidos, unidad incorrecta, producto ausente, asociación desactualizada o stock desconocido. El resumen indica cuántas filas revisar y **Revisar primer artículo pendiente** lleva a la primera. La simulación también resalta sus propios REVIEW por línea; un stock que cambió obliga a **Actualizar stock y catálogo**, revisar la cantidad final y simular de nuevo. Las líneas omitidas aparecen con fondo gris. Si falta el catálogo, se explica junto al botón de simulación.
+
+
+## Compatibilidad de búsqueda de fotos — 1.25.0
+
+Para GPT-4.1/GPT-4o, Despensa usa `web_search_preview` con el formato documentado para esos modelos; las familias nuevas mantienen `web_search` filtrado. No cambia el modelo configurado ni reintenta la búsqueda automáticamente. Preview no admite `filters`: se indican los sitios de catálogo en la búsqueda y el servidor sigue admitiendo únicamente candidatos con fuente/cita de Open Facts, GTIN válido y verificación exacta en el catálogo. No es una garantía de filtrado remoto; ningún enlace arbitrario del modelo se descarga ni se guarda.
+
+El log instalado `ai_request_rejected provider_status=400 parameter=tools` confirmó un rechazo de la configuración del buscador. La 1.25 adapta esa petición; una nueva búsqueda explícita tras actualizar comprobará la aceptación real de OpenAI. No hace falta cambiar la clave por este diagnóstico.
