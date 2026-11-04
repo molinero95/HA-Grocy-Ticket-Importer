@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.25.0] — 2026-11-04
+
+### Fixed
+- Use the documented web_search_preview request for GPT-4.1/GPT-4o photo searches, without unsupported preview filters. Keep filtered web_search for newer model families. Select the tool profile before the one explicit request; do not automatically retry or change models.
+- Add catalog site restrictions to the search instructions. A provider-side domain filter is unavailable in preview: candidate admission remains strictly local, requiring a trusted Open Facts citation, matching consulted source, valid GTIN and exact-code catalog verification. Never fetch an arbitrary cited URL or accept a model-supplied image URL.
+
+### Validation
+- Local: 412 Python regressions, TypeScript/Vite build and six targeted Chromium photo/camera scenarios passed.
+- Installed 1.24 logs confirmed HTTP 400 at parameter tools; that log groups tool subfields, so it does not establish the rejected subfield. Regression fixtures exercise the compatible legacy request, retained modern filters and rejection of off-catalog or unverified candidates. An installed paid-provider success still requires a new explicit search after updating.
+
 ## [1.24.0] — 2026-11-03
 
 ### Added

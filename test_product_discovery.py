@@ -32,7 +32,7 @@ class DiscoveryTests(unittest.TestCase):
     def search(self, result=None, code="", found=CANDIDATE, failure=None):
         response = unittest.mock.MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(result or self.result()).encode()
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "disposable-key"}), patch.object(
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "disposable-key", "OPENAI_MODEL": "gpt-4.1-mini"}), patch.object(
             recognition.urllib.request, "urlopen", return_value=response
         ) as remote, patch.object(product_images, "verify_discovered_product", return_value=found, side_effect=failure) as verify:
             output = recognition.discover("Crema Example 100 ml", code)
@@ -42,10 +42,11 @@ class DiscoveryTests(unittest.TestCase):
         output, payload, verify = self.search()
         self.assertEqual(output["candidates"], [CANDIDATE])
         self.assertFalse(payload["store"])
-        self.assertEqual(payload["tools"][0]["type"], "web_search")
+        self.assertEqual(payload["tools"][0]["type"], "web_search_preview")
         self.assertEqual(payload["tool_choice"], "required")
         self.assertIn("web_search_call.action.sources", payload["include"])
-        self.assertIn("openbeautyfacts.org", payload["tools"][0]["filters"]["allowed_domains"])
+        self.assertNotIn("filters", payload["tools"][0])
+        self.assertIn("site:openbeautyfacts.org", payload["instructions"])
         verify.assert_called_once_with(PAGE)
 
     def test_invented_unsafe_uncited_invalid_and_wrong_scanned_codes_are_not_looked_up(self):
@@ -240,3 +241,50 @@ class DiscoveryTransportTests(unittest.TestCase):
                 error = recognition.discovery_http_error(400, json.dumps({'error': {'param': parameter, 'message': 'private'}}).encode())
                 self.assertEqual(error.provider_parameter, expected)
                 self.assertNotIn('private', str(error))
+
+class SearchToolCompatibilityTests(unittest.TestCase):
+    def test_default_legacy_model_uses_preview_without_unsupported_controls(self):
+        from urllib.error import HTTPError
+        response = unittest.mock.MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(DiscoveryTests().result()).encode()
+        def provider(request, timeout):
+            payload = json.loads(request.data)
+            tool = payload['tools'][0]
+            if tool['type'] != 'web_search_preview' or set(tool) != {'type', 'search_context_size'}:
+                raise HTTPError(request.full_url, 400, 'Rejected tools', {}, io.BytesIO(b'{"error":{"param":"tools"}}'))
+            self.assertEqual(payload['model'], 'gpt-4.1-mini')
+            self.assertEqual(payload['max_tool_calls'], 1)
+            self.assertFalse(payload['store'])
+            return response
+        with patch.dict(os.environ, OPENAI_API_KEY='disposable-key', OPENAI_MODEL='gpt-4.1-mini'), patch.object(recognition.urllib.request, 'urlopen', side_effect=provider) as remote, patch.object(product_images, 'verify_discovered_product', return_value=CANDIDATE) as verify:
+            result = recognition.discover('Crema Example 100 ml')
+        self.assertEqual(result['candidates'], [CANDIDATE])
+        remote.assert_called_once();verify.assert_called_once_with(PAGE)
+
+    def test_legacy_snapshots_and_modern_models_keep_their_own_tool_profiles(self):
+        for model in ('gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-mini-2025-04-14', 'gpt-4o', 'gpt-4o-mini'):
+            with self.subTest(model=model):
+                self.assertEqual(recognition.discovery_tool(model), {'type': 'web_search_preview', 'search_context_size': 'low'})
+        for model in ('gpt-5-mini', 'gpt-5.4-mini'):
+            with self.subTest(model=model):
+                tool = recognition.discovery_tool(model)
+                self.assertEqual(tool['type'], 'web_search')
+                self.assertEqual(tool['filters']['allowed_domains'], ['openfoodfacts.org', 'openproductsfacts.org', 'openbeautyfacts.org'])
+
+    def test_legacy_search_still_rejects_off_catalog_citations_and_source_only_claims(self):
+        for urls, sources in [(['https://evil.invalid/product/'+CODE], None), ([PAGE], []), ([], [PAGE])]:
+            with self.subTest(urls=urls, sources=sources), patch.dict(os.environ, OPENAI_MODEL='gpt-4.1-mini'):
+                output, payload, verify = DiscoveryTests().search(DiscoveryTests().result(urls, sources))
+            self.assertEqual(payload['tools'][0]['type'], 'web_search_preview')
+            self.assertEqual(output['candidates'], []);verify.assert_not_called()
+
+    def test_modern_model_payload_preserves_filters_and_explicit_model_without_retry(self):
+        response = unittest.mock.MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(DiscoveryTests().result()).encode()
+        with patch.dict(os.environ, OPENAI_API_KEY='disposable-key', OPENAI_MODEL='gpt-5-mini'), patch.object(recognition.urllib.request, 'urlopen', return_value=response) as remote, patch.object(product_images, 'verify_discovered_product', return_value=CANDIDATE):
+            recognition.discover('Crema Example 100 ml')
+        payload = json.loads(remote.call_args.args[0].data)
+        self.assertEqual(payload['model'], 'gpt-5-mini')
+        self.assertEqual(payload['tools'][0]['type'], 'web_search')
+        self.assertEqual(len(payload['tools'][0]['filters']['allowed_domains']), 3)
+        remote.assert_called_once()

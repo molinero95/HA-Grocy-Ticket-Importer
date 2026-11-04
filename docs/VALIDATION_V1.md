@@ -164,3 +164,14 @@ Receipt tests cover omitted lines without catalog/stock/alias writes, unchanged 
 
 
 Local 1.24 validation: 408 Python regressions, 139 Vitest tests with V8 coverage, TypeScript/Vite build, 22 disposable real Grocy contracts and all 44 Chromium scenarios passed. Five targeted photo/ticket browser cases were repeated after the readiness/unit-confirmation UI adjustment, and the omitted/pending mobile screenshot was visually reviewed. A local run using the default large fork pool could not start six workers; a complete run with maxWorkers=2 passed. CI uses its normal runner setup and must pass on the final source head before merging.
+
+
+## Web-search tool compatibility 1.25.0
+
+Installed read-only log evidence: 2026-11-03 19:53:51 UTC, `product_discovery_failed code=ai_request_rejected provider_status=400 parameter=tools`. The 1.24 safe parameter category does not identify the exact nested field. Use the documented GPT-4 family preview tool profile instead of the filtered GA request for that family; no automatic fallback retries or model changes. Preview lacks remote filters, so do not claim remote allowlisting: instructions use site restrictions and strict candidate admission still validates trusted catalog provenance, consulted/cited intersection, checksum and exact-code API results. Current official references: [GPT-4.1-mini preview example](https://developers.openai.com/cookbook/examples/evaluation/use-cases/web-search-evaluation), [web-search guide](https://developers.openai.com/api/docs/guides/tools-web-search).
+
+Regression fixtures validate the exact accepted preview shape, snapshots, the modern filtered profile, single transport dispatch, and off-catalog/uncited/source-only rejection. Paid-provider and installed acceptance are separate and remain pending; no installed config, stock, lists, photos or credentials changed. Final-head CI is recorded in the PR.
+
+Local 1.25 checks: 412 Python regressions, TypeScript/Vite build and six targeted Chromium photo/camera scenarios passed. Full frontend, real Grocy, browser and architecture checks run on the final CI source head and are recorded in the PR.
+
+Nov 4 read-only follow-up confirms installed 1.24.0 and two HTTP 400/tools failures (Nov 3 19:53:51 and 20:02:09 UTC). The pending 1.25 source had not yet been published. Proxy GET of the documented auth/status API still returned INVALID_ARGUMENT after verifying the proxy tool schema against its official source; no live provider query or installed change was made.
