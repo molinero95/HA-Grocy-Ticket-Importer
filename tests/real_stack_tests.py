@@ -134,6 +134,42 @@ class RealStackTests(unittest.TestCase):
         self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 10)
         self.assertNotEqual(self.client.post(f'/api/v1/receipts/{rid}/commit', headers=self.headers).status_code, 200)
 
+    def test_receipt_monetary_mismatch_and_default_bag_omission_import_quantities_once(self):
+        import copy
+        import hashlib
+        from unittest.mock import patch
+        raw = b'synthetic-discount-and-bag-contract'
+        names = ['Receipt advisory product A', 'Receipt advisory product B', 'Receipt advisory product C', 'BOLSA 50% RECICLADA']
+        receipt = {'merchant': 'Synthetic shop', 'receipt_date': '2026-01-01', 'total': 7.04,
+                   'source_sha256': hashlib.sha256(raw).hexdigest(),
+                   'items': [{'name': name, 'quantity': 1, 'unit_price': price, 'ambiguous': True, 'reason': 'Receipt total mismatch'}
+                             for name, price in zip(names, (.95, 3.90, 2.55, .15))]}
+        edits = [{'name': name, 'purchase_units': '1', 'pieces_per_pack': 1, 'stock_unit': 'piece',
+                  'product_mode': 'new' if index < 3 else 'skip', 'remember_product': False, 'product_id': None}
+                 for index, name in enumerate(names)]
+        with patch.object(self.web.extract, 'extract', side_effect=lambda path: copy.deepcopy(receipt)):
+            def upload():
+                result = self.client.post('/api/v1/receipts', data={'ticket': (io.BytesIO(raw), 'synthetic.pdf')}, headers=self.headers)
+                self.assertEqual(result.status_code, 201, result.json)
+                self.assertIn('no bloquea', result.json['receipt']['total_warning'])
+                self.assertEqual(result.json['receipt']['items'][3]['product_mode'], 'skip')
+                return '/api/v1/receipts/' + result.json['receipt_id']
+            base = upload()
+            preview = self.client.post(base + '/preview', json={'items': edits}, headers=self.headers)
+            self.assertTrue(preview.json['ready_to_commit'], preview.json)
+            self.assertIn('AVISO:', preview.json['preview'])
+            self.assertEqual(self.client.post(base + '/commit', headers=self.headers).status_code, 200)
+            products = self.instance.http('GET', 'objects/products')
+            self.assertFalse(any(p['name'] == names[3] for p in products))
+            ids = [int(next(p['id'] for p in products if p['name'] == name)) for name in names[:3]]
+            for pid in ids: self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 1)
+            base = upload()
+            preview = self.client.post(base + '/preview', json={'items': edits}, headers=self.headers)
+            self.assertTrue(preview.json['ready_to_commit'], preview.json)
+            self.assertIn('SKIP omitted', preview.json['preview'])
+            self.assertEqual(self.client.post(base + '/commit', headers=self.headers).status_code, 200)
+            for pid in ids: self.assertEqual(self.instance.http('GET', f'stock/products/{pid}')['stock_amount'], 1)
+
     def test_variant_photo_and_metadata_survive_restart(self):
         product = next(p for p in self.instance.http('GET','objects/products') if p['name']=='Leche de prueba')
         pid = product['id']

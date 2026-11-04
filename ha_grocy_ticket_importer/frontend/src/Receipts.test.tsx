@@ -28,12 +28,15 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.restoreAllMocks());
-async function upload() {
+async function upload(selectNew = true) {
   await userEvent.upload(
     screen.getByLabelText("Foto o PDF del ticket"),
     new File(["fixture"], "ticket.png", { type: "image/png" }),
   );
   await screen.findAllByLabelText("Artículo");
+  if (selectNew) for (const selector of screen.getAllByLabelText("Producto de Despensa")) {
+    if ((selector as HTMLSelectElement).value === "") await userEvent.selectOptions(selector, "new");
+  }
 }
 async function preview() {
   await upload();
@@ -71,9 +74,12 @@ it("requires a preview of the current edits and shows calculated stock read-only
       purchase_units: "2",
       pieces_per_pack: 5,
       stock_unit: "piece",
-      product_mode: "auto",
+      product_mode: "new",
       product_id: null,
-      remember_product: false,
+      remember_product: true,
+      stock_to_add: undefined,
+      expected_stock: undefined,
+      mapping_stale: false,
     },
   ]);
   expect(api.commitReceipt).not.toHaveBeenCalled();
@@ -269,7 +275,7 @@ it("loads a remembered merchant mapping while retaining the original receipt tex
     },
   });
   renderWithClient(<Receipts />);
-  await upload();
+  await upload(false);
   await screen.findByRole("option", { name: "Leche entera" });
   expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty(
     "value",
@@ -327,7 +333,7 @@ it("requires an explicit replacement when a remembered product or conversion is 
     },
   });
   renderWithClient(<Receipts />);
-  await upload();
+  await upload(false);
   await screen.findByText(/La asociación guardada ha cambiado/);
   expect(
     screen.getByRole("button", { name: "Simular importación" }),
@@ -366,9 +372,9 @@ it("lets pack input be empty and replaces a leading zero while typing", async ()
 });
 it("selected products accept a direct addition and show current plus final stock instead of pack editing", async () => {
   vi.mocked(api.getReceiptReviewContext).mockResolvedValue({ products: [{ id: 41, name: "Leche entera", current_stock: "5", stock_unit: "piece", pieces_per_pack: 6 }], mappings: {}, line_suggestions: [[41]] });
-  renderWithClient(<Receipts />);await upload();
+  renderWithClient(<Receipts />);await upload(false);
   expect(screen.getByRole("group", { name: "Sugeridos por parecido" })).toBeTruthy();
-  expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty("value", "auto");
+  expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty("value", "");
   await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "41");
   expect(screen.queryByLabelText("Piezas por envase")).toBeNull();
   expect(screen.getByText("Stock actual: 5 Piece")).toBeTruthy();
@@ -389,7 +395,7 @@ it("offers complete catalog and new creation when no similar suggestion exists",
 it("aggregates all explicitly associated lines into the same final product stock", async () => {
   vi.mocked(api.uploadReceipt).mockResolvedValue({ receipt_id: "repeated-lines", receipt: { items: [{ name: "Leche", quantity: 1 }, { name: "Leche", quantity: 1 }] } });
   vi.mocked(api.getReceiptReviewContext).mockResolvedValue({ products: [{ id: 41, name: "Leche entera", current_stock: "5", stock_unit: "piece", pieces_per_pack: 1 }], mappings: { leche: { product_id: 41, stock_unit: "piece", pieces_per_pack: 1 } } });
-  renderWithClient(<Receipts />);await upload();
+  renderWithClient(<Receipts />);await upload(false);
   const inputs = await screen.findAllByLabelText("Cantidad a añadir");
   await userEvent.clear(inputs[0]);await userEvent.type(inputs[0], "3");
   await userEvent.clear(inputs[1]);await userEvent.type(inputs[1], "4");
@@ -418,9 +424,24 @@ it("colors a server REVIEW row and explains the reason without enabling import",
   expect(screen.getByRole("group", { name: "Línea 1: Leche" }).className).toContain("receipt-line-invalid");
   expect(screen.queryByRole("button", { name: "Confirmar e importar a Grocy" })).toBeNull();
 });
-it("can explicitly confirm the already displayed unit without changing it to a different unit first", async () => {
-  renderWithClient(<Receipts />);await upload();
-  await userEvent.click(screen.getByRole("button", { name: "Confirmar unidad elegida" }));
+it("requires an explicit product selection and removes automatic name detection", async () => {
+  renderWithClient(<Receipts />);await upload(false);
+  expect(screen.queryByRole("option", { name: "Detectar por nombre" })).toBeNull();
+  expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty("value", "");
+  expect(screen.getByRole("button", { name: "Simular importación" })).toHaveProperty("disabled", true);
+  expect(api.previewReceipt).not.toHaveBeenCalled();
+  await userEvent.selectOptions(screen.getByLabelText("Producto de Despensa"), "new");
   await userEvent.click(screen.getByRole("button", { name: "Simular importación" }));
-  expect(api.previewReceipt).toHaveBeenCalledWith("ticket-1", [expect.objectContaining({ stock_unit: "piece", unit_confirmed: true })]);
+  expect(api.previewReceipt).toHaveBeenCalledWith("ticket-1", [expect.objectContaining({ stock_unit: "piece", product_mode: "new" })]);
+});
+
+it("keeps carry bags omitted despite a remembered mapping and makes price discrepancies advisory", async () => {
+  vi.mocked(api.uploadReceipt).mockResolvedValue({ receipt_id: "bag-ticket", receipt: { total_warning: "La diferencia de precio no bloquea la importación", items: [{ name: "BOLSA 50% RECICLADA", quantity: 1, product_mode: "skip" }] } });
+  vi.mocked(api.getReceiptReviewContext).mockResolvedValue({ products: [{ id: 41, name: "Bolsa", current_stock: "0", stock_unit: "piece", pieces_per_pack: 1 }], mappings: { "bolsa 50% reciclada": { product_id: 41, stock_unit: "piece", pieces_per_pack: 1 } } });
+  renderWithClient(<Receipts />);await upload(false);
+  expect(await screen.findByText("La diferencia de precio no bloquea la importación")).toBeTruthy();
+  expect(screen.getByLabelText("Producto de Despensa")).toHaveProperty("value", "skip");
+  expect(screen.getByRole("group", { name: "Línea 1: BOLSA 50% RECICLADA" }).className).toContain("receipt-line-skipped");
+  await userEvent.click(screen.getByRole("button", { name: "Simular importación" }));
+  expect(api.previewReceipt).toHaveBeenCalledWith("bag-ticket", [expect.objectContaining({ product_mode: "skip", remember_product: false })]);
 });

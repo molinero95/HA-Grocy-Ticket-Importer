@@ -8,7 +8,7 @@ from decimal import InvalidOperation
 from pathlib import Path
 from flask import jsonify, request, session
 from werkzeug.utils import secure_filename
-from receipt_review import validate_review, mappings, has_review, key, suggestions, review_issues
+from receipt_review import validate_review, mappings, has_review, key, suggestions, review_issues, is_shopping_bag, total_warning
 import importer
 
 
@@ -99,6 +99,12 @@ def register_receipt_routes(app, data_dir, allowed, extract_module, run_import, 
         try:
             upload.save(source)
             receipt = extract_module.extract(source)
+            warning = total_warning(receipt)
+            if warning:
+                receipt['total_warning'] = warning
+            for item in receipt['items']:
+                if is_shopping_bag(item.get('name', '')):
+                    item['product_mode'] = 'skip'
             (data_dir / (receipt_id + ".json")).write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             app.logger.exception("api_v1_receipt_extraction_failed")

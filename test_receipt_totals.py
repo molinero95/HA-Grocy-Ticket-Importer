@@ -41,11 +41,47 @@ class ReceiptTotalsTests(unittest.TestCase):
                     for q, p in LINES)
         self.assertEqual(total, Decimal('78.08'))
 
-    def test_real_mismatch_is_rejected(self):
+    def test_monetary_mismatch_is_advisory_without_changing_quantities_or_prices(self):
         data = receipt()
         data['total'] = 77.00
-        with self.assertRaisesRegex(ValueError, 'Total mismatch'):
-            importer.validate(data)
+        before = json.dumps(data)
+        importer.validate(data)
+        self.assertIn('no bloquea', importer.total_warning(data))
+        self.assertEqual(json.dumps(data), before)
+
+    def test_gross_lines_and_unallocated_discount_do_not_mark_stock_ambiguous(self):
+        data = {'merchant': 'Synthetic shop', 'receipt_date': '2026-01-01', 'total': 7.04,
+                'items': [{'name': 'Product ' + str(i), 'quantity': 1, 'unit_price': price, 'ambiguous': False, 'reason': ''}
+                          for i, price in enumerate((.95, 3.90, 2.55, .15))]}
+        response = MockResponse()
+        response.read = lambda: json.dumps({'output': [{'content': [{'type': 'output_text', 'text': json.dumps(data)}]}]}).encode()
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'synthetic.pdf';path.write_bytes(b'disposable receipt')
+            with patch.dict(os.environ, {'OPENAI_API_KEY': 'disposable'}), patch('urllib.request.urlopen', return_value=response):
+                result = extract.extract(path)
+        importer.validate(result)
+        self.assertIn('7.55', result['total_warning']);self.assertIn('7.04', result['total_warning'])
+        self.assertFalse(any(item['ambiguous'] for item in result['items']))
+        self.assertEqual([i['quantity'] for i in result['items']], [1, 1, 1, 1])
+
+    def test_legacy_total_only_flags_are_ignored_but_real_uncertainty_remains(self):
+        base = {'name': 'Product', 'quantity': 1, 'ambiguous': True}
+        self.assertEqual(importer.classify({**base, 'reason': 'Receipt total mismatch'})[0], 'STOCK')
+        for reason in ('Uncertain quantity', 'Unclear product Receipt total mismatch'):
+            self.assertEqual(importer.classify({**base, 'reason': reason})[0], 'REVIEW')
+
+    def test_carry_bags_are_nonstock_but_food_bags_are_not(self):
+        from receipt_review import is_shopping_bag
+        for name in ('Bolsa', 'BOLSA 50% RECICLADA', 'Bolsa de papel', 'Bolsa reutilizable'):
+            self.assertTrue(is_shopping_bag(name), name)
+            self.assertEqual(importer.classify({'name': name, 'quantity': 1})[0], 'EXPENSE')
+        for name in ('Hielo bolsa 2 kg', 'Bolsa de patatas', 'Bolsa basura 50 l', 'Bolsa de pan', 'Patata bolsa 2 kg'):
+            self.assertFalse(is_shopping_bag(name), name)
+
+    def test_invalid_stock_numbers_and_negative_prices_still_fail(self):
+        for field, value in (('quantity', 0), ('quantity', 'NaN'), ('unit_price', -1)):
+            data = receipt();data['items'][0][field] = value
+            with self.assertRaises(ValueError): importer.validate(data)
 
     def test_fractional_unit_price_is_not_rounded_early(self):
         self.assertEqual(importer.money(Decimal('2') * Decimal('1.765')), Decimal('3.53'))

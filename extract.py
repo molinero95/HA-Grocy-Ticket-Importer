@@ -8,7 +8,7 @@ import mimetypes
 import os
 from pathlib import Path
 import urllib.request
-from decimal import Decimal, ROUND_HALF_UP
+from receipt_review import total_warning
 
 SCHEMA = {
   'type':'object','additionalProperties':False,
@@ -35,7 +35,10 @@ def extract(path):
       'store':False,
       'instructions':('Extract supermarket receipt line items faithfully. Do not invent product variants, EANs, or expiry dates. '
        'Return quantity and unit_price; when receipt shows line total for multiple units, divide exactly. '
-       'Mark ambiguous=true for unclear products, missing prices, uncertain quantity, or discounts not attributable to lines. '
+       'Mark ambiguous=true for unclear product identity or uncertain quantity. '
+       'Prices and the payable total are advisory: do not mark stock lines ambiguous solely for discounts, missing prices or a monetary mismatch. '
+       'Use a known net unit price when clearly printed; otherwise keep the printed unit price, or zero if unavailable. '
+       'Never invent or distribute discounts to force totals to match. Discount and coupon rows are not stock products. '
        'Do not include loyalty balances, payment, personal identifiers, or VAT summaries as products. '
        'Use YYYY-MM-DD for receipt_date; if unknown, return empty string. '
        'Use the actual payable receipt total, accounting for discounts. Keep reason empty for unambiguous lines.'),
@@ -52,18 +55,11 @@ def extract(path):
     if not content: raise ValueError('No structured output from model')
     receipt=json.loads(''.join(content))
     receipt['source_sha256']=hashlib.sha256(raw).hexdigest()
-    # If extraction is uncertain, preserve lines for review instead of committing a partial receipt.
-    try:
-        cent = Decimal('0.01')
-        summed = sum((Decimal(str(i['quantity'])) * Decimal(str(i['unit_price']))).quantize(cent, rounding=ROUND_HALF_UP) for i in receipt['items'])
-        if summed != Decimal(str(receipt['total'])).quantize(cent, rounding=ROUND_HALF_UP):
-            for item in receipt['items']:
-                item['ambiguous']=True
-                item['reason']=(item.get('reason','')+' Receipt total mismatch').strip()
-    except Exception:
-        for item in receipt['items']:
-            item['ambiguous']=True
-            item['reason']='Invalid extracted numeric value'
+    # Monetary differences do not create product/quantity ambiguity. Real
+    # uncertainty stays intact and numeric stock guards still run on import.
+    warning = total_warning(receipt)
+    if warning:
+        receipt['total_warning'] = warning
     return receipt
 
 if __name__=='__main__':

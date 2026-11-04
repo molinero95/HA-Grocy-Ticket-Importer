@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.27.0] — 2026-11-04
+
+### Changed
+- Receipt monetary-total differences are advisory warnings instead of blocking stock import. Preserve extracted amounts without inventing/distributing discounts; do not mark every product ambiguous solely for totals. Ignore only the exact legacy automatic total-mismatch flag, keeping real identity/quantity uncertainty and numeric stock guards.
+- Omit recognized checkout carry bags by default, retaining an explicit selector to include them. Preserve line indices/source hash/terminal omission records; saved mappings cannot re-enable an omitted bag. Bagged food and bin-bag products remain normal stock candidates.
+- Remove **Detectar por nombre**. Unmapped stock lines require explicit selection from suggestions/full catalog, new-product creation or omission. Valid saved associations remain preselected. Keep preview invalidation, locks, duplicate checks and one-shot/pending import guards.
+
+### Validation
+- Local: 426 Python regressions, 142 Vitest tests, TypeScript/Vite build, 23 real Grocy contracts and all 46 Chromium flows passed; mobile review inspected.
+- Synthetic regression: gross lines 7.55 versus payable 7.04 remains advisory; reviewed stock imports once, checkout bag stays omitted, and repeated upload changes no quantities. Private receipt bytes/identifiers are not committed. No installed receipt/stock mutation or paid extraction was made; user upgrade acceptance remains pending.
+
 ## [1.26.0] — 2026-11-04
 
 ### Added

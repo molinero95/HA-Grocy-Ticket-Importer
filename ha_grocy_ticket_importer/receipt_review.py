@@ -3,8 +3,37 @@ import re
 import sqlite3
 import unicodedata
 from contextlib import closing
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from pathlib import Path
+
+
+def total_warning(receipt):
+    """Monetary reconciliation is advisory; never infer a stock adjustment."""
+    try:
+        cent = Decimal('.01')
+        calculated = sum(((Decimal(str(item['quantity'])) * Decimal(str(item['unit_price']))).quantize(cent, rounding=ROUND_HALF_UP)
+                          for item in receipt['items']), Decimal('0'))
+        printed = Decimal(str(receipt['total'])).quantize(cent, rounding=ROUND_HALF_UP)
+        if not calculated.is_finite() or not printed.is_finite():
+            raise ValueError('Non-finite total')
+        if calculated != printed:
+            return f'Los importes no coinciden (calculado {calculated:.2f} €, ticket {printed:.2f} €). La diferencia de precio no bloquea la importación; revisa productos y cantidades.'
+    except (KeyError, TypeError, ValueError, InvalidOperation):
+        return 'No se pudo comprobar el importe del ticket. El total monetario es informativo; revisa productos y cantidades.'
+    return None
+
+
+def is_shopping_bag(name):
+    """Conservative carry-bag names; never match bagged food or bin bags."""
+    text = unicodedata.normalize('NFKD', str(name)).casefold()
+    text = ''.join(c for c in text if not unicodedata.combining(c))
+    words = re.findall(r'[a-z0-9]+', text)
+    allowed = {'de', 'la', 'compra', 'plastico', 'papel', 'reciclada', 'reciclado', 'recicladas',
+               'reutilizable', 'reutilizables', 'compostable', 'compostables', 'biodegradable',
+               'biodegradables', 'camiseta', 'rafia', 'grande', 'mediana', 'pequena', 'con', 'asas',
+               'ecologica', 'ecologicas'}
+    return bool(words and words[0] in ('bolsa', 'bolsas')
+                and all(word in allowed or word.isdigit() for word in words[1:]))
 
 
 def key(value):
