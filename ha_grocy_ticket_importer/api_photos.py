@@ -109,6 +109,36 @@ def register_photo_routes(app, barcode_stock, lock):
             app.logger.warning("api_v1_photo_lookup_unavailable")
             return jsonify({"error": "No se pudo consultar la fotografía. Puedes continuar sin ella."}), 503
 
+    @app.post('/api/v1/photos/generic')
+    def api_v1_generic_photos():
+        from itsdangerous import URLSafeTimedSerializer
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or type(payload.get('product_id')) is not int
+                or payload['product_id'] <= 0 or not isinstance(payload.get('name'), str)
+                or not 3 <= len(payload['name'].strip()) <= 200):
+            return jsonify({'error': 'Revisa el producto y su nombre'}), 400
+        if not IDENTIFY_LOCK.acquire(blocking=False):
+            return jsonify({'error': 'Hay otra búsqueda de imágenes en curso'}), 409
+        try:
+            product_id, name = payload['product_id'], payload['name'].strip()
+            product = barcode_stock.product_detail(product_id)
+            if product['name'] != name:
+                return jsonify({'error': 'El nombre ha cambiado. Actualiza la ficha antes de buscar.'}), 409
+            result = product_images.search_generic_photos(name)
+            signer = URLSafeTimedSerializer(app.secret_key, salt='product-name-photo-v1')
+            for candidate in result['candidates']:
+                candidate['discovery_token'] = signer.dumps({
+                    'kind': 'generic', 'file_id': candidate['file_id'], 'name': name,
+                    'image_url': candidate['image_url'], 'session': session.get('csrf'),
+                    'product_id': product_id,
+                    'expected_image_url': local_image_url(product_id) or product.get('image_url'),
+                })
+            return jsonify(result)
+        except Exception:
+            return jsonify({'error': 'No se pudieron consultar las fotos genéricas. Puedes continuar sin imagen.'}), 503
+        finally:
+            IDENTIFY_LOCK.release()
+
     @app.post("/api/v1/catalog/products/<int:product_id>/photo-discovery")
     def api_v1_save_name_photo(product_id):
         from itsdangerous import URLSafeTimedSerializer, BadData
@@ -137,10 +167,21 @@ def register_photo_routes(app, barcode_stock, lock):
                 if product['name'] != choice['name'] or code not in product['barcodes']:
                     return jsonify({'error': 'El nombre o el código han cambiado. Vuelve a elegir la imagen.'}), 409
                 if existing: return jsonify({'saved': False, 'preserved': True})
-            found = product_images.verify_discovered_product(choice['source_url'])
-            image = product_images.safe_image_url(found.get('image_url')) if found and found['barcode'] == choice['candidate_code'] else None
+            if choice.get('kind') == 'generic':
+                # Generic photos are bound to an existing product; never assign a code.
+                if not editing:
+                    return jsonify({'error': 'Vuelve a buscar desde la ficha del producto'}), 409
+                found = product_images.verify_generic_photo(choice.get('file_id'))
+                image = (product_images.safe_commons_image_url(found.get('image_url'))
+                         if found and found['image_url'] == choice.get('image_url') else None)
+            else:
+                found = product_images.verify_discovered_product(choice['source_url'])
+                image = product_images.safe_image_url(found.get('image_url')) if found and found['barcode'] == choice['candidate_code'] else None
             if not image: return jsonify({'saved': False})
-            barcode_stock.save_product_photo(product_id, image)
+            if choice.get('kind') == 'generic':
+                barcode_stock.save_product_photo(product_id, image, credit=found['credit'])
+            else:
+                barcode_stock.save_product_photo(product_id, image)
             if editing:
                 # Keep the previous local image privately; only retire it after URL persistence succeeds.
                 local = image_directory() / f"{product_id}.jpg"

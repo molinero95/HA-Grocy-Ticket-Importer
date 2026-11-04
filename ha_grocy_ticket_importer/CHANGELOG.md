@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.26.0] — 2026-11-04
+
+### Added
+- A separate **Buscar foto genérica** action in product details for loose foods such as garlic or fruit. Search Wikimedia Commons by the saved name without requiring a barcode, an OpenAI key or a paid AI request. Review and explicitly select a representative photo; packaged-product AI/code discovery remains separate.
+- Verify each selected Commons file again through the fixed API before saving. Require a trusted raster thumbnail and a recognized public-domain/CC0/CC BY/CC BY-SA license, retaining author, license and source in Grocy metadata and displaying credit in product details. Preserve stock, codes, notes, existing-photo replacement consent and signed session/product/name/photo guards.
+
+### Fixed
+- Explain why exact-catalog search can have no verified GTIN results for generic foods, and point to generic-photo search instead of treating this as an OpenAI failure.
+
+### Validation
+- Local: 420 Python regressions, 141 Vitest tests, TypeScript/Vite build, 22 real Grocy contracts and seven targeted Chromium scenarios passed. Mobile view inspected.
+- An actual read-only Commons query for ajo returned six licensed candidates, headed by Garlic bulbs and cloves.jpg. No paid OpenAI request, installed photo/catalog/stock write or configuration change was made. Installed selection/upgrade acceptance remains separate.
+
 ## [1.25.0] — 2026-11-04
 
 ### Fixed

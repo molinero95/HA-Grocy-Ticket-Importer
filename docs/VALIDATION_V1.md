@@ -175,3 +175,10 @@ Regression fixtures validate the exact accepted preview shape, snapshots, the mo
 Local 1.25 checks: 412 Python regressions, TypeScript/Vite build and six targeted Chromium photo/camera scenarios passed. Full frontend, real Grocy, browser and architecture checks run on the final CI source head and are recorded in the PR.
 
 Nov 4 read-only follow-up confirms installed 1.24.0 and two HTTP 400/tools failures (Nov 3 19:53:51 and 20:02:09 UTC). The pending 1.25 source had not yet been published. Proxy GET of the documented auth/status API still returned INVALID_ARGUMENT after verifying the proxy tool schema against its official source; no live provider query or installed change was made.
+
+
+## Generic-photo search — 1.26.0
+
+Local validation: 420 Python, 141 Vitest, TypeScript/Vite build, 22 real Grocy contracts, seven targeted Chromium photo/camera scenarios; mobile screenshot reviewed. The real Grocy contract replaces the public photo and re-reads persisted source/license/author, preserves private notes, and compares complete stock/stock_log/product_barcodes snapshots unchanged. API tests cover CSRF, saved-name binding, signed file/image selection and source drift; frontend tests cover double click, late replies, no paid request and explicit choice. Catalog exact-code admission remains separate.
+
+Read-only public Commons query for ajo returned six candidates, including Garlic bulbs and cloves.jpg first. Current imageinfo returns thumb.wikimedia.org URLs with utm tracking parameters: only the two exact Commons image hosts and raster path are allowed, only known tracking keys are removed, and redirects/arbitrary query keys remain rejected. No production data/options/photos or paid requests changed. Observe final-head CI before merge; the user installs and accepts the update.

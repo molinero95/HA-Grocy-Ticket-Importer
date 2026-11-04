@@ -452,6 +452,24 @@ class RealStackTests(unittest.TestCase):
         self.assertIn('Notas conservadas', description)
         for entity, before in stock.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)
 
+        # Generic photo source/license persists in real Grocy, independently of GTINs.
+        import product_images
+        from test_product_images import commons_page, COMMONS_IMAGE
+        generic = product_images._commons_candidate(commons_page())
+        with patch('product_images.search_generic_photos', return_value={'candidates': [copy.deepcopy(generic)], 'advisory': True}), \
+             patch('product_images.verify_generic_photo', return_value=generic):
+            response = self.client.post('/api/v1/photos/generic', json={'name': name, 'product_id': pid}, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+            token = response.json['candidates'][0]['discovery_token']
+            response = self.client.post(f'/api/v1/catalog/products/{pid}/photo-discovery', json={'token': token, 'replace': True}, headers=self.headers)
+            self.assertTrue(response.json['saved'], response.json)
+        detail = self.client.get(f'/api/v1/catalog/products/{pid}').json
+        self.assertEqual(detail['image_url'], COMMONS_IMAGE)
+        self.assertEqual(detail['photo_credit'], generic['credit'])
+        self.assertEqual(detail['description'], 'Notas conservadas')
+        self.assertEqual(detail['barcodes'], [])
+        for entity, before in stock.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)
+
     def test_resolved_merge_converts_real_lots_prices_references_and_final_stock(self):
         from decimal import Decimal
         import barcode_stock

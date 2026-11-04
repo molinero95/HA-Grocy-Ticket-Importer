@@ -210,6 +210,44 @@ class PhotoApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400, response.json)
             discover.assert_not_called()
 
+    def test_generic_search_and_explicit_save_work_without_a_barcode_or_ai(self):
+        import product_images
+        from test_product_images import commons_page, COMMONS_IMAGE
+        candidate = product_images._commons_candidate(commons_page())
+        self.product.update(name='ajo', barcodes=[])
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), \
+             patch('product_images.search_generic_photos', return_value={'candidates': [candidate], 'advisory': True}) as search, \
+             patch('product_recognition.discover') as paid, patch.object(web.barcode_stock, 'save_product_photo') as save:
+            self.assertEqual(self.client.post('/api/v1/photos/generic', json={'name': 'ajo', 'product_id': 7}).status_code, 403)
+            self.assertEqual(self.client.post('/api/v1/photos/generic', json={'name': 'Otro', 'product_id': 7}, headers=self.headers).status_code, 409)
+            search.assert_not_called()
+            response = self.client.post('/api/v1/photos/generic', json={'name': 'ajo', 'product_id': 7}, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.json)
+            token = response.json['candidates'][0]['discovery_token']
+            save.assert_not_called(); paid.assert_not_called()
+            with patch('product_images.verify_generic_photo', return_value=candidate) as verify:
+                saved = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token}, headers=self.headers)
+            self.assertTrue(saved.json['saved'], saved.json)
+            verify.assert_called_once_with(123)
+            save.assert_called_once_with(7, COMMONS_IMAGE, credit=candidate['credit'])
+        self.assertEqual(self.product['barcodes'], [])
+        self.assertIn('https://upload.wikimedia.org', response.headers['Content-Security-Policy'])
+
+    def test_generic_photo_stale_image_and_product_are_rejected_without_writes(self):
+        import product_images
+        from test_product_images import commons_page, COMMONS_IMAGE
+        candidate = product_images._commons_candidate(commons_page())
+        token = self.edit_photo_token(kind='generic', file_id=123, image_url=COMMONS_IMAGE)
+        with patch.object(web.barcode_stock, 'product_detail', return_value=self.product), \
+             patch('product_images.verify_generic_photo', return_value={**candidate, 'image_url': COMMONS_IMAGE.replace('480px', '640px')}), \
+             patch.object(web.barcode_stock, 'save_product_photo') as save:
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token}, headers=self.headers)
+            self.assertFalse(response.json['saved'])
+            self.product['name'] = 'Otro'
+            response = self.client.post('/api/v1/catalog/products/7/photo-discovery', json={'token': token}, headers=self.headers)
+            self.assertEqual(response.status_code, 409)
+            save.assert_not_called()
+
 
 class StandaloneAuthTests(unittest.TestCase):
     def test_anonymous_bootstrap_login_rotation_and_logout(self):

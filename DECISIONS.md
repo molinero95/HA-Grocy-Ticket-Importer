@@ -149,3 +149,8 @@ Ticket 1.24.0: omisión explícita por línea (sin producto/stock/alias) con tot
 ## Compatibilidad de búsqueda 1.25.0
 
 Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT-4o a web_search_preview sin filters; mantener web_search filtrado para familias nuevas. No cambiar modelo ni repetir solicitudes pagadas. La variante preview carece de filtro remoto: sitios en instrucciones y admisión local estricta de fuentes/citas/GTIN/API exacta, sin URLs arbitrarias. El subcampo rechazado y el éxito de una nueva consulta instalada no se deducen del log resumido. Conservar el resto de 1.24 (omisiones, filas amarillas y diagnósticos).
+
+
+## Generic product photos — 1.26.0
+
+1.26 separates generic images from product identity. An explicit existing-product Commons search uses a fixed bounded API (no paid AI), recognized PD/CC0/CC BY/CC BY-SA licenses, raster-only trusted thumbnails and plain author credit. A session/product/name/current-photo token binds the selected file/image; exact file revalidation precedes metadata persistence. Store source/license/author beside the photo marker and show it in details; local uploads hide obsolete remote credit. Open Facts exact-GTIN admission stays unchanged. No automatic fallback or production writes.

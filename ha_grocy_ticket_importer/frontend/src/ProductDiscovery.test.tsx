@@ -4,7 +4,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { ProductDiscovery } from "./ProductDiscovery";
 import * as api from "./api";
 import { deferred, renderWithClient } from "./test/helpers";
-vi.mock("./api", () => ({ discoverProduct: vi.fn() }));
+vi.mock("./api", () => ({ discoverGenericPhotos: vi.fn(), discoverProduct: vi.fn() }));
 const candidate: api.ProductDiscoveryCandidate = {
   name: "Crema Example 100 ml", barcode: "4006000082295",
   image_url: "https://images.openbeautyfacts.org/example.jpg",
