@@ -33,6 +33,130 @@ def safe_image_url(url):
     return _trusted_url(url, IMAGE_HOSTS)
 
 
+def safe_commons_image_url(url):
+    """Only raster files served from Commons, never arbitrary thumbnail URLs."""
+    import re
+    if not _trusted_url(url, {'upload.wikimedia.org', 'thumb.wikimedia.org'}):
+        return None
+    parts = urlparse(url)
+    from urllib.parse import parse_qs, urlunparse
+    if (not parts.path.startswith('/wikipedia/commons/') or parts.fragment
+            or set(parse_qs(parts.query, keep_blank_values=True)) - {'utm_source', 'utm_campaign', 'utm_content'}
+            or re.search(r'[\s\[\]<>]', url)
+            or not parts.path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))):
+        return None
+    # Commons currently adds attribution tracking parameters to imageinfo URLs.
+    return urlunparse(parts._replace(query=''))
+
+
+def safe_saved_image_url(url):
+    return safe_image_url(url) or safe_commons_image_url(url)
+
+
+class _NoCommonsRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise URLError('Redirección de imágenes no permitida')
+
+
+def _commons_query(**parameters):
+    from urllib.parse import urlencode
+    url = 'https://commons.wikimedia.org/w/api.php?' + urlencode({
+        'action': 'query', 'format': 'json', 'formatversion': 2,
+        'prop': 'imageinfo', 'iiprop': 'url|mime|mediatype|extmetadata',
+        'iiurlwidth': 480,
+        'iiextmetadatafilter': 'LicenseShortName|Artist|Restrictions', **parameters,
+    })
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'Despensa/1.26.0 (https://github.com/molinero95/HA-Grocy-Ticket-Importer)',
+        'Accept': 'application/json',
+    })
+    # Fixed API, bounded response and no redirects, retries or image downloads.
+    with urllib.request.build_opener(_NoCommonsRedirect()).open(req, timeout=12) as response:
+        raw = response.read(262145)
+    if len(raw) > 262144:
+        raise ValueError('Respuesta de imágenes demasiado grande')
+    data = json.loads(raw)
+    if not isinstance(data, dict) or 'error' in data:
+        raise ValueError('Respuesta de imágenes inválida')
+    pages = data.get('query', {}).get('pages', [])
+    if not isinstance(pages, list):
+        raise ValueError('Respuesta de imágenes inválida')
+    return pages
+
+
+def _commons_candidate(page):
+    if (not isinstance(page, dict) or page.get('ns') != 6 or page.get('missing')
+            or type(page.get('pageid')) is not int or page['pageid'] <= 0
+            or not isinstance(page.get('title'), str) or not page['title'].startswith('File:')):
+        return None
+    infos = page.get('imageinfo')
+    if not isinstance(infos, list) or not infos or not isinstance(infos[0], dict):
+        return None
+    info = infos[0]
+    metadata = info.get('extmetadata')
+    if not isinstance(metadata, dict):
+        return None
+    license_info, restrictions = metadata.get('LicenseShortName'), metadata.get('Restrictions', {})
+    licenses = {'Public domain': 'https://commons.wikimedia.org/wiki/Help:Public_domain',
+                'CC0': 'https://creativecommons.org/publicdomain/zero/1.0/'}
+    for version in ('1.0', '2.0', '2.5', '3.0', '4.0'):
+        licenses['CC BY ' + version] = 'https://creativecommons.org/licenses/by/' + version + '/'
+        licenses['CC BY-SA ' + version] = 'https://creativecommons.org/licenses/by-sa/' + version + '/'
+    if (not isinstance(license_info, dict) or license_info.get('value') not in licenses
+            or not isinstance(restrictions, dict) or restrictions.get('value')):
+        return None
+    image = safe_commons_image_url(info.get('thumburl'))
+    if (not image or info.get('mime') not in ('image/jpeg', 'image/png', 'image/webp')
+            or info.get('mediatype') != 'BITMAP'):
+        return None
+    source = 'https://commons.wikimedia.org/?curid=' + str(page['pageid'])
+    from html.parser import HTMLParser
+    class PlainText(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.parts = []
+        def handle_data(self, data):
+            self.parts.append(data)
+    artist = metadata.get('Artist', {})
+    text = PlainText()
+    text.feed(str(artist.get('value', ''))[:8192] if isinstance(artist, dict) else '')
+    author = ' '.join(' '.join(text.parts).split())[:500]
+    if license_info['value'].startswith('CC BY') and not author:
+        return None
+    credit = {'artist': author, 'license': license_info['value'],
+              'license_url': licenses[license_info['value']], 'source_url': source, 'image_url': image}
+    return {'kind': 'generic', 'file_id': page['pageid'], 'name': page['title'][5:205],
+            'barcode': '', 'image_url': image, 'source_url': source, 'search_source_url': source,
+            'credit': credit, 'attribution': 'Wikimedia Commons · ' + license_info['value'] + (' · ' + author if author else '')}
+
+
+def search_generic_photos(name):
+    """Explicit, unpaid generic-photo search; no inferred barcode or identity."""
+    import re
+    if not isinstance(name, str) or not 3 <= len(name.strip()) <= 200:
+        raise ValueError('Escribe un nombre de entre 3 y 200 caracteres')
+    words = re.findall(r'[^\W_]+', name, flags=re.UNICODE)
+    if not words:
+        raise ValueError('Escribe el nombre del alimento o producto')
+    pages = _commons_query(generator='search', gsrsearch='"' + ' '.join(words) + '" filetype:bitmap',
+                           gsrnamespace=6, gsrlimit=12)
+    candidates = []
+    for page in sorted(pages, key=lambda p: p.get('index', 999) if isinstance(p, dict) else 999):
+        found = _commons_candidate(page)
+        if found and found['file_id'] not in {c['file_id'] for c in candidates}:
+            candidates.append(found)
+    return {'candidates': candidates[:6], 'advisory': True}
+
+
+def verify_generic_photo(file_id):
+    if type(file_id) is not int or file_id <= 0:
+        return None
+    for page in _commons_query(pageids=file_id):
+        if isinstance(page, dict) and page.get('pageid') == file_id:
+            return _commons_candidate(page)
+    return None
+
+
 class _CatalogRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         # The universal API redirects between catalogs. Validate before following.

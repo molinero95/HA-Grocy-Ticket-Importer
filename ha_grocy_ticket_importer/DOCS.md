@@ -288,3 +288,10 @@ Las filas amarillas muestran por qué no están listas: cantidad o envase invál
 Para GPT-4.1/GPT-4o, Despensa usa `web_search_preview` con el formato documentado para esos modelos; las familias nuevas mantienen `web_search` filtrado. No cambia el modelo configurado ni reintenta la búsqueda automáticamente. Preview no admite `filters`: se indican los sitios de catálogo en la búsqueda y el servidor sigue admitiendo únicamente candidatos con fuente/cita de Open Facts, GTIN válido y verificación exacta en el catálogo. No es una garantía de filtrado remoto; ningún enlace arbitrario del modelo se descarga ni se guarda.
 
 El log instalado `ai_request_rejected provider_status=400 parameter=tools` confirmó un rechazo de la configuración del buscador. La 1.25 adapta esa petición; una nueva búsqueda explícita tras actualizar comprobará la aceptación real de OpenAI. No hace falta cambiar la clave por este diagnóstico.
+
+
+## Fotos genéricas sin código — 1.26.0
+
+En la ficha del producto, **Buscar foto genérica** sirve para alimentos como ajo o fruta. Envía el nombre guardado a Wikimedia Commons, sin OpenAI, clave de API ni coste de IA. Revisa las imágenes y pulsa **Usar esta foto** o **Sustituir foto por esta imagen**. No añade códigos ni modifica nombre, stock o listas. La búsqueda de producto envasado con IA sigue siendo independiente y exige códigos verificables; un resultado vacío no es un rechazo de OpenAI.
+
+Solo se admiten fotografías raster de Commons con licencia reconocida de dominio público, CC0, CC BY o CC BY-SA y sin restricciones adicionales indicadas. Se vuelven a comprobar el archivo, la imagen y la licencia al guardar; autor, fuente y licencia se conservan en la descripción de Grocy y se muestran en la ficha. El token liga sesión, producto, nombre y foto actual y caduca a los 30 minutos. Una imagen previa requiere sustitución explícita. No se descargan URLs arbitrarias ni se cambia la política del buscador de códigos de Open Facts. Los resultados dependen de las fotos y licencias disponibles; siempre se puede continuar sin imagen o usar una fotografía propia.

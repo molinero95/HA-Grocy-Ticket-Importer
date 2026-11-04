@@ -38,28 +38,51 @@ def list_products():
         key=lambda p: (p["name"].casefold(), p["id"]),
     )
 
-PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://images\.(?:openfoodfacts|openproductsfacts|openbeautyfacts)\.org/[^\]\s]+)\]\s*")
+PHOTO_MARKER = re.compile(r"(?:\n|^)\[Despensa: imagen=(https://(?:images\.(?:openfoodfacts|openproductsfacts|openbeautyfacts)\.org/|(?:upload|thumb)\.wikimedia\.org/wikipedia/commons/)[^\]\s]+)\]\s*")
+PHOTO_CREDIT_MARKER = re.compile(r"(?:\n|^)\[Despensa: credito=([A-Za-z0-9_=-]{1,8192})\]\s*")
 
 
 def saved_photo(product):
-    """Only show image URLs from the trusted open-catalog image hosts."""
-    from product_images import safe_image_url
+    """Only show image URLs from the trusted catalog and Commons image hosts."""
+    from product_images import safe_saved_image_url
     match = PHOTO_MARKER.search(str(product.get("description") or ""))
-    return safe_image_url(match.group(1)) if match else None
+    return safe_saved_image_url(match.group(1)) if match else None
 
 
-def save_product_photo(product_id, image_url):
+def saved_photo_credit(product):
+    import base64
+    import json
+    match = PHOTO_CREDIT_MARKER.search(str(product.get('description') or ''))
+    try:
+        credit = json.loads(base64.urlsafe_b64decode(match.group(1))) if match else None
+        if (not isinstance(credit, dict) or credit.get('image_url') != saved_photo(product)
+                or any(not isinstance(credit.get(key), str) for key in ('artist', 'license', 'source_url', 'license_url'))
+                or not re.fullmatch(r'https://commons\.wikimedia\.org/\?curid=[1-9][0-9]*', credit['source_url'])
+                or not (re.fullmatch(r'https://creativecommons\.org/licenses/(?:by|by-sa)/(?:1\.0|2\.0|2\.5|3\.0|4\.0)/', credit['license_url'])
+                        or credit['license_url'] in ('https://creativecommons.org/publicdomain/zero/1.0/', 'https://commons.wikimedia.org/wiki/Help:Public_domain'))):
+            return None
+        return credit
+    except (ValueError, UnicodeError):
+        return None
+
+
+def save_product_photo(product_id, image_url, *, credit=None):
     """Persist the discovered public image URL in Grocy product metadata."""
-    from product_images import safe_image_url
-    url = safe_image_url(image_url)
+    from product_images import safe_saved_image_url
+    url = safe_saved_image_url(image_url)
     if not url:
         raise BarcodeError("URL de imagen no permitida")
     pid = int(product_id)
     product = grocy("GET", f"objects/products/{pid}")
     if not isinstance(product, dict) or int(product.get("id") or 0) != pid:
         raise BarcodeError("Producto inexistente")
-    description = PHOTO_MARKER.sub("", str(product.get("description") or "")).rstrip()
+    description = PHOTO_MARKER.sub('', PHOTO_CREDIT_MARKER.sub("", str(product.get("description") or ""))).rstrip()
     description += ("\n" if description else "") + "[Despensa: imagen=" + url + "]"
+    if credit:
+        import base64
+        import json
+        encoded = base64.urlsafe_b64encode(json.dumps(credit, ensure_ascii=False).encode()).decode()
+        description += '\n[Despensa: credito=' + encoded + ']'
     grocy("PUT", f"objects/products/{pid}", {"description": description})
     return url
 
@@ -331,8 +354,9 @@ def product_detail(product_id):
         "is_pack": is_pack,
         "pack_size": pack_factor,
         "purchase_unit_id": purchase_unit_id,
-        "description": PHOTO_MARKER.sub("", PACK_MARKER.sub("", description)).strip(),
+        "description": PHOTO_MARKER.sub('', PHOTO_CREDIT_MARKER.sub("", PACK_MARKER.sub("", description))).strip(),
         "image_url": saved_photo(product),
+        "photo_credit": saved_photo_credit(product),
         "barcodes": codes,
         "unit_id": int(product["qu_id_stock"]),
         "units": units,

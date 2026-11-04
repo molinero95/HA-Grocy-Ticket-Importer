@@ -174,3 +174,8 @@ Ticket 1.24.0: omisión explícita por línea (sin producto/stock/alias) con tot
 ## Compatibilidad de búsqueda 1.25.0
 
 Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT-4o a web_search_preview sin filters; mantener web_search filtrado para familias nuevas. No cambiar modelo ni repetir solicitudes pagadas. La variante preview carece de filtro remoto: sitios en instrucciones y admisión local estricta de fuentes/citas/GTIN/API exacta, sin URLs arbitrarias. El subcampo rechazado y el éxito de una nueva consulta instalada no se deducen del log resumido. Conservar el resto de 1.24 (omisiones, filas amarillas y diagnósticos).
+
+
+## Generic product photos — 1.26.0
+
+1.26: generic-photo search from product details implemented for loose foods without a barcode or OpenAI request; retained explicit selection, license/source credit and existing-photo guards. The user screenshot after 1.25 shows a completed search with no verified catalog candidates, distinct from the old HTTP 400. Installed generic-photo acceptance remains separate from isolated tests.
