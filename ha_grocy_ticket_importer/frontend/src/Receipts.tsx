@@ -14,6 +14,7 @@ type EditableItem = Omit<ReceiptReviewItem, "pieces_per_pack"> & { pieces_per_pa
 function lineProblems(item: EditableItem, products: ReceiptReviewProduct[], all: EditableItem[]): string[] {
   if (item.product_mode === "skip") return [];
   const problems: string[] = [];
+  if (item.product_mode !== "existing" && item.product_mode !== "new") problems.push("Elige un producto de las sugerencias o del catálogo, crea uno nuevo u omite la línea.");
   const bounded = (value: unknown, integer = false) => {
     const number = Number(value);
     return String(value ?? "").trim() !== "" && Number.isFinite(number) && number > 0 && number <= 1000000 && (integer ? Number.isInteger(number) : Math.abs(number * 1000 - Math.round(number * 1000)) <= .000001);
@@ -62,6 +63,7 @@ export function Receipts() {
       return;
     setItems((previous) =>
       previous.map((item, index) => {
+        if (item.product_mode === "skip") return item;
         const original = receipt.receipt.items[index];
         const key = (original.original_name ?? original.name)
           .normalize("NFKC")
@@ -128,7 +130,7 @@ export function Receipts() {
         result.receipt.items.map((item) => ({
           name: item.name,
           stock_unit: Number.isInteger(Number(item.quantity)) ? "piece" : "kg",
-          product_mode: "auto",
+          product_mode: item.product_mode === "skip" ? "skip" : undefined,
           product_id: null,
           remember_product: false,
           purchase_units: String(item.quantity),
@@ -225,9 +227,10 @@ export function Receipts() {
       {receipt && (
         <section>
           <h3>Revisión de artículos</h3>
+          {receipt.receipt.total_warning && <p className="receipt-review-summary" role="status">{receipt.receipt.total_warning}</p>}
           <p>
             Corrige las unidades que entrarán en stock y elige su producto. El
-            importe original del ticket se conserva. La cantidad final se
+            importe del ticket es informativo y no bloquea la importación. La cantidad final se
             calcula automáticamente.
           </p>
           {context.isPending && <p role="status">Consultando productos…</p>}
@@ -252,7 +255,7 @@ export function Receipts() {
           {items.map((item, index) => (
             <div className={"variant-form receipt-line" + (problems[index].length ? " receipt-line-invalid" : item.product_mode === "skip" ? " receipt-line-skipped" : "")} key={index} id={`receipt-line-${index}`} role="group" aria-label={`Línea ${index + 1}: ${item.name}`} tabIndex={-1}>
               {problems[index].length > 0 && <div className="receipt-line-problems" role="alert"><strong>Pendiente de revisión · Línea {index + 1}</strong><ul>{problems[index].map((message, issue) => <li key={issue}>{message}</li>)}</ul></div>}
-              {item.product_mode === "skip" && <p className="receipt-line-omitted">Omitido: no se creará producto ni se añadirá stock de esta línea. Se conserva para comprobar el total del ticket.</p>}
+              {item.product_mode === "skip" && <p className="receipt-line-omitted">Omitido: no se creará producto ni se añadirá stock de esta línea. Se conserva para reconocer el ticket y evitar importaciones repetidas.</p>}
               <label className="variant-field">
                 Artículo
                 <input
@@ -288,7 +291,7 @@ export function Receipts() {
                   value={
                     item.product_mode === "existing"
                       ? String(item.product_id)
-                      : (item.product_mode ?? "auto")
+                      : (item.product_mode ?? "")
                   }
                   onChange={(event) => {
                     const value = event.target.value;
@@ -308,7 +311,7 @@ export function Receipts() {
                             remember_product: true,
                           }
                         : {
-                            product_mode: value as "auto" | "new" | "skip",
+                            product_mode: value as "new" | "skip",
                             product_id: null,
                             stock_to_add: undefined,
                             expected_stock: undefined,
@@ -317,7 +320,7 @@ export function Receipts() {
                     );
                   }}
                 >
-                  <option value="auto">Detectar por nombre</option>
+                  <option value="" disabled>Elegir producto o crear uno nuevo</option>
                   <option value="new">Crear producto nuevo al importar</option>
                   <option value="skip">Omitir: no crear producto ni añadir stock</option>
                   {(context.data?.line_suggestions?.[index]?.length ?? 0) > 0 && <optgroup label="Sugeridos por parecido">{context.data!.line_suggestions![index].map(id => context.data!.products.find(product => product.id === id)).filter(product => product !== undefined).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</optgroup>}
@@ -351,7 +354,6 @@ export function Receipts() {
                   <option value="kg">Kilogramos</option>
                 </select>
               </label>
-              {item.product_mode === "auto" && !item.unit_confirmed && <button className="secondary-button" disabled={busy || commitStarted} onClick={() => update(index, { unit_confirmed: true })}>Confirmar unidad elegida</button>}
               {item.product_mode === "existing" ? <>
                 <p>Stock actual: {item.expected_stock ?? "Desconocido"} {item.stock_unit === "kg" ? "kg" : "Piece"}</p>
                 <label className="variant-field">Cantidad a añadir<input aria-label="Cantidad a añadir" type="number" min={item.stock_unit === "kg" ? "0.001" : "1"} max="1000000" step={item.stock_unit === "kg" ? "0.001" : "1"} disabled={busy || commitStarted} value={item.stock_to_add ?? ""} onChange={event => update(index, { stock_to_add: event.target.value.replace(/^0+(?=\d)/, "") })} /><span>{item.stock_unit === "kg" ? "kg" : "Piece"} que se añadirán a este producto</span></label>
@@ -394,7 +396,7 @@ export function Receipts() {
                 <input
                   type="checkbox"
                   disabled={
-                    busy || commitStarted || item.product_mode === "auto"
+                    busy || commitStarted || !item.product_mode
                   }
                   checked={item.remember_product ?? false}
                   onChange={(event) =>

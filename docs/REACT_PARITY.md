@@ -92,3 +92,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Generic product photos — 1.26.0
 
 1.26: product details add explicit unpaid generic-photo search by saved name. Generic results are labeled without a barcode, ignored after context changes and only persisted on selection. Existing packaged-product discovery remains unchanged. The refreshed photo shows author, license and source; local uploads suppress the previous public-photo credit.
+
+
+## Quantity-first receipt review — 1.27.0
+
+1.27 removes auto product selection and its unit-confirmation workaround. Unmapped rows show a disabled placeholder and pending reason; suggestions/full catalog/new/skip remain. Carry bags remain skipped across mapping initialization and can be explicitly included. Monetary mismatches are informational while stock review, simulation and confirmation remain mandatory. This user-approved policy supersedes older references to mandatory monetary reconciliation.

@@ -131,6 +131,8 @@ test("receipt preview/commit converts packs and re-upload cannot duplicate adjus
   await page.getByLabel("Foto o PDF del ticket").setInputFiles(file);
   await expect(page.getByLabel("Cantidad final calculada")).toHaveValue("10");
   await expect(page.getByLabel("Cantidad final calculada")).toHaveAttribute("readonly", "");
+  await expect(page.getByRole("button", { name: "Simular importación" })).toBeDisabled();
+  await page.getByLabel("Producto de Despensa").selectOption("new");
   await page.getByRole("button", { name: "Simular importación" }).click();
   await expect(
     page.getByRole("heading", { name: "Resultado de la simulación" }),

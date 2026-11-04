@@ -16,7 +16,7 @@ import urllib.request
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from purchase_units import purchase_factor, create_purchase_conversion
-from receipt_review import validate_review, remember, mappings, key
+from receipt_review import validate_review, remember, mappings, key, total_warning, is_shopping_bag
 
 DB_PATH = os.environ.get('GROCY_IMPORT_DB', str(Path(__file__).resolve().parent / 'grocy_imports.sqlite3'))
 
@@ -52,9 +52,11 @@ def money(value):
 def classify(item):
     name = norm(item['name'])
     qty = dec(item['quantity'])
-    if item.get('ambiguous'):
+    # Older extractions marked every item ambiguous solely for this automatic
+    # monetary mismatch. Keep genuine identity/quantity uncertainty in REVIEW.
+    if item.get('ambiguous') and str(item.get('reason') or '').strip() != 'Receipt total mismatch':
         return 'REVIEW', None, item.get('reason') or 'AI marked ambiguous'
-    if any(x in name for x in ('gastos servicio', 'gastos envio', 'servicio domicilio', 'bolsa reutilizable', 'bolsa compra')):
+    if is_shopping_bag(item['name']) or any(x in name for x in ('gastos servicio', 'gastos envio', 'servicio domicilio')):
         return 'EXPENSE', None, 'Non-stock charge (tracked in local expense ledger)'
     if re.search(r'\bhielo\b', name) and re.search(r'\bbolsa\b', name) and qty == 1:
         return 'STOCK', 2, ''
@@ -79,7 +81,6 @@ def validate(receipt):
     dt.date.fromisoformat(receipt['receipt_date'])
     if not receipt.get('items'):
         raise ValueError('No items')
-    total = Decimal('0')
     new_names = [norm(item['name']) for item in receipt['items'] if item.get('product_mode') == 'new']
     names = [norm(item['name']) for item in receipt['items'] if item.get('product_mode') != 'skip']
     if any(names.count(name) > 1 for name in new_names):
@@ -91,9 +92,7 @@ def validate(receipt):
         qty, price = dec(item['quantity']), dec(item['unit_price'])
         if not qty.is_finite() or not price.is_finite() or qty <= 0 or price < 0:
             raise ValueError('Invalid quantity or price')
-        total += money(qty * price)
-    if money(total) != money(receipt['total']):
-        raise ValueError(f'Total mismatch: calculated {money(total)}, ticket {money(receipt["total"])}')
+        money(qty * price)  # Validate cost representability before any remote writes.
 
 def main():
     parser = argparse.ArgumentParser()
@@ -107,6 +106,9 @@ def main():
     load_dotenv(os.environ.get('GROCY_ENV_FILE', str(Path(__file__).resolve().parent / '.env')))
     receipt = json.loads(args.receipt.read_text(encoding='utf-8'))
     validate(receipt)
+    warning = total_warning(receipt)
+    if warning:
+        print('AVISO: ' + warning)
     digest = receipt.get('source_sha256') or hashlib.sha256(args.receipt.read_bytes()).hexdigest()
     products = grocy('GET', 'objects/products')
     units = {int(u['id']): u['name'] for u in grocy('GET', 'objects/quantity_units')}

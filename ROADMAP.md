@@ -179,3 +179,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Generic product photos — 1.26.0
 
 1.26: generic-photo search from product details implemented for loose foods without a barcode or OpenAI request; retained explicit selection, license/source credit and existing-photo guards. The user screenshot after 1.25 shows a completed search with no verified catalog candidates, distinct from the old HTTP 400. Installed generic-photo acceptance remains separate from isolated tests.
+
+
+## Quantity-first receipt review — 1.27.0
+
+1.27 implements advisory monetary totals, default carry-bag omission and removal of frontend automatic-name product selection. Unmapped rows require an explicit choice; saved valid mappings still work. Keep stock/unit/quantity and one-shot import guards. Installed acceptance follows update; no real receipt was committed.

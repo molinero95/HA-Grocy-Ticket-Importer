@@ -325,12 +325,13 @@ export const getReceiptReviewContext = (id: string) =>
   );
 export type ReceiptItem = {
   name: string;
+  product_mode?: "skip";
   original_name?: string;
   quantity: number | string;
   pieces_per_pack?: number;
   purchase_units?: string;
 };
-export type Receipt = { items: ReceiptItem[]; [key: string]: unknown };
+export type Receipt = { items: ReceiptItem[]; total_warning?: string; [key: string]: unknown };
 export type ReceiptUpload = { receipt_id: string; receipt: Receipt };
 export type CatalogUnit = { id: number; name: string };
 export type CatalogProductInput = {

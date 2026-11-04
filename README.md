@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.26.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.27.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -320,3 +320,12 @@ El log instalado `ai_request_rejected provider_status=400 parameter=tools` confi
 En la ficha del producto, **Buscar foto genérica** sirve para alimentos como ajo o fruta. Envía el nombre guardado a Wikimedia Commons, sin OpenAI, clave de API ni coste de IA. Revisa las imágenes y pulsa **Usar esta foto** o **Sustituir foto por esta imagen**. No añade códigos ni modifica nombre, stock o listas. La búsqueda de producto envasado con IA sigue siendo independiente y exige códigos verificables; un resultado vacío no es un rechazo de OpenAI.
 
 Solo se admiten fotografías raster de Commons con licencia reconocida de dominio público, CC0, CC BY o CC BY-SA y sin restricciones adicionales indicadas. Se vuelven a comprobar el archivo, la imagen y la licencia al guardar; autor, fuente y licencia se conservan en la descripción de Grocy y se muestran en la ficha. El token liga sesión, producto, nombre y foto actual y caduca a los 30 minutos. Una imagen previa requiere sustitución explícita. No se descargan URLs arbitrarias ni se cambia la política del buscador de códigos de Open Facts. Los resultados dependen de las fotos y licencias disponibles; siempre se puede continuar sin imagen o usar una fotografía propia.
+
+
+## Tickets centrados en productos y cantidades — 1.27.0
+
+El importe total es informativo: una diferencia por promociones o descuentos muestra un aviso y permite simular e importar las cantidades revisadas. No hay que corregir precios ni se reparten descuentos automáticamente. Los importes extraídos se conservan como referencia, sin garantizar contabilidad exacta de promociones. Siguen las validaciones de productos, cantidades y unidades, stock desactualizado, simulación previa y protección contra importaciones repetidas o inciertas.
+
+Las bolsas de compra reconocibles aparecen omitidas por defecto. Puedes cambiar su selector para incluir una. No se omiten bolsas de alimentos (hielo, patatas o pan) ni productos de bolsas de basura. Se conserva cada línea y su posición para reconocer repeticiones, sin crear producto ni añadir stock en las omitidas.
+
+Se retira **Detectar por nombre**. Elige un producto de las sugerencias o del catálogo, **Crear producto nuevo al importar**, u omite la línea. Una asociación guardada válida se mantiene seleccionada; las filas sin decisión aparecen pendientes. Las asociaciones no reactivan una bolsa omitida.

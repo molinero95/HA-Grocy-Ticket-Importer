@@ -146,11 +146,21 @@ class ReviewedPurchaseTests(unittest.TestCase):
         self.receipt.write_text(json.dumps(receipt))
         output = self.run_import('--commit');self.assertTrue(has_review(output));self.assertIn('SKIP pending', output);self.assertEqual(self.writes, [])
 
-    def test_omitted_original_cost_is_still_in_total_validation(self):
+    def test_omitted_line_with_monetary_mismatch_does_not_write_stock(self):
         receipt = json.loads(self.receipt.read_text());receipt['items'][0].update(product_mode='skip', remember_product=False);receipt['total'] = 1
         self.receipt.write_text(json.dumps(receipt))
-        with self.assertRaisesRegex(ValueError, 'Total mismatch'): self.run_import('--commit')
+        self.assertIn('AVISO:', self.run_import('--commit'))
         self.assertEqual(self.writes, [])
+
+    def test_mismatch_does_not_block_reviewed_stock_or_allow_reimport(self):
+        self.edit()
+        receipt = json.loads(self.receipt.read_text());receipt['total'] = 5.49
+        receipt['items'][0].update(ambiguous=True, reason='Receipt total mismatch')
+        self.receipt.write_text(json.dumps(receipt))
+        self.assertIn('AVISO:', self.run_import('--dry-run'));self.assertEqual(self.writes, [])
+        self.run_import('--commit');self.assertEqual(self.amount, 10)
+        count = len(self.writes)
+        self.assertIn('SKIP imported', self.run_import('--commit'));self.assertEqual(len(self.writes), count)
 
     def test_review_issues_translate_actual_row_numbers_and_pending_guards(self):
         from receipt_review import review_issues

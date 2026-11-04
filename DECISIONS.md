@@ -154,3 +154,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Generic product photos — 1.26.0
 
 1.26 separates generic images from product identity. An explicit existing-product Commons search uses a fixed bounded API (no paid AI), recognized PD/CC0/CC BY/CC BY-SA licenses, raster-only trusted thumbnails and plain author credit. A session/product/name/current-photo token binds the selected file/image; exact file revalidation precedes metadata persistence. Store source/license/author beside the photo marker and show it in details; local uploads hide obsolete remote credit. Open Facts exact-GTIN admission stays unchanged. No automatic fallback or production writes.
+
+
+## Quantity-first receipt review — 1.27.0
+
+The user prioritizes inventory quantities over receipt prices. Since 1.27, monetary mismatch is advisory; preserve extracted prices rather than allocating discounts. Ignore only the exact legacy automatic total-mismatch flag, never arbitrary uncertainty. Checkout bags default to indexed skip lines and mappings cannot re-enable them. Frontend removes auto/name detection and requires explicit existing/new/skip unless a valid mapping preselects an identity. Legacy backend auto remains. Preserve ledger, checkpoints and uncertain outcomes.

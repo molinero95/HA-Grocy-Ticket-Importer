@@ -40,6 +40,24 @@ class ReceiptSafetyTests(unittest.TestCase):
         self.assertEqual(response.json["error"], "receipt_changed_since_preview")
         self.importer.assert_not_called()
 
+    def test_upload_marks_only_carry_bags_omitted_without_filtering_line_ids_or_stock_writes(self):
+        import io
+        from unittest.mock import Mock
+        data = {'merchant': 'Synthetic shop', 'receipt_date': '2026-01-01', 'total': 7.04,
+                'items': [{'name': name, 'quantity': 1, 'unit_price': price}
+                          for name, price in [('Product A', .95), ('Product B', 3.90), ('Product C', 2.55), ('BOLSA 50% RECICLADA', .15), ('Bolsa de pan', 0)]]}
+        # Register an independent disposable app with a controlled extractor.
+        app = Flask(__name__);app.secret_key = 'disposable'
+        register_receipt_routes(app, self.data, {'.pdf'}, Mock(extract=Mock(return_value=data)), self.importer, threading.Lock())
+        response = app.test_client().post('/api/v1/receipts', data={'ticket': (io.BytesIO(b'synthetic upload'), 'test.pdf')})
+        self.assertEqual(response.status_code, 201, response.json)
+        items = response.json['receipt']['items']
+        self.assertEqual(len(items), 5)
+        self.assertEqual(items[3]['product_mode'], 'skip')
+        self.assertNotIn('product_mode', items[4])
+        self.assertIn('no bloquea', response.json['receipt']['total_warning'])
+        self.importer.assert_not_called()
+
     def test_double_commit_runs_importer_only_once(self):
         self.authorize()
         first = self.client.post("/api/v1/receipts/" + self.rid + "/commit")

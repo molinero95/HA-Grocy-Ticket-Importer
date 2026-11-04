@@ -57,7 +57,7 @@ test("receipt suggestions keep a manual choice, show direct addition and allow e
   await page.getByRole("button", { name: "Escanear ticket", exact: true }).click();
   await page.getByLabel("Foto o PDF del ticket").setInputFiles({ name: "review.pdf", mimeType: "application/pdf", buffer: Buffer.from("disposable receipt UI") });
   const selector = page.getByLabel("Producto de Despensa");
-  await expect(selector).toHaveValue("auto");
+  await expect(selector).toHaveValue("");
   await expect(page.locator('optgroup[label="Sugeridos por parecido"] option')).toHaveText("Yogur natural");
   await selector.selectOption("41");
   await expect(page.getByLabel("Piezas por envase")).toHaveCount(0);
@@ -95,6 +95,7 @@ test("ticket rows explain disabled simulation, allow omission and highlight serv
   await expect(page.getByRole("button", { name: "Simular importación" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Revisar primer artículo pendiente" })).toBeVisible();
   await first.getByLabel("Producto de Despensa").selectOption("skip");
+  await second.getByLabel("Producto de Despensa").selectOption("new");
   await expect(first).toHaveClass(/receipt-line-skipped/);
   await page.getByRole("button", { name: "Simular importación" }).click();
   await expect(second).toHaveClass(/receipt-line-invalid/);
@@ -106,4 +107,33 @@ test("ticket rows explain disabled simulation, allow omission and highlight serv
   await page.getByRole("button", { name: "Simular importación" }).click();
   await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toBeVisible();
   expect(previews).toBe(2);
+});
+
+test("price mismatch stays advisory, carry bag is omitted and every stock product requires a choice", async ({ page }, info) => {
+  const warning = "Los importes no coinciden (calculado 7.55 €, ticket 7.04 €). La diferencia de precio no bloquea la importación; revisa productos y cantidades.";
+  let previews = 0;
+  await page.route("**/api/v1/receipts", route => route.fulfill({ status: 201, json: { receipt_id: "advisory-ticket", receipt: { total_warning: warning, items: [{ name: "Producto de prueba", quantity: 1 }, { name: "BOLSA 50% RECICLADA", quantity: 1, product_mode: "skip" }] } } }));
+  await page.route("**/api/v1/receipts/advisory-ticket/review-context", route => route.fulfill({ json: { products: [], mappings: {}, line_suggestions: [[], []] } }));
+  await page.route("**/api/v1/receipts/advisory-ticket/preview", route => {
+    previews++;
+    expect(route.request().postDataJSON().items).toMatchObject([{ product_mode: "new" }, { product_mode: "skip" }]);
+    return route.fulfill({ json: { ready_to_commit: true, preview: "AVISO: " + warning + "\n[1] WOULD IMPORT Producto de prueba: 1 Piece\n[2] WOULD OMIT BOLSA 50% RECICLADA", line_issues: [] } });
+  });
+  await page.goto(base);await page.getByRole("button", { name: "Acciones", exact: true }).click();
+  await page.getByRole("button", { name: "Escanear ticket", exact: true }).click();
+  await page.getByLabel("Foto o PDF del ticket").setInputFiles({ name: "advisory.pdf", mimeType: "application/pdf", buffer: Buffer.from("synthetic advisory UI") });
+  await expect(page.getByText(warning, { exact: true })).toBeVisible();
+  const first = page.getByRole("group", { name: "Línea 1: Producto de prueba" });
+  const bag = page.getByRole("group", { name: "Línea 2: BOLSA 50% RECICLADA" });
+  await expect(bag).toHaveClass(/receipt-line-skipped/);
+  await expect(first.getByLabel("Producto de Despensa")).toHaveValue("");
+  await expect(page.getByRole("option", { name: "Detectar por nombre" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Simular importación" })).toBeDisabled();
+  await first.getByLabel("Producto de Despensa").selectOption("new");
+  await expect(page.getByRole("button", { name: "Simular importación" })).toBeEnabled();
+  await page.getByRole("button", { name: "Simular importación" }).click();
+  await expect(page.getByRole("button", { name: "Confirmar e importar a Grocy" })).toBeVisible();
+  expect(previews).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("receipt-advisory-bag-mobile.png"), fullPage: true });
 });
