@@ -189,3 +189,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## OpenAI photo search — 1.28.0
 
 1.28: one OpenAI photo-only search in product details, editable search text, cited public manufacturer/retailer pages, private sanitized previews and explicit local saving/source attribution. No GTIN prerequisite for photos. Existing source-site protections may make individual pages unavailable; installed provider acceptance remains an explicit user search after updating.
+
+
+## Catálogo completo en compra — 1.29.0
+
+Selector con sugeridos y resto del catálogo activo, búsqueda por nombre y elección manual explícita fuera del ranking. Evidencia manual por ID en la cola existente, limitada a nombre/generación del episodio; comprobar nombre del producto activo antes de guardar. No cambia la selección automática, no crea alias ni toca stock. Conservar fila/cantidad/nota, bloqueos de duplicados, CSRF, locks y journal. Productos ausentes/archivados quedan obsoletos; una nueva aparición limpia únicamente la prueba manual del episodio anterior. Validación aislada y CI final en la PR; actualización instalada pendiente del usuario.

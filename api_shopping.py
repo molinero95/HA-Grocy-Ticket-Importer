@@ -79,7 +79,7 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
             from shopping_choice_conversion import manual_choice
             with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
                 result = manual_choice(barcode_stock.grocy, shopping_match_queue,
-                    shopping_match_queue.DEFAULT_PATH, key, payload["product_id"], payload.get("operation_id"))
+                    shopping_match_queue.DEFAULT_PATH, key, payload["product_id"], payload.get("operation_id"), catalog_choice=payload.get("catalog_choice"))
         except BlockingIOError:
             return jsonify({"error": "operation_in_progress"}), 409
         except CommandConflict:

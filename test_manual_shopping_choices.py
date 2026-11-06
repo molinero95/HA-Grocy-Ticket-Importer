@@ -66,6 +66,91 @@ class ManualShoppingChoiceTests(unittest.TestCase):
     def choose(self, product_id=8, operation=None):
         return manual_choice(self.grocy, queue, self.path, "arroz", product_id, operation or self.operation)
 
+    def full_catalog_choice(self, product_id=9, **changes):
+        return {"expected_name": "Arroz", "generation": 1,
+                "product_name": next(p["name"] for p in self.products if p["id"] == product_id), **changes}
+
+    def test_full_catalog_choice_survives_worker_refresh_without_name_similarity(self):
+        self.products.append({"id": 9, "name": "Leche Clau", "qu_id_stock": 2})
+        original = copy.deepcopy(self.note(amount=3))
+        choice = self.full_catalog_choice()
+        self.assertNotIn(9, [p['id'] for p in queue.pending(self.path)[0]['candidates']])
+        for _ in range(2):
+            result = manual_choice(self.grocy, queue, self.path, "arroz", 9, self.operation, catalog_choice=choice)
+            self.assertEqual(result['item_id'], original['id'])
+        self.assertEqual(self.rows[0], {**original, 'product_id': 9, 'qu_id': 2})
+        self.assertEqual(len(self.writes), 1)
+        self.products[-1]['name'] = 'Leche Jaime'
+        queue.refresh(self.path, ['Arroz'], self.products)
+        self.assertFalse(queue.pending(self.path)[0]['selection_stale'])
+        choices = queue.resolved_choices(self.path, ['Arroz'], self.products)
+        self.assertTrue(choices['arroz']['trusted_manual'])
+        result, _, _ = self.worker(False)
+        self.assertEqual(result['next_baseline'], ['p:9'])
+        self.assertEqual(len(self.writes), 1)
+        queue.refresh(self.path, [], self.products)
+        queue.refresh(self.path, ['Arroz'], self.products)
+        entry = queue.pending(self.path)[0]
+        self.assertEqual(entry['generation'], 2)
+        self.assertIsNone(entry['manual_product_id'])
+        self.assertIsNone(entry['selected_product_id'])
+
+    def test_full_catalog_request_rejects_stale_deleted_archived_and_forged_choices(self):
+        self.products.append({"id": 9, "name": "Leche Clau", "qu_id_stock": 2})
+        valid = self.full_catalog_choice()
+        for choice in [False, [], {}, {**valid, 'generation': True}, {**valid, 'generation': 2},
+                       {**valid, 'expected_name': 'Otro'}, {**valid, 'product_name': 'Otro'}]:
+            with self.subTest(choice=choice), self.assertRaises(ValueError):
+                manual_choice(self.grocy, queue, self.path, 'arroz', 9, self.operation, catalog_choice=choice)
+        with self.assertRaises(ValueError):
+            self.choose(9)  # An ordinary suggestion cannot bypass ranking.
+        for state in ['0', 'deleted']:
+            if state == 'deleted': self.products.pop()
+            else: self.products[-1]['active'] = state
+            with self.assertRaises(ValueError):
+                manual_choice(self.grocy, queue, self.path, 'arroz', 9, self.operation, catalog_choice=valid)
+        self.assertEqual(self.writes, [])
+        self.assertIsNone(queue.pending(self.path)[0]['manual_product_id'])
+
+    def test_removed_full_catalog_product_becomes_stale_without_resetting_identity(self):
+        self.products.append({"id": 9, "name": "Leche Clau", "qu_id_stock": 2})
+        manual_choice(self.grocy, queue, self.path, 'arroz', 9, self.operation, catalog_choice=self.full_catalog_choice())
+        self.products[-1]['active'] = '0'
+        queue.refresh_catalog(self.path, self.products)
+        self.assertTrue(queue.pending(self.path)[0]['selection_stale'])
+        self.assertEqual(queue.resolved_choices(self.path, ['Arroz'], self.products), {})
+        with self.assertRaisesRegex(ValueError, 'renewed review'):
+            self.worker(False)
+        self.assertEqual(len(self.writes), 1)
+
+    def test_full_catalog_choice_preserves_duplicate_and_attached_row_guards(self):
+        self.products.append({"id": 9, "name": "Leche Clau", "qu_id_stock": 2})
+        self.note()
+        self.note(id=2, product_id=9, note='', amount=6)
+        with self.assertRaisesRegex(ValueError, 'ya está en la lista'):
+            manual_choice(self.grocy, queue, self.path, 'arroz', 9, self.operation, catalog_choice=self.full_catalog_choice())
+        self.assertEqual(self.writes, [])
+        self.rows.pop()
+        self.choose(8)
+        before = copy.deepcopy(self.rows)
+        with self.assertRaisesRegex(ValueError, 'ya está asociado'):
+            manual_choice(self.grocy, queue, self.path, 'arroz', 9, str(uuid.uuid4()), catalog_choice=self.full_catalog_choice())
+        self.assertEqual(self.rows, before)
+
+    def test_full_catalog_api_requires_csrf_and_persists_explicit_choice(self):
+        self.products.append({"id": 9, "name": "Leche Jaime", "qu_id_stock": 2})
+        self.note()
+        client, headers = self.api()
+        payload = {'product_id': 9, 'operation_id': self.operation, 'catalog_choice': self.full_catalog_choice()}
+        url = '/api/v1/alexa/matches/arroz/choose'
+        self.assertEqual(client.post(url, json=payload).status_code, 403)
+        self.assertEqual(self.writes, [])
+        for _ in range(2):
+            response = client.post(url, json=payload, headers=headers)
+            self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual(self.rows[0]['product_id'], 9)
+        self.assertEqual(len(self.writes), 1)
+
     def test_new_candidate_can_be_selected_without_waiting_for_worker_refresh(self):
         self.products.append({'id': 9, 'name': 'Arroz integral', 'qu_id_stock': 2})
         self.assertNotIn(9, [p['id'] for p in queue.pending(self.path)[0]['candidates']])

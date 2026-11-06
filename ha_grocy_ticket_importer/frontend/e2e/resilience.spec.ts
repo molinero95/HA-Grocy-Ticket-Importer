@@ -220,7 +220,7 @@ test("a saved suggestion immediately offers bought/remove controls, including af
   ).toBeVisible();
   await expect(page.getByText("1 artículos", { exact: true })).toBeVisible();
   await page.getByText("Elegir producto para «Arroz»", { exact: true }).click();
-  await page.getByLabel("Producto sugerido").selectOption("8");
+  await page.getByLabel("Producto", { exact: true }).selectOption("8");
   await page
     .getByRole("button", { name: "Guardar elección", exact: true })
     .click();

@@ -25,6 +25,7 @@ import {
   clearCompletedShopping,
   getAuthStatus,
   getShopping,
+  getInventory,
   loginStandalone,
   logoutStandalone,
   removeShopping,
@@ -45,9 +46,28 @@ function Suggestions({
   const [selected, setSelected] = useState(
     String(match.selected_product_id ?? (match.requires_product ? match.candidates[0]?.id ?? "" : "")),
   );
+  const [opened, setOpened] = useState(false);
+  const [search, setSearch] = useState("");
+  const catalog = useQuery({ queryKey: ["inventory"], queryFn: getInventory, enabled: opened });
+  const products = [...(catalog.data?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const suggestedIds = new Set(match.candidates.map(candidate => candidate.id));
+  const normalize = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+  const matchesSearch = (product: {id: number; name: string}) => String(product.id) === selected || normalize(product.name).includes(normalize(search));
+  const suggested = match.candidates.filter(matchesSearch);
+  const others = products.filter(product => !suggestedIds.has(product.id) && matchesSearch(product));
   const [operationId] = useState(() => crypto.randomUUID());
   const mutation = useMutation({
-    mutationFn: (id: number) => chooseAlexaMatch(match.key, id, operationId),
+    mutationFn: (id: number) => {
+      const product = products.find(product => product.id === id);
+      if (id && !suggestedIds.has(id)) {
+        if (!product || !catalog.isSuccess || match.generation === undefined)
+          throw new Error("Actualiza los productos y la lista antes de guardar.");
+        return chooseAlexaMatch(match.key, id, operationId, {
+          expected_name: match.name, generation: match.generation, product_name: product.name,
+        });
+      }
+      return chooseAlexaMatch(match.key, id, operationId);
+    },
     retry: false,
     onSuccess: async () => {
       onSaved();
@@ -58,17 +78,23 @@ function Suggestions({
     },
   });
   useEffect(() => {
-    if (selected && !match.candidates.some((candidate) => String(candidate.id) === selected))
+    if (selected && !match.candidates.some((candidate) => String(candidate.id) === selected)
+        && catalog.isSuccess && !products.some(product => String(product.id) === selected))
       setSelected("");
-  }, [match.candidates, selected]);
+  }, [match.candidates, catalog.data, catalog.isSuccess, selected]);
   return (
     <>
-    <details className="suggestions">
+    <details className="suggestions" onToggle={event => setOpened(event.currentTarget.open)}>
       <summary>Elegir producto para «{match.name}»</summary>
       <div className="suggestion-options">
         {match.selection_stale && <p>El producto elegido ha cambiado o ya no está disponible. Revisa las opciones antes de guardar.</p>}
         {match.requires_product && <p>Este artículo está guardado como texto. Puedes asociarlo al producto conservando su cantidad, o quitarlo de la lista.</p>}
-        <label htmlFor={"choice-" + match.key}>Producto sugerido</label>
+        <label htmlFor={"product-search-" + match.key}>Buscar en todos los productos</label>
+        <input id={"product-search-" + match.key} type="search" placeholder="Buscar producto…" value={search}
+          disabled={mutation.isPending || mutation.isSuccess} onChange={event => setSearch(event.target.value)} />
+        {catalog.isLoading && <p role="status">Cargando todos los productos…</p>}
+        {catalog.isError && <p role="alert">No se pudo cargar el catálogo completo. <button onClick={() => void catalog.refetch()}>Reintentar productos</button></p>}
+        <label htmlFor={"choice-" + match.key}>Producto</label>
         <select
           id={"choice-" + match.key}
           value={selected}
@@ -78,12 +104,14 @@ function Suggestions({
           {match.requires_product
             ? <option value="" disabled>Selecciona un producto</option>
             : <option value="">Mantener artículo original</option>}
-          {match.candidates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name}
-            </option>
-          ))}
+          {suggested.length > 0 && <optgroup label="Sugeridos">{suggested.map(product => (
+            <option key={product.id} value={product.id}>{product.name}</option>
+          ))}</optgroup>}
+          {others.length > 0 && <optgroup label="Resto de productos">{others.map(product => (
+            <option key={product.id} value={product.id}>{product.name}</option>
+          ))}</optgroup>}
         </select>
+        {catalog.isSuccess && suggested.length === 0 && others.length === 0 && <p>No hay productos que coincidan con la búsqueda.</p>}
         <button
           disabled={mutation.isPending || mutation.isSuccess || (match.requires_product && !selected)}
           onClick={() => mutation.mutate(selected ? Number(selected) : 0)}
@@ -421,7 +449,7 @@ function AuthenticatedApp() {
                     Quitar
                   </button>
                 </div>
-                <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />
+                <Suggestions key={match.generation ?? 1} match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />
               </article>
             ))}
             {visibleItems.map((item) => {
@@ -512,7 +540,7 @@ function AuthenticatedApp() {
                   </div>
                   {reviewReasons.has(item.id) && <p className="sync-review-reason"><strong>Revisar sincronización</strong> · {reviewReasons.get(item.id)}</p>}
                   {!match && !item.product_id && !item.done && <button className="secondary-button shopping-create-button" onClick={() => setCreatingMatch({key: normalizeName(item.name), name: item.name})}>Crear producto para «{item.name}»</button>}
-                  {match && <Suggestions match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />}
+                  {match && <Suggestions key={match.generation ?? 1} match={match} onSaved={choiceSaved} onCreate={() => setCreatingMatch({key: match.key, name: match.name})} />}
                 </article>
               );
             })}
@@ -540,7 +568,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.28.0</footer>
+      <footer>Despensa 1.29.0</footer>
     </div>
     </NavigationContext.Provider>
   );

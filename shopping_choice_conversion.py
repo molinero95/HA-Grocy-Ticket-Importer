@@ -13,7 +13,7 @@ def _default_rows(grocy):
             and not _grocy_done(row.get("done"))]
 
 
-def manual_choice(grocy, queue, path, key, product_id, operation_id=None):
+def manual_choice(grocy, queue, path, key, product_id, operation_id=None, *, catalog_choice=None):
     """Materialize an explicit choice now; no Alexa or stock writes, no increment."""
     import uuid
     from stock_commands import execute_once
@@ -38,14 +38,21 @@ def manual_choice(grocy, queue, path, key, product_id, operation_id=None):
     if attached and attached.get("product_id") and product_id and int(attached["product_id"]) != product_id:
         raise ValueError("El artículo ya está asociado a otro producto. Quita esa fila antes de elegir uno nuevo.")
     product = next((p for p in products if int(p["id"]) == product_id), None)
-    if product_id:
+    if catalog_choice is not None:
+        if (product_id <= 0 or product is None or type(catalog_choice) is not dict
+                or type(catalog_choice.get('generation')) is not int
+                or catalog_choice.get('generation') != entry['generation']
+                or catalog_choice.get('expected_name') != entry['name']
+                or catalog_choice.get('product_name') != product['name']):
+            raise ValueError("El artículo o el producto ha cambiado; actualiza la lista y vuelve a elegir")
+    if product_id and catalog_choice is None:
         decision, candidates = suggest_catalog_matches(entry["name"], products)
-        created_choice = product_id == entry.get('created_product_id')
+        created_choice = product_id in (entry.get('created_product_id'), entry.get('manual_product_id'))
         if (product is None or (not created_choice and ((decision != "review" and not (decision == "exact" and entry.get("requires_product")))
                 or product_id not in {int(p["id"]) for p in candidates}))
                 or product_id not in {int(p["id"]) for p in entry["candidates"]}):
             raise ValueError("La sugerencia ha cambiado; actualiza la lista")
-    elif entry.get("requires_product"):
+    elif not product_id and entry.get("requires_product"):
         raise ValueError("Asocia la nota a su producto o quita únicamente el artículo original de la lista")
     notes = [r for r in rows if not r.get("product_id") and normalize(r.get("note") or "") == entry["key"]]
     canonical = [r for r in rows if product_id and int(r.get("product_id") or 0) == product_id]
@@ -72,14 +79,19 @@ def manual_choice(grocy, queue, path, key, product_id, operation_id=None):
         if len(saved) != 1:
             raise RuntimeError("No se pudo verificar la elección; comprueba la lista antes de reintentar")
         if product_id:
-            queue.choose(path, entry["key"], product_id)
+            if catalog_choice is None:
+                queue.choose(path, entry["key"], product_id)
+            else:
+                queue.choose(path, entry["key"], product_id, catalog_choice=catalog_choice)
+                queue.refresh_catalog(path, products)
         else:
             queue.keep_original(path, entry["key"])
         queue.attach_entry(path, entry["key"], saved[0]["id"])
         return {"ok": True, "item_id": int(saved[0]["id"])}
 
     return execute_once(operation_id, {"kind": "manual-shopping-choice", "scope": str(path),
-                                     "key": entry["key"], "product_id": product_id}, apply)
+                                     "key": entry["key"], "product_id": product_id,
+                                     **({"catalog_choice": catalog_choice} if catalog_choice is not None else {})}, apply)
 
 
 def delete_verified(grocy, original):

@@ -314,8 +314,9 @@ test("a newly created product becomes an Alexa suggestion without another worker
   await page.getByRole("button", { name: "Cerrar", exact: true }).click();
   await page.getByRole("button", { name: "Lista de la compra", exact: true }).click();
   await page.getByText(`Elegir producto para «${name}»`, { exact: true }).click();
-  await expect(page.getByRole("option", { name, exact: true })).toHaveCount(1);
-  await page.getByText(`Elegir producto para «${name}»`, {exact: true}).locator("..").getByLabel("Producto sugerido").selectOption({label: name});
+  const selection = page.getByText(`Elegir producto para «${name}»`, { exact: true }).locator("..").getByLabel("Producto", { exact: true });
+  await expect(selection.getByRole("option", { name, exact: true })).toHaveCount(1);
+  await selection.selectOption({ label: name });
   await page.getByRole("button", { name: "Guardar elección", exact: true }).click();
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   const row = page.locator("article").filter({ has: page.getByRole("button", { name, exact: true }) });

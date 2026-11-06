@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.29.0] — 2026-11-06
+
+### Added
+- Shopping/Alexa product selection shows ranked suggestions first and the rest of the active catalog alphabetically, without duplicate options. Search all products without case/accent sensitivity, including products with zero stock; retain contextual creation and keep-original actions.
+- Explicit full-catalog choices bind the observed source name/generation and product name to the active product ID. Persist that evidence only for the current source episode so worker refresh/ranking changes respect the selection. Deleted/archived products and obsolete episodes remain blocked for review.
+
+### Preserved
+- Existing shopping row ID, amount and note; separate IDs for different milk products; catalog and stock; shared locks, CSRF, duplicate guards, command journal and uncertain-write protection. No installed list/configuration changes or automatic alias creation.
+
 ## [1.28.0] — 2026-11-04
 
 ### Changed

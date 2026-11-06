@@ -294,7 +294,8 @@ footer {
 .suggestion-options button:disabled {
   opacity: 0.45;
 }
-.suggestion-options select {
+.suggestion-options select,
+.suggestion-options input[type="search"] {
   display: block;
   width: 100%;
   max-width: 360px;

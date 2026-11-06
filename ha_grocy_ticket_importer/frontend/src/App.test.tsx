@@ -134,14 +134,14 @@ it("keeps an ambiguous Alexa suggestion visible after a stale choice is rejected
     await screen.findByText("Elegir producto para «Leche»"),
   );
   await userEvent.selectOptions(
-    screen.getByLabelText("Producto sugerido"),
+    screen.getByLabelText("Producto"),
     "7",
   );
   await userEvent.click(
     screen.getByRole("button", { name: "Guardar elección" }),
   );
   await screen.findByRole("alert");
-  expect(screen.getByLabelText("Producto sugerido")).toHaveProperty(
+  expect(screen.getByLabelText("Producto")).toHaveProperty(
     "value",
     "7",
   );
@@ -191,7 +191,7 @@ it.each([7, 0])(
     await userEvent.click(screen.getByText("Elegir producto para «Leche»"));
     if (productId)
       await userEvent.selectOptions(
-        screen.getByLabelText("Producto sugerido"),
+        screen.getByLabelText("Producto"),
         "7",
       );
     await userEvent.dblClick(
@@ -305,7 +305,7 @@ it("updates candidate names and clears unavailable selections when catalog data 
   vi.mocked(api.getShopping).mockResolvedValue(initial);
   const { client } = renderWithClient(<App />);
   await userEvent.click(await screen.findByText("Elegir producto para «Leche»"));
-  await userEvent.selectOptions(screen.getByLabelText("Producto sugerido"), "7");
+  await userEvent.selectOptions(screen.getByLabelText("Producto"), "7");
   act(() => client.setQueryData(["shopping"], {
     ...initial,
     pending_matches: [{ key: "leche", name: "Leche", requires_product: true, selection_stale: true,
@@ -313,7 +313,7 @@ it("updates candidate names and clears unavailable selections when catalog data 
   }));
   await screen.findByRole("option", { name: "Leche semi" });
   expect(screen.queryByRole("option", { name: "Leche entera" })).toBeNull();
-  await waitFor(() => expect(screen.getByLabelText("Producto sugerido")).toHaveProperty("value", ""));
+  await waitFor(() => expect(screen.getByLabelText("Producto")).toHaveProperty("value", ""));
   expect(screen.getByRole("button", { name: "Guardar elección" })).toHaveProperty("disabled", true);
   expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
 });
@@ -404,4 +404,64 @@ it("highlights the exact product reported by the worker even when it is already 
   expect(rows[0].classList.contains("sync-review-item")).toBe(true);
   await userEvent.click(screen.getByText("Ver detalles de sincronización"));
   expect(screen.getAllByText(/La última sincronización rechazó una asociación/).length).toBeGreaterThan(0);
+});
+
+
+it("offers suggested products first and the full searchable catalog without duplicate options", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping, pending_matches: [{
+    key: "leche", name: "Leche", generation: 3, candidates: [{ id: 7, name: "Leche entera" }],
+  }] });
+  const product = { amount: "0", unit: "Piece", image_url: null, shopping_amount: "0", shopping_step: "1", shopping_unit: "Piece", shopping_can_subtract: false };
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [
+    { ...product, id: 9, name: "Leche Jaime" }, { ...product, id: 8, name: "Leche Clau" },
+    { ...product, id: 7, name: "Leche entera" },
+  ] });
+  const write = deferred<unknown>();
+  vi.mocked(api.chooseAlexaMatch).mockReturnValue(write.promise);
+  renderWithClient(<App />);
+  await userEvent.click(await screen.findByText("Elegir producto para «Leche»"));
+  const select = screen.getByLabelText("Producto");
+  await within(select).findByRole("option", { name: "Leche Clau" });
+  expect(Array.from(select.querySelectorAll("optgroup")).map(group => group.label)).toEqual(["Sugeridos", "Resto de productos"]);
+  expect(within(select).getAllByRole("option", { name: "Leche entera" })).toHaveLength(1);
+  await userEvent.type(screen.getByLabelText("Buscar en todos los productos"), "CLÁU");
+  expect(within(select).queryByRole("option", { name: "Leche Jaime" })).toBeNull();
+  await userEvent.selectOptions(select, "8");
+  await userEvent.dblClick(screen.getByRole("button", { name: "Guardar elección" }));
+  expect(api.chooseAlexaMatch).toHaveBeenCalledExactlyOnceWith("leche", 8, expect.any(String), {
+    expected_name: "Leche", generation: 3, product_name: "Leche Clau",
+  });
+  await act(async () => write.resolve({ ok: true }));
+});
+
+it("retains suggestions when full catalog loading fails and lets the user retry the read", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping, pending_matches: [{
+    key: "leche", name: "Leche", generation: 1, candidates: [{ id: 7, name: "Leche entera" }],
+  }] });
+  vi.mocked(api.getInventory).mockRejectedValueOnce(new Error("Sin conexión"));
+  renderWithClient(<App />);
+  await userEvent.click(await screen.findByText("Elegir producto para «Leche»"));
+  await screen.findByText(/No se pudo cargar el catálogo completo/);
+  expect(within(screen.getByLabelText("Producto")).getByRole("option", { name: "Leche entera" })).toBeTruthy();
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [] });
+  await userEvent.click(screen.getByRole("button", { name: "Reintentar productos" }));
+  await waitFor(() => expect(api.getInventory).toHaveBeenCalledTimes(2));
+  expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
+});
+
+
+it("clears a full catalog draft when the same Alexa name starts a new source episode", async () => {
+  const match = { key: "leche", name: "Leche", generation: 1, candidates: [] };
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping, pending_matches: [match] });
+  vi.mocked(api.getInventory).mockResolvedValue({ items: [{
+    id: 8, name: "Leche Clau", amount: "0", unit: "Piece", image_url: null,
+    shopping_amount: "0", shopping_step: "1", shopping_unit: "Piece", shopping_can_subtract: false,
+  }] });
+  const { client } = renderWithClient(<App />);
+  await userEvent.click(await screen.findByText("Elegir producto para «Leche»"));
+  await screen.findByRole("option", { name: "Leche Clau" });
+  await userEvent.selectOptions(screen.getByLabelText("Producto"), "8");
+  act(() => client.setQueryData(["shopping"], { ...shopping, pending_matches: [{ ...match, generation: 2 }] }));
+  await waitFor(() => expect(screen.getByLabelText("Producto")).toHaveProperty("value", ""));
+  expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
 });

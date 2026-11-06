@@ -311,3 +311,10 @@ Se retira **Detectar por nombre**. Elige un producto de las sugerencias o del ca
 La ficha tiene un único botón **Buscar foto con IA**, tanto para alimentos genéricos como para productos envasados o de limpieza. OpenAI localiza páginas públicas de fabricantes y tiendas por nombre, sin exigir código de barras ni limitarse a catálogos de códigos. Puedes añadir marca y formato al **Nombre para buscar la foto** sin renombrar el artículo. Las fotos son sugerencias: revisa envase y variante y elige una para guardarla. La búsqueda tiene coste en la cuenta API configurada y nunca se repite automáticamente.
 
 La aplicación comprueba las páginas citadas, recupera una foto publicada, la convierte en una vista previa privada y guarda esos mismos bytes cuando los eliges. Se conserva la fuente y una copia de la imagen anterior. Los códigos, el nombre y el stock no cambian. Las vistas previas caducan a los 30 minutos y una ficha/foto modificada obliga a buscar de nuevo. No se admiten destinos de red privada ni descargas con credenciales de Home Assistant. Algunas webs bloquean descargas o no publican una imagen utilizable: en ese caso se explica y puedes concretar la búsqueda o usar una fotografía propia. Los endpoints antiguos y los créditos de Commons siguen siendo compatibles, pero desaparece el botón de foto genérica.
+
+
+## Elegir cualquier producto en la compra — 1.29.0
+
+En **Lista de la compra → Elegir producto para «…»**, el selector muestra **Sugeridos** y **Resto de productos**. Usa **Buscar en todos los productos** para localizar cualquier producto activo, incluso sin existencias, aunque el buscador no lo haya sugerido. Así puedes distinguir, por ejemplo, Leche Clau y Leche Jaime por su producto de catálogo.
+
+**Guardar elección** conserva la cantidad, nota e ID de la fila existente. La elección explícita se guarda por ID para esa aparición del artículo de Alexa y se respeta al sincronizar; no crea un alias permanente ni modifica existencias. Si el producto desaparece/se archiva o el artículo reaparece en un nuevo episodio, requiere nueva revisión. Se mantienen las protecciones contra duplicados y operaciones inciertas.
