@@ -36,14 +36,14 @@ STATE = Path(os.environ.get("SHOPPING_SYNC_STATE", "/data/shopping-sync-" + ENTI
 STATE_V2 = STATE.with_name(STATE.stem + "-identity-v2.json")
 
 
-def run_once(*, dry_run=True):
+def run_once(*, dry_run=True, failure_count=None):
     from shopping_match_queue import mutation_lock
     from shopping_sync_status import record
     with mutation_lock(MATCH_QUEUE):
         try:
             result = _run_once(dry_run=dry_run)
         except Exception as exc:
-            record(MATCH_QUEUE, dry_run=dry_run, error=exc)
+            record(MATCH_QUEUE, dry_run=dry_run, error=exc, failure_count=failure_count)
             raise
         record(MATCH_QUEUE, dry_run=dry_run)
         return result
@@ -131,6 +131,44 @@ def _run_once(*, dry_run=True):
         acknowledge_choices(MATCH_QUEUE, choices)
     return result
 
+class SyncScheduler:
+    """Persisted cooldown, with an in-memory fallback if health storage fails.
+
+    Events coalesce during a pause; each retry still uses a fresh full snapshot.
+    The journal/checkpoint and manual UI actions are outside this scheduler.
+    """
+    def __init__(self, path):
+        from shopping_sync_status import retry_state
+        retry = retry_state(path)
+        self.failures = retry["consecutive_failures"]
+        self.retry_at = retry["next_retry_at"]
+
+    def remaining(self):
+        return max(0, self.retry_at - time.time())
+
+    def run(self, *, dry_run):
+        from shopping_sync_status import retry_delay
+        if self.remaining():
+            return None
+        try:
+            result = run_once(dry_run=dry_run, failure_count=min(31, self.failures + 1))
+        except Exception:
+            self.failures = min(31, self.failures + 1)
+            self.retry_at = time.time() + retry_delay(self.failures)
+            raise
+        self.failures, self.retry_at = 0, 0
+        return result
+
+    def wait(self, wake):
+        from shopping_sync_status import poll_interval
+        remaining = self.remaining()
+        if remaining:
+            # Do not wait on the event: HA/local events must not bypass backoff.
+            time.sleep(remaining)
+            return "retry"
+        return "event" if wake.wait(timeout=poll_interval()) else "polling"
+
+
 def main():
     STATE.parent.mkdir(parents=True, exist_ok=True)
     with open(str(STATE) + ".lock", "a+") as lock:
@@ -138,23 +176,24 @@ def main():
         wake = threading.Event()
         threading.Thread(target=listen, args=(wake,), daemon=True).start()
         threading.Thread(target=listen_local, args=(wake, MATCH_QUEUE), daemon=True).start()
+        scheduler = SyncScheduler(MATCH_QUEUE)
         trigger = "startup"
         while True:
             # Events arriving during a cycle remain set for the following cycle.
             wake.clear()
             try:
-                result = run_once(dry_run=os.environ.get("SHOPPING_SYNC_ENABLED") != "1")
-                print("Shopping sync checked (" + trigger + "): " +
-                      ", ".join(key + "=" + str(len(result[key])) for key in (
-                          "add_alexa", "add_grocy", "remove_alexa", "remove_grocy")),
-                      flush=True)
+                result = scheduler.run(dry_run=os.environ.get("SHOPPING_SYNC_ENABLED") != "1")
+                if result is not None:
+                    print("Shopping sync checked (" + trigger + "): " +
+                          ", ".join(key + "=" + str(len(result[key])) for key in (
+                              "add_alexa", "add_grocy", "remove_alexa", "remove_grocy")),
+                          flush=True)
             except Exception as exc:
                 # Only our own fixed conflict messages are safe to print.
                 # Remote exception strings can contain tokens or private data.
                 reason = str(exc) if isinstance(exc, IdentityConflict) else type(exc).__name__
-                print("Shopping sync failed: " + reason, flush=True)
-            triggered = wake.wait(timeout=max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120")))))
-            trigger = "event" if triggered else "polling"
+                print("Shopping sync failed: " + reason + "; retry in " + str(int(scheduler.remaining()) + 1) + "s", flush=True)
+            trigger = scheduler.wait(wake)
 
 
 if __name__ == "__main__":

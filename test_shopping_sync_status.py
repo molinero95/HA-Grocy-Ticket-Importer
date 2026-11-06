@@ -58,3 +58,36 @@ class SyncStatusTests(unittest.TestCase):
         self.assertEqual(snapshot(self.path)['affected_product_ids'], [7])
         record(self.path, dry_run=False)
         self.assertEqual(snapshot(self.path)['affected_product_ids'], [])
+
+
+    def test_exponential_pause_persists_safely_and_is_not_reported_as_stale(self):
+        from shopping_sync_status import retry_state
+        now = 10000
+        with patch('shopping_sync_status.time.time', side_effect=lambda: now):
+            for delay in [120, 240, 480, 960, 1800, 1800]:
+                record(self.path, dry_run=False, error=RuntimeError('private token'))
+                health = snapshot(self.path)
+                self.assertTrue(health['paused'])
+                self.assertEqual(health['next_retry_at'], now + delay)
+                now += delay - 1
+                self.assertEqual(snapshot(self.path)['state'], 'error')
+                self.assertTrue(snapshot(self.path)['paused'])
+                now += 1
+                self.assertFalse(snapshot(self.path)['paused'])
+            record(self.path, dry_run=False)
+            self.assertEqual(retry_state(self.path)['consecutive_failures'], 0)
+            self.assertFalse(snapshot(self.path)['paused'])
+            self.assertIsNone(snapshot(self.path)['next_retry_at'])
+            record(self.path, dry_run=False, error=RuntimeError())
+            self.assertEqual(snapshot(self.path)['next_retry_at'], now + 120)
+        self.assertNotIn('private', Path(str(self.path)+'.sync-status.json').read_text())
+
+    def test_corrupt_or_unbounded_pause_cannot_suspend_worker_indefinitely(self):
+        from shopping_sync_status import retry_state
+        for checked, retry, count in [(0, 10**12, 1), (10**12, 10**12+120, 1),
+                                      (float('nan'), 120, 1), (0, float('inf'), 1),
+                                      (0, 120, True), (10**400, 10**400, 1)]:
+            Path(str(self.path)+'.sync-status.json').write_text(json.dumps({
+                'state': 'error', 'checked_at': checked, 'next_retry_at': retry,
+                'consecutive_failures': count, 'dry_run': False}))
+            self.assertEqual(retry_state(self.path)['next_retry_at'], 0)

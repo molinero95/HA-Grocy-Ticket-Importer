@@ -396,7 +396,9 @@ function AuthenticatedApp() {
           )}
           {data?.sync && !["ok", "unconfigured"].includes(data.sync.state) && (
             <div role="alert" className="notice sync-notice"><p>
-              {data.sync.state === "disabled"
+              {data.sync.paused && data.sync.next_retry_at
+                ? `Sincronización con Alexa en pausa automática. Próximo intento: ${new Date(data.sync.next_retry_at * 1000).toLocaleString("es-ES")}. Puedes seguir usando la lista.`
+                : data.sync.state === "disabled"
                 ? "La sincronización con Alexa está desactivada; las sugerencias se consultan en modo lectura."
                 : data.sync.state === "stale" || data.sync.state === "unknown"
                   ? "No se ha confirmado una sincronización reciente con Alexa. Revisa los logs del complemento."
@@ -405,6 +407,7 @@ function AuthenticatedApp() {
                     : "Alexa no se ha sincronizado. Revisa las asociaciones y los logs del complemento antes de reintentar."}
             </p><details><summary>Ver detalles de sincronización</summary>
               <p>{syncDetail}</p>
+              {data.sync.paused && <p>La espera aumenta con los fallos repetidos hasta 30 minutos y se restablece al completar un ciclo. Si has configurado un intervalo mayor, se respeta. Los cambios pendientes se revisarán al reanudar. Esta pausa afecta a Despensa; Alexa Devices mantiene sus propias actualizaciones en Home Assistant.</p>}
               {data.sync.checked_at && <p>Última comprobación: {new Date(data.sync.checked_at * 1000).toLocaleString("es-ES")}</p>}
               {data.sync.last_success_at && <p>Última sincronización correcta: {new Date(data.sync.last_success_at * 1000).toLocaleString("es-ES")}</p>}
               {reviewReasons.size || unassigned.length ? <><strong>Artículos que necesitan revisión</strong><ul>
@@ -568,7 +571,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.29.0</footer>
+      <footer>Despensa 1.30.0</footer>
     </div>
     </NavigationContext.Provider>
   );

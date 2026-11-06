@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.30.0] — 2026-11-06
+
+### Added
+- Automatic shopping sync cooldown after failures: 2, 4, 8, 16 and up to 30 minutes, respecting any longer configured polling interval. A successful cycle resets the delay. Applies to both write-enabled and read-only worker modes; HA/local events coalesce and cannot bypass the pause.
+- Persist sanitized failure count and next-attempt time in the existing scoped health file; honor the pause after worker restart. In-memory scheduling still backs off if health writes fail. Planned waits retain the real error/affected-product diagnostics and are not mislabeled as a stale worker.
+- Show the automatic pause and next attempt in the shopping notice while manual shopping actions remain usable. The pause controls Despensa only; it does not disable or reconfigure Home Assistant's Alexa Devices integration or claim to reset Amazon's rate limit.
+
+### Preserved
+- Fresh snapshot reconciliation on retry, identity guards, command journal, pending choices and verified checkpoints. No automatic cleanup, uncertain command replay or production list/configuration changes.
+
 ## [1.29.0] — 2026-11-06
 
 ### Added
