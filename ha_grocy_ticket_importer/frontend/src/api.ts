@@ -105,14 +105,17 @@ export const clearCompletedShopping = () =>
   request<{ removed: number }>("shopping/clear-completed", "POST");
 export const removeShopping = (id: number) =>
   request("shopping/" + id, "DELETE");
+export type CatalogChoice = { expected_name: string; generation: number; product_name: string };
 export const chooseAlexaMatch = (
   key: string,
   productId: number,
   operationId: string,
+  catalogChoice?: CatalogChoice,
 ) =>
   request("alexa/matches/" + encodeURIComponent(key) + "/choose", "POST", {
     product_id: productId,
     operation_id: operationId,
+    ...(catalogChoice ? { catalog_choice: catalogChoice } : {}),
   });
 export const removeAlexaMatch = (key: string) =>
   request("alexa/matches/" + encodeURIComponent(key), "DELETE");

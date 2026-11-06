@@ -102,3 +102,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## OpenAI photo search — 1.28.0
 
 1.28: remove the separate generic search action. One Buscar foto con IA button uses the photo-only endpoint for saved products. Search query may change independently from the saved product name and invalidates old results; late replies/product/photo changes still discard selections. Render local authenticated preview URLs, no invented barcode, explicit save/replace and a source link after refresh. Creation keeps its separate existing exact-code workflow.
+
+
+## Catálogo completo en compra — 1.29.0
+
+Selector con sugeridos y resto del catálogo activo, búsqueda por nombre y elección manual explícita fuera del ranking. Evidencia manual por ID en la cola existente, limitada a nombre/generación del episodio; comprobar nombre del producto activo antes de guardar. No cambia la selección automática, no crea alias ni toca stock. Conservar fila/cantidad/nota, bloqueos de duplicados, CSRF, locks y journal. Productos ausentes/archivados quedan obsoletos; una nueva aparición limpia únicamente la prueba manual del episodio anterior. Validación aislada y CI final en la PR; actualización instalada pendiente del usuario.

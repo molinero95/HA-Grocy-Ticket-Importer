@@ -66,6 +66,7 @@ def connect(path):
     for name, definition in (
             ("shopping_entry_id", "INTEGER"),
             ("created_product_id", "INTEGER"),
+            ("manual_product_id", "INTEGER"),
             ("removed", "INTEGER NOT NULL DEFAULT 0"),
             ("requires_product", "INTEGER NOT NULL DEFAULT 0"),
             ("removal_json", "TEXT"),
@@ -76,7 +77,7 @@ def connect(path):
     return db
 
 
-def _creation_candidate(candidates, products, product_id):
+def _explicit_candidate(candidates, products, product_id):
     product = next((p for p in products if int(p['id']) == product_id and _active(p)), None)
     if product and product_id not in {int(p['id']) for p in candidates}:
         candidates = [*candidates, {'id': product_id, 'name': product['name'], 'score': 1.0}]
@@ -104,7 +105,10 @@ def refresh(path, alexa_names, products, grocy_rows=()):
     silently reset while a verified checkpoint may still reference them.
     """
     with closing(connect(path)) as db:
-        created = {key: pid for key, pid in db.execute("SELECT normalized_name,created_product_id FROM pending_matches WHERE active=1 AND created_product_id IS NOT NULL")}
+        proven = {key: pid for key, pid in db.execute(
+            "SELECT normalized_name,COALESCE(manual_product_id,created_product_id) "
+            "FROM pending_matches WHERE active=1 "
+            "AND COALESCE(manual_product_id,created_product_id) IS NOT NULL")}
         selected = {key for key, pid in db.execute(
             "SELECT normalized_name, selected_product_id FROM pending_matches WHERE active=1") if pid is not None}
     # Every free-text note can be reviewed or turned into a new product.
@@ -118,8 +122,8 @@ def refresh(path, alexa_names, products, grocy_rows=()):
         if not key:
             continue
         decision, candidates = suggest_catalog_matches(name, products)
-        candidates = _creation_candidate(candidates, products, created.get(key))
-        exact_note = (decision == "exact" and (key in note_names or key in selected)) or key in created
+        candidates = _explicit_candidate(candidates, products, proven.get(key))
+        exact_note = (decision == "exact" and (key in note_names or key in selected)) or key in proven
         if decision in ("review", "unmatched") or exact_note or key in selected:
             if key in pending:
                 raise ValueError("Duplicate normalized Alexa item")
@@ -140,7 +144,7 @@ def refresh(path, alexa_names, products, grocy_rows=()):
             if key in old_active and not old_active[key]:
                 # A new source item with the same name starts a fresh review episode.
                 db.execute("UPDATE pending_matches SET selected_product_id=NULL, dismissed=0, "
-                           "shopping_entry_id=NULL, created_product_id=NULL, removed=0, removal_json=NULL, generation=generation+1 "
+                           "shopping_entry_id=NULL, created_product_id=NULL, manual_product_id=NULL, removed=0, removal_json=NULL, generation=generation+1 "
                            "WHERE normalized_name=?", (key,))
 
 
@@ -160,9 +164,9 @@ def refresh_catalog(path, products, note_names=()):
             if row and row.get("removed"):
                 continue
             decision, candidates = suggest_catalog_matches(name, products)
-            candidates = _creation_candidate(candidates, products, row.get('created_product_id') if row else None)
+            candidates = _explicit_candidate(candidates, products, (row.get('manual_product_id') or row.get('created_product_id')) if row else None)
             encoded = json.dumps(candidates, ensure_ascii=False)
-            exact_note = int(decision == "exact" or bool(row and row.get('created_product_id')))
+            exact_note = int(decision == "exact" or bool(row and (row.get('manual_product_id') or row.get('created_product_id'))))
             if row is None:
                 db.execute("INSERT INTO pending_matches(normalized_name,original_name,candidates_json,requires_product) VALUES (?,?,?,?)",
                            (key, str(name).strip(), encoded, exact_note))
@@ -175,32 +179,39 @@ def pending(path):
     with closing(connect(path)) as db:
         rows = db.execute(
             "SELECT normalized_name, original_name, candidates_json, selected_product_id, dismissed, "
-            "shopping_entry_id, removed, removal_json, generation, requires_product, created_product_id "
+            "shopping_entry_id, removed, removal_json, generation, requires_product, created_product_id, manual_product_id "
             "FROM pending_matches WHERE active=1 ORDER BY original_name").fetchall()
     result = []
-    for key, original, candidates, selected, dismissed, entry_id, removed, removal_json, generation, requires_product, created_product_id in rows:
+    for key, original, candidates, selected, dismissed, entry_id, removed, removal_json, generation, requires_product, created_product_id, manual_product_id in rows:
         options = json.loads(candidates)
         candidate_ids = {int(option["id"]) for option in options}
         result.append({"key": key, "name": original, "candidates": options,
                        "selected_product_id": selected, "dismissed": bool(dismissed),
                        "shopping_entry_id": entry_id, "removed": bool(removed),
                        "removal": json.loads(removal_json) if removal_json else None,
-                       "generation": generation, "created_product_id": created_product_id,
+                       "generation": generation, "created_product_id": created_product_id, "manual_product_id": manual_product_id,
                        "requires_product": bool(requires_product),
                        "selection_stale": selected is not None and selected not in candidate_ids})
     return result
 
 
-def choose(path, key, product_id):
-    """Record an explicit candidate choice; never convert shopping notes."""
+def choose(path, key, product_id, *, catalog_choice=None):
+    """Persist a ranked choice, or a full-catalog choice verified by manual_choice."""
     key = normalize(key)
     pid = int(product_id)
     with closing(connect(path)) as db, db:
         row = db.execute(
-            "SELECT candidates_json FROM pending_matches WHERE normalized_name=? AND active=1",
+            "SELECT candidates_json,original_name,generation,removed FROM pending_matches WHERE normalized_name=? AND active=1",
             (key,)).fetchone()
-        if not row or pid not in {int(item["id"]) for item in json.loads(row[0])}:
+        if not row or row[3] or (catalog_choice is None and pid not in {int(item["id"]) for item in json.loads(row[0])}):
             raise ValueError("La coincidencia ya no está disponible; actualiza la lista")
+        if catalog_choice is not None:
+            if row[1] != catalog_choice['expected_name'] or row[2] != catalog_choice['generation']:
+                raise ValueError("El artículo ha cambiado; actualiza la lista")
+            # Only manual_choice supplies this after checking the live active catalog.
+            db.execute("UPDATE pending_matches SET manual_product_id=? WHERE normalized_name=?", (pid, key))
+        else:
+            db.execute("UPDATE pending_matches SET manual_product_id=CASE WHEN manual_product_id=? THEN manual_product_id ELSE NULL END WHERE normalized_name=?", (pid, key))
         db.execute("UPDATE pending_matches SET selected_product_id=?, dismissed=0, created_product_id=CASE WHEN created_product_id=? THEN created_product_id ELSE NULL END WHERE normalized_name=?",
                    (pid, pid, key))
 
@@ -218,7 +229,7 @@ def keep_original(path, key):
         if row is None:
             raise ValueError("La propuesta ya no está disponible; actualiza la lista")
         db.execute(
-            "UPDATE pending_matches SET selected_product_id=NULL, created_product_id=NULL, dismissed=1 WHERE normalized_name=? AND active=1",
+            "UPDATE pending_matches SET selected_product_id=NULL, created_product_id=NULL, manual_product_id=NULL, dismissed=1 WHERE normalized_name=? AND active=1",
             (key,))
 
 
@@ -227,10 +238,11 @@ def resolved_choices(path, alexa_names, products):
 
     Never changes remote shopping entries or local checkpoints. An explicit
     selection is valid only while the original Alexa item is present and the
-    chosen product remains a current candidate in the Grocy catalog.
+    chosen product remains active. Full-catalog choices carry server-stored proof
+    scoped to this review episode; ordinary suggestions still require ranking.
     """
     present = {normalize(name) for name in alexa_names}
-    catalog = {int(product["id"]): product for product in products}
+    catalog = {int(product["id"]): product for product in products if _active(product)}
     result = {}
     for entry in pending(path):
         if entry.get("removed"):
@@ -243,10 +255,12 @@ def resolved_choices(path, alexa_names, products):
         if selected not in candidate_ids or selected not in catalog:
             continue
         decision, current = suggest_catalog_matches(entry["name"], products)
-        if selected != entry.get('created_product_id') and ((decision != "review" and not (decision == "exact" and entry.get("requires_product"))) or selected not in {int(item["id"]) for item in current}):
+        if selected not in (entry.get('created_product_id'), entry.get('manual_product_id')) and ((decision != "review" and not (decision == "exact" and entry.get("requires_product"))) or selected not in {int(item["id"]) for item in current}):
             continue
         result[key] = {"product_id": selected, "product_name": catalog[selected]["name"],
                        "original_name": entry["name"]}
+        if selected == entry.get('manual_product_id'):
+            result[key]['trusted_manual'] = True
         if selected == entry.get('created_product_id'):
             # This ID was explicitly created/prepared and selected in this source episode.
             # It is deliberate identity evidence even when the edited name is unrelated.

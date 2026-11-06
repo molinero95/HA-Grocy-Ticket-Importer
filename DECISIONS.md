@@ -164,3 +164,8 @@ The user prioritizes inventory quantities over receipt prices. Since 1.27, monet
 ## OpenAI photo search — 1.28.0
 
 Photo-only search must not require product identity/GTIN. The user reports both Chocoflakes and anti cucarachas missing and explicitly requests OpenAI with a single search button. Existing-product details now use one unrestricted web-search request to locate cited manufacturer/retailer pages. The server retrieves and sanitizes an actual page image through public-DNS-pinned TLS (all addresses public, redirects rechecked, no ambient auth/proxies, bounded bytes/deadlines). Private expiring previews bind session/product/name/current image and selected-byte hash. Explicit save is local only with source/hash sidecar and previous-photo backups; never assign codes or update stock. Keep legacy exact-code creation discovery and Commons endpoints/credits compatible; no generic-photo button remains.
+
+
+## Catálogo completo en compra — 1.29.0
+
+Selector con sugeridos y resto del catálogo activo, búsqueda por nombre y elección manual explícita fuera del ranking. Evidencia manual por ID en la cola existente, limitada a nombre/generación del episodio; comprobar nombre del producto activo antes de guardar. No cambia la selección automática, no crea alias ni toca stock. Conservar fila/cantidad/nota, bloqueos de duplicados, CSRF, locks y journal. Productos ausentes/archivados quedan obsoletos; una nueva aparición limpia únicamente la prueba manual del episodio anterior. Validación aislada y CI final en la PR; actualización instalada pendiente del usuario.

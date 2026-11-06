@@ -9,6 +9,7 @@ export type ShoppingItem = {
 };
 export type MatchCandidate = { id: number; name: string; score?: number };
 export type AlexaMatch = {
+  generation?: number;
   key: string;
   name: string;
   candidates: MatchCandidate[];

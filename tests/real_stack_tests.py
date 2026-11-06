@@ -37,6 +37,44 @@ class RealStackTests(unittest.TestCase):
             self.assertEqual(self.client.delete('/api/v1/alexa/matches/pasta', headers=self.headers).status_code, 200)
         self.assertEqual(self.client.get('/api/v1/shopping').json['pending_matches'], [])
 
+    def test_full_catalog_choices_keep_two_milks_distinct_and_preserve_real_stock(self):
+        import copy
+        from unittest.mock import patch
+        import barcode_stock
+        import shopping_match_queue as queue
+        from shopping_identity_sync import identities
+        piece = next(u['id'] for u in self.instance.http('GET', 'objects/quantity_units') if u['name'] == 'Piece')
+        ids = [barcode_stock.create_catalog_product(name, unit_id=piece, initial_stock='3')['product_id']
+               for name in ('Leche Clau', 'Leche Jaime')]
+        names = ['Encargo alfa', 'Encargo beta']
+        products = self.instance.http('GET', 'objects/products')
+        queue.refresh(queue.DEFAULT_PATH, names, products)
+        before = {entity: self.instance.http('GET', 'objects/' + entity) for entity in ('products', 'stock', 'stock_log')}
+        saved = []
+        for index, (name, pid) in enumerate(zip(names, ids)):
+            rid = int(self.instance.http('POST', 'objects/shopping_list', {'shopping_list_id': 1, 'note': name, 'amount': index + 2})['created_object_id'])
+            original = copy.deepcopy(self.instance.http('GET', f'objects/shopping_list/{rid}'))
+            entry = next(row for row in queue.pending(queue.DEFAULT_PATH) if row['name'] == name)
+            self.assertNotIn(pid, {p['id'] for p in entry['candidates']})
+            product = next(p for p in products if int(p['id']) == pid)
+            body = {'product_id': pid, 'operation_id': str(uuid.uuid4()), 'catalog_choice': {
+                'expected_name': name, 'generation': entry['generation'], 'product_name': product['name']}}
+            with patch('shopping_sync_adapters.ha_service', side_effect=AssertionError('Manual choice must not call Alexa')):
+                for _ in range(2):
+                    result = self.client.post('/api/v1/alexa/matches/' + name + '/choose', json=body, headers=self.headers)
+                    self.assertEqual(result.status_code, 200, result.json)
+                    self.assertEqual(result.json['item_id'], rid)
+            row = self.instance.http('GET', f'objects/shopping_list/{rid}')
+            self.assertEqual(row, {**original, 'product_id': pid, 'qu_id': int(piece)})
+            saved.append((product['name'], row))
+        queue.refresh(queue.DEFAULT_PATH, names, products, saved)
+        choices = queue.resolved_choices(queue.DEFAULT_PATH, names, products)
+        alexa, grocy = identities(names, saved, products, choices)
+        self.assertEqual(set(alexa), {'p:' + str(pid) for pid in ids})
+        self.assertEqual(set(alexa), set(grocy))
+        for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
+        for _, row in saved: self.instance.http('DELETE', f"objects/shopping_list/{row['id']}")
+
     def test_exact_note_review_preserves_real_row_quantity_and_stock(self):
         import shopping_match_queue
         from shopping_choice_conversion import manual_choice

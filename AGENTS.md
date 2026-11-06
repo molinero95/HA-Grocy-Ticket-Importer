@@ -1,6 +1,10 @@
 # AGENTS.md — Despensa / Grocy Ticket Importer
 
-## Current handoff — 2026-11-04
+## Current handoff — 2026-11-06
+
+1.29.0 adds full active catalog selection in shopping/Alexa review, with suggestions first, deduped alphabetical remaining products and accent/case-insensitive search. `catalog_choice` carries expected source name/generation and product name. `manual_choice` validates these against the current active catalog under the shared lock before any remote write. Additive `manual_product_id` in the existing queue proves explicit selection for this episode; refresh retains it by ID and `resolved_choices` emits internal `trusted_manual`. Do not accept browser trust flags or relax automatic matching. New episodes clear manual proof; removed/archived products become stale. Preserve original row/amount/note, stock/catalog, duplicate guards and command journal. No production list/configuration changes; user updates installed app. Observe all final-head CI before merge.
+
+## Previous handoff — 2026-11-04
 
 Main has 1.27.0 (PR #40, merge 18ff8fd277c1a46d20279992f0391fcebc20fa3b), tested tree 18a2925fd099541b5637e779fc3bb553edf4af64. All seven final-head checks passed (426 Python, 142 Vitest, 23 real Grocy, 46 Chromium). Branch fix/web-product-photos prepares 1.28.0: user reports both Chocoflakes and anti cucarachas missing, requests OpenAI directly and a single search button.
 
