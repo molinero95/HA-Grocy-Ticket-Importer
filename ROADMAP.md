@@ -194,3 +194,8 @@ Tras log instalado HTTP 400/parameter tools, adaptar la petición de GPT-4.1/GPT
 ## Catálogo completo en compra — 1.29.0
 
 Selector con sugeridos y resto del catálogo activo, búsqueda por nombre y elección manual explícita fuera del ranking. Evidencia manual por ID en la cola existente, limitada a nombre/generación del episodio; comprobar nombre del producto activo antes de guardar. No cambia la selección automática, no crea alias ni toca stock. Conservar fila/cantidad/nota, bloqueos de duplicados, CSRF, locks y journal. Productos ausentes/archivados quedan obsoletos; una nueva aparición limpia únicamente la prueba manual del episodio anterior. Validación aislada y CI final en la PR; actualización instalada pendiente del usuario.
+
+
+## Pausa de sincronización — 1.30.0
+
+Backoff de fallos 2/4/8/16/30 minutos, respetando intervalos mayores, reinicio tras éxito, persistencia en salud existente e in-memory fallback. Eventos no saltan la pausa; acciones manuales siguen disponibles y el siguiente ciclo lee snapshots nuevos. Mostrar próxima hora y mantener diagnóstico/error original durante esperas previstas; vigilar worker obsoleto tras el plazo y margen. No deshabilitar Alexa Devices, cambiar configuración de HA, vaciar colas/checkpoints ni repetir comandos inciertos. Validación aislada/CI en la PR; actualización y aceptación instalada posteriores por el usuario.

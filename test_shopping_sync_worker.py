@@ -89,3 +89,79 @@ class ShoppingWorkerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SyncSchedulerTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
+        self.path = Path(temp.name) / 'queue.sqlite3'
+        self.now = 10000
+        clock = patch('shopping_sync_worker.time.time', side_effect=lambda: self.now)
+        clock.start(); self.addCleanup(clock.stop)
+        env = patch.dict('os.environ', {'SHOPPING_SYNC_INTERVAL_SECONDS': '30'})
+        env.start(); self.addCleanup(env.stop)
+
+    def test_event_storm_never_retries_early_and_success_resets_backoff(self):
+        from threading import Event
+        scheduler = worker.SyncScheduler(self.path)
+        with patch.object(worker, 'run_once', side_effect=RuntimeError('private')) as run:
+            for delay in [120, 240, 480, 960, 1800, 1800]:
+                before = run.call_count
+                with self.assertRaises(RuntimeError): scheduler.run(dry_run=False)
+                self.assertEqual(scheduler.remaining(), delay)
+                for _ in range(20):
+                    self.assertIsNone(scheduler.run(dry_run=False))
+                self.assertEqual(run.call_count, before + 1)
+                wake = Event(); wake.set()
+                with patch.object(worker.time, 'sleep') as sleep:
+                    self.assertEqual(scheduler.wait(wake), 'retry')
+                    sleep.assert_called_once_with(delay)
+                self.now += delay - 1
+                self.assertIsNone(scheduler.run(dry_run=False))
+                self.now += 1
+        with patch.object(worker, 'run_once', return_value={'ok': True}) as run:
+            self.assertEqual(scheduler.run(dry_run=False), {'ok': True})
+            self.assertEqual(scheduler.remaining(), 0)
+            self.assertEqual(scheduler.failures, 0)
+            run.assert_called_once_with(dry_run=False, failure_count=7)
+        with patch.object(worker, 'run_once', side_effect=RuntimeError()):
+            with self.assertRaises(RuntimeError): scheduler.run(dry_run=False)
+            self.assertEqual(scheduler.remaining(), 120)
+
+    def test_restart_honors_persisted_pause_and_due_retry_reads_fresh_state(self):
+        from shopping_sync_status import record
+        record(self.path, dry_run=False, error=IdentityConflict('Multiple Alexa items resolve to the same identity'))
+        self.now += 10
+        scheduler = worker.SyncScheduler(self.path)
+        with patch.object(worker, 'run_once', return_value={}) as run:
+            self.assertIsNone(scheduler.run(dry_run=False))
+            self.assertEqual(scheduler.remaining(), 110)
+            run.assert_not_called()
+            self.now += 110
+            self.assertEqual(scheduler.run(dry_run=False), {})
+            run.assert_called_once_with(dry_run=False, failure_count=2)
+
+    def test_storage_failure_does_not_disable_in_memory_backoff(self):
+        scheduler = worker.SyncScheduler(self.path)
+        with patch.object(worker, '_run_once', side_effect=RuntimeError('token secret')) as run, \
+             patch('shopping_sync_status.tempfile.mkstemp', side_effect=OSError()):
+            with self.assertRaises(RuntimeError): scheduler.run(dry_run=True)
+            self.assertEqual(scheduler.remaining(), 120)
+            self.assertIsNone(scheduler.run(dry_run=True))
+            run.assert_called_once()
+            self.now += 120
+            with self.assertRaises(RuntimeError): scheduler.run(dry_run=True)
+            self.assertEqual(scheduler.remaining(), 240)
+
+    def test_normal_events_and_configured_longer_interval_are_preserved(self):
+        from unittest.mock import Mock
+        scheduler = worker.SyncScheduler(self.path)
+        wake = Mock(); wake.wait.return_value = True
+        self.assertEqual(scheduler.wait(wake), 'event')
+        wake.wait.assert_called_once_with(timeout=30)
+        with patch.dict('os.environ', {'SHOPPING_SYNC_INTERVAL_SECONDS': '3600'}), \
+             patch.object(worker, 'run_once', side_effect=RuntimeError()):
+            with self.assertRaises(RuntimeError): scheduler.run(dry_run=False)
+            self.assertEqual(scheduler.remaining(), 3600)

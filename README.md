@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.29.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.30.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -343,3 +343,12 @@ La aplicación comprueba las páginas citadas, recupera una foto publicada, la c
 En **Lista de la compra → Elegir producto para «…»**, el selector muestra **Sugeridos** y **Resto de productos**. Usa **Buscar en todos los productos** para localizar cualquier producto activo, incluso sin existencias, aunque el buscador no lo haya sugerido. Así puedes distinguir, por ejemplo, Leche Clau y Leche Jaime por su producto de catálogo.
 
 **Guardar elección** conserva la cantidad, nota e ID de la fila existente. La elección explícita se guarda por ID para esa aparición del artículo de Alexa y se respeta al sincronizar; no crea un alias permanente ni modifica existencias. Si el producto desaparece/se archiva o el artículo reaparece en un nuevo episodio, requiere nueva revisión. Se mantienen las protecciones contra duplicados y operaciones inciertas.
+
+
+## Pausa automática de sincronización — 1.30.0
+
+Si falla un ciclo de sincronización, Despensa espera 2 minutos antes de intentarlo de nuevo. Si sigue fallando, espera 4, 8, 16 y hasta 30 minutos. Un intervalo configurado mayor se respeta. Tras completar un ciclo correcto, vuelve al intervalo normal y a reaccionar a eventos.
+
+Durante la pausa, la lista muestra la hora del próximo intento. Puedes seguir marcando, quitando o asociando productos; los eventos quedan agrupados para el siguiente ciclo y no acortan la espera. Se conservan listas, cantidades, decisiones y checkpoints; el siguiente intento vuelve a leer el estado actual. La pausa se mantiene si reinicias el complemento, siempre que el estado pueda guardarse. También se aplica al worker de lectura con sync deshabilitado.
+
+Esta pausa afecta al sincronizador de Despensa. La integración Alexa Devices de Home Assistant mantiene sus propias actualizaciones: no se deshabilita, no se cambian sus opciones y no se garantiza cuándo Amazon retirará un límite de peticiones. Los conflictos de productos conservan su diagnóstico y pueden necesitar una corrección manual.

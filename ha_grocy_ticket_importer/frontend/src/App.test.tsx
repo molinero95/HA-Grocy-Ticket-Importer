@@ -465,3 +465,16 @@ it("clears a full catalog draft when the same Alexa name starts a new source epi
   await waitFor(() => expect(screen.getByLabelText("Producto")).toHaveProperty("value", ""));
   expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
 });
+
+
+it("explains the automatic sync pause and next attempt while keeping shopping usable", async () => {
+  vi.mocked(api.getShopping).mockResolvedValue({ ...shopping,
+    sync: { state: "error", reason: "unavailable", paused: true, next_retry_at: 1793980000, consecutive_failures: 3 },
+  });
+  renderWithClient(<App />);
+  await screen.findByText(/Sincronización con Alexa en pausa automática/);
+  expect(screen.getByRole("button", { name: "✓ Comprado" })).toHaveProperty("disabled", false);
+  await userEvent.click(screen.getByText("Ver detalles de sincronización"));
+  expect(screen.getByText(/Alexa Devices mantiene sus propias actualizaciones/)).toBeTruthy();
+  expect(api.chooseAlexaMatch).not.toHaveBeenCalled();
+});

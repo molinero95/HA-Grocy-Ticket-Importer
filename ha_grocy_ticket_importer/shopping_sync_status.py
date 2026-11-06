@@ -1,5 +1,6 @@
 """Sanitized worker health shared with Flask; no names, credentials or checkpoints."""
 import json
+import math
 import os
 import tempfile
 import time
@@ -29,17 +30,53 @@ def _read(path):
         return {}
 
 
-def record(path, *, dry_run, error=None):
+def poll_interval():
+    try:
+        return max(30, min(3600, int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120"))))
+    except ValueError:
+        return 120
+
+
+def retry_delay(failures):
+    # 2, 4, 8, 16, then 30 minutes. Never shorten a longer configured interval.
+    return max(poll_interval(), min(1800, 120 * 2 ** min(max(0, failures - 1), 4)))
+
+
+def _finite(value):
+    try:
+        return type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def retry_state(path):
+    data = _read(path)
+    count = data.get("consecutive_failures")
+    checked, retry = data.get("checked_at"), data.get("next_retry_at")
+    if (data.get("state") != "error" or type(count) is not int or not 1 <= count <= 31
+            or not _finite(checked) or not _finite(retry)
+            or not checked <= retry <= checked + 3600 or retry > time.time() + 3600):
+        return {"consecutive_failures": 0, "next_retry_at": 0}
+    return {"consecutive_failures": count, "next_retry_at": retry}
+
+
+def record(path, *, dry_run, error=None, failure_count=None):
     from shopping_identity_sync import IdentityConflict
     reason = None
     if error is not None:
         reason = "note_conflict" if isinstance(error, IdentityConflict) and "note conflicts" in str(error) else (
             "identity_conflict" if isinstance(error, IdentityConflict) else "unavailable")
     now = time.time()
+    previous = _read(path)
+    failures = 0
+    if error:
+        failures = (failure_count if type(failure_count) is int and 1 <= failure_count <= 31
+                    else min(31, retry_state(path)["consecutive_failures"] + 1))
     data = {"state": "error" if error else "ok", "reason": reason,
             "detail_code": DETAILS.get(str(error)) if isinstance(error, IdentityConflict) else None,
             "affected_product_ids": list(error.product_ids)[:20] if isinstance(error, IdentityConflict) else [],
-            "checked_at": now, "last_success_at": _read(path).get("last_success_at"), "dry_run": bool(dry_run)}
+            "consecutive_failures": failures, "next_retry_at": now + retry_delay(failures) if error else None,
+            "checked_at": now, "last_success_at": previous.get("last_success_at"), "dry_run": bool(dry_run)}
     if error is None and not dry_run:
         data["last_success_at"] = now
     # Health reporting must never turn a verified shopping operation into a retry.
@@ -70,18 +107,20 @@ def snapshot(path):
     if data.get("state") not in ("ok", "error") or data.get("dry_run") is not False:
         return {"state": "unknown"}
     checked = data.get("checked_at")
-    if not isinstance(checked, (int, float)) or isinstance(checked, bool):
+    if not _finite(checked):
         return {"state": "unknown"}
-    try:
-        interval = int(os.environ.get("SHOPPING_SYNC_INTERVAL_SECONDS", "120"))
-    except ValueError:
-        interval = 120
-    if time.time() - checked > max(180, interval * 3):
+    retry = retry_state(path)
+    now = time.time()
+    # A sleeping worker is healthy until its scheduled retry plus the usual grace.
+    if now - max(checked, retry["next_retry_at"]) > max(180, poll_interval() * 3):
         return {"state": "stale", "checked_at": checked}
     reason = data.get("reason")
     return {"state": "error" if data.get("state") == "error" else "ok",
+            "paused": retry["next_retry_at"] > now,
+            "next_retry_at": retry["next_retry_at"] or None,
+            "consecutive_failures": retry["consecutive_failures"],
             "reason": reason if reason in ("note_conflict", "identity_conflict", "unavailable") else None,
             "checked_at": checked,
             "affected_product_ids": [pid for pid in data.get('affected_product_ids', []) if type(pid) is int and pid > 0][:20] if isinstance(data.get('affected_product_ids', []), list) else [],
-            "last_success_at": data.get("last_success_at") if isinstance(data.get("last_success_at"), (int, float)) else None,
+            "last_success_at": data.get("last_success_at") if _finite(data.get("last_success_at")) else None,
             "detail_code": data.get("detail_code") if data.get("detail_code") in DETAILS.values() else None}
