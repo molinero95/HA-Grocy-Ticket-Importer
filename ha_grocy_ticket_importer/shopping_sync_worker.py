@@ -36,10 +36,10 @@ STATE = Path(os.environ.get("SHOPPING_SYNC_STATE", "/data/shopping-sync-" + ENTI
 STATE_V2 = STATE.with_name(STATE.stem + "-identity-v2.json")
 
 
-def run_once(*, dry_run=True, failure_count=None):
+def run_once(*, dry_run=True, failure_count=None, blocking=True):
     from shopping_match_queue import mutation_lock
     from shopping_sync_status import record
-    with mutation_lock(MATCH_QUEUE):
+    with mutation_lock(MATCH_QUEUE, blocking=blocking):
         try:
             result = _run_once(dry_run=dry_run)
         except Exception as exc:
@@ -140,31 +140,63 @@ class SyncScheduler:
     def __init__(self, path):
         from shopping_sync_status import retry_state
         retry = retry_state(path)
+        self.path = path
         self.failures = retry["consecutive_failures"]
         self.retry_at = retry["next_retry_at"]
+        self.revision = self.status_revision()
+
+    def status_revision(self):
+        try:
+            return Path(str(self.path) + ".sync-status.json").stat().st_mtime_ns
+        except OSError:
+            return None
+
+    def refresh(self):
+        # A CSRF-protected manual cycle can complete while this worker is paused.
+        # Ordinary list events do not change health and cannot shorten a pause.
+        from shopping_sync_status import snapshot
+        revision = self.status_revision()
+        if revision is None or revision == self.revision:
+            return
+        health = snapshot(self.path)
+        if health.get("state") not in ("ok", "error"):
+            return
+        self.failures = health.get("consecutive_failures", 0)
+        self.retry_at = health.get("next_retry_at") or 0
+        self.revision = revision
 
     def remaining(self):
         return max(0, self.retry_at - time.time())
 
     def run(self, *, dry_run):
         from shopping_sync_status import retry_delay
+        self.refresh()
         if self.remaining():
             return None
         try:
-            result = run_once(dry_run=dry_run, failure_count=min(31, self.failures + 1))
+            result = run_once(dry_run=dry_run, failure_count=min(31, self.failures + 1), blocking=False)
+        except BlockingIOError:
+            # A manual cycle owns the shared lock. Observe its result later.
+            return None
         except Exception:
             self.failures = min(31, self.failures + 1)
             self.retry_at = time.time() + retry_delay(self.failures)
+            self.revision = self.status_revision()
             raise
+        self.revision = self.status_revision()
         self.failures, self.retry_at = 0, 0
         return result
 
     def wait(self, wake):
         from shopping_sync_status import poll_interval
-        remaining = self.remaining()
-        if remaining:
-            # Do not wait on the event: HA/local events must not bypass backoff.
-            time.sleep(remaining)
+        was_paused = bool(self.remaining())
+        while self.remaining():
+            # Bound local checks so a manual cycle can replace the schedule even
+            # if its advisory wake notification could not be written.
+            wake.wait(timeout=min(1, self.remaining()))
+            wake.clear()
+            self.refresh()
+        if was_paused and self.retry_at:
             return "retry"
         return "event" if wake.wait(timeout=poll_interval()) else "polling"
 

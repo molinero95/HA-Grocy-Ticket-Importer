@@ -118,6 +118,7 @@ def snapshot(path):
     return {"state": "error" if data.get("state") == "error" else "ok",
             "paused": retry["next_retry_at"] > now,
             "next_retry_at": retry["next_retry_at"] or None,
+            "retry_after_seconds": max(0, math.ceil(retry["next_retry_at"] - now)),
             "consecutive_failures": retry["consecutive_failures"],
             "reason": reason if reason in ("note_conflict", "identity_conflict", "unavailable") else None,
             "checked_at": checked,

@@ -6,7 +6,7 @@
 
 Complemento para **Home Assistant OS** que integra [Grocy](https://grocy.info/) con una interfaz móvil en español para consultar existencias, escanear códigos de barras y digitalizar tickets de compra mediante OpenAI.
 
-> **Versión 1.30.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
+> **Versión 1.31.0:** migración React integrada desde PR #10. La ficha tiene un único ajuste de existencias: indicar la cantidad total que queda. Home Assistant detecta esta versión mediante el manifiesto del complemento. Actualiza la instalación existente con copia de seguridad, sin desinstalar. Validación automatizada contra Grocy 4.7.1 aislado; cámara Android, escrituras Alexa y aceptación de la actualización real siguen pendientes.
 
 > **Fotos de productos:** al escanear o introducir un código de barras, se usa primero la consulta universal v3 de Open Facts por código exacto. Se siguen únicamente redirecciones HTTPS a Food, Products y Beauty; las consultas directas se conservan como respaldo ante fallos o datos incompletos. Si hay nombre disponible, se muestra como sugerencia y puedes aplicarlo con «Usar este nombre», sin sustituir lo que escribes automáticamente. Las imágenes encontradas se guardan como referencias URL en la descripción del producto de Grocy y se muestran en la ficha, Mi despensa y Lista de la compra. También puedes subir una foto saneada al almacenamiento persistente del complemento. Puede haber productos sin fotografía o con nombre incompleto en esos catálogos; puedes introducir el nombre y subir una foto manualmente.
 
@@ -352,3 +352,13 @@ Si falla un ciclo de sincronización, Despensa espera 2 minutos antes de intenta
 Durante la pausa, la lista muestra la hora del próximo intento. Puedes seguir marcando, quitando o asociando productos; los eventos quedan agrupados para el siguiente ciclo y no acortan la espera. Se conservan listas, cantidades, decisiones y checkpoints; el siguiente intento vuelve a leer el estado actual. La pausa se mantiene si reinicias el complemento, siempre que el estado pueda guardarse. También se aplica al worker de lectura con sync deshabilitado.
 
 Esta pausa afecta al sincronizador de Despensa. La integración Alexa Devices de Home Assistant mantiene sus propias actualizaciones: no se deshabilita, no se cambian sus opciones y no se garantiza cuándo Amazon retirará un límite de peticiones. Los conflictos de productos conservan su diagnóstico y pueden necesitar una corrección manual.
+
+
+## Tiempo restante de sincronización — 1.31.0
+
+El aviso de pausa muestra **Reintentará en X min**, calculado a partir de los segundos restantes que devuelve Despensa. No depende de que Home Assistant y el móvil tengan la misma fecha. La pantalla descuenta el tiempo aunque no reciba una nueva respuesta; al vencer muestra que espera una nueva comprobación, sin afirmar que la sincronización ya se haya reanudado.
+
+Si un servidor antiguo no proporciona una duración válida, se muestra **Tiempo restante sin confirmar** y se puede actualizar la lista. La espera automática y sus límites se conservan; esta corrección no ajusta el reloj de Home Assistant ni modifica existencias, listas o checkpoints.
+
+
+En el mismo aviso, **Forzar sincronización** permite un intento inmediato aunque la espera automática siga activa. El botón muestra **Sincronizando…** y bloquea pulsaciones repetidas. No está disponible si la sincronización está desactivada. Se conservan las comprobaciones de productos, cantidades y checkpoints: no se fuerza una asociación incompatible. Si falla, se actualiza el error y continúa la espera; si funciona, se restablece el ritmo normal. Una respuesta perdida no se reenvía automáticamente y el mismo identificador de operación nunca ejecuta otro ciclo.

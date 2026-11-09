@@ -315,6 +315,49 @@ class ManualShoppingChoiceTests(unittest.TestCase):
         headers = {"X-CSRF-Token": client.get("/api/v1/auth/status").json["csrf_token"]}
         return client, headers
 
+    def test_force_sync_is_csrf_protected_enabled_only_and_never_replays_same_operation(self):
+        import shopping_sync_worker as worker
+        client, headers = self.api()
+        url = '/api/v1/shopping/sync'
+        body = {'operation_id': self.operation}
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}), \
+             patch.object(worker, 'run_once', return_value={}) as run:
+            self.assertEqual(client.post(url, json=body).status_code, 403)
+            run.assert_not_called()
+            for _ in range(2):
+                result = client.post(url, json=body, headers=headers)
+                self.assertEqual(result.status_code, 200, result.json)
+            run.assert_called_once_with(dry_run=False, blocking=False)
+            with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '0'}):
+                self.assertEqual(client.post(url, json={'operation_id': str(uuid.uuid4())}, headers=headers).status_code, 409)
+            self.assertEqual(run.call_count, 1)
+
+    def test_force_sync_worker_busy_and_failures_do_not_escape_or_replay(self):
+        import shopping_sync_worker as worker
+        client, headers = self.api()
+        url = '/api/v1/shopping/sync'
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}):
+            for error, status in [(BlockingIOError(), 409), (RuntimeError('private secret'), 503)]:
+                body = {'operation_id': str(uuid.uuid4())}
+                with patch.object(worker, 'run_once', side_effect=error) as run:
+                    for _ in range(2):
+                        result = client.post(url, json=body, headers=headers)
+                        self.assertEqual(result.status_code, status, result.json)
+                        self.assertNotIn('private', str(result.json))
+                    run.assert_called_once()
+
+    def test_force_sync_cannot_acquire_workers_shared_lock_or_touch_checkpoint(self):
+        import shopping_sync_worker as worker
+        client, headers = self.api()
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}), \
+             patch.object(worker, 'MATCH_QUEUE', self.path), \
+             patch.object(worker, '_run_once') as run, \
+             patch.object(worker, 'save_identity_state') as save, queue.mutation_lock(self.path):
+            result = client.post('/api/v1/shopping/sync', json={'operation_id': self.operation}, headers=headers)
+            self.assertEqual(result.status_code, 409, result.json)
+            run.assert_not_called(); save.assert_not_called()
+        self.assertEqual(self.writes, [])
+
     def test_choice_and_pending_remove_require_csrf(self):
         client, _ = self.api()
         self.assertEqual(client.post("/api/v1/alexa/matches/arroz/choose", json={"product_id": 8}).status_code, 403)

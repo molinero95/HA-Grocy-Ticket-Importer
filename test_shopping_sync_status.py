@@ -91,3 +91,15 @@ class SyncStatusTests(unittest.TestCase):
                 'state': 'error', 'checked_at': checked, 'next_retry_at': retry,
                 'consecutive_failures': count, 'dry_run': False}))
             self.assertEqual(retry_state(self.path)['next_retry_at'], 0)
+
+
+    def test_remaining_duration_does_not_require_matching_client_and_server_dates(self):
+        # The browser can be a day ahead; the API returns seconds, not a browser date.
+        with patch('shopping_sync_status.time.time', return_value=1794217721):
+            record(self.path, dry_run=False, error=RuntimeError())
+            self.assertEqual(snapshot(self.path)['retry_after_seconds'], 120)
+        with patch('shopping_sync_status.time.time', return_value=1794217782):
+            self.assertEqual(snapshot(self.path)['retry_after_seconds'], 59)
+        with patch('shopping_sync_status.time.time', return_value=1794217842):
+            self.assertFalse(snapshot(self.path)['paused'])
+            self.assertEqual(snapshot(self.path)['retry_after_seconds'], 0)
