@@ -1078,3 +1078,5 @@ select:focus-visible {
 .receipt-line-skipped { background: #edf1ee; border: 1px dashed #9baa9e; border-radius: 12px; padding: 14px; }
 .receipt-line-omitted { color: #526357; grid-column: 1 / -1; }
 .receipt-review-summary { background: #fff6df; color: #72500c; border: 1px solid #e4b64b; margin: 1rem 0; padding: 14px; border-radius: 12px; }
+
+.force-sync { margin: 12px 0; }

@@ -104,7 +104,6 @@ class SyncSchedulerTests(unittest.TestCase):
         env.start(); self.addCleanup(env.stop)
 
     def test_event_storm_never_retries_early_and_success_resets_backoff(self):
-        from threading import Event
         scheduler = worker.SyncScheduler(self.path)
         with patch.object(worker, 'run_once', side_effect=RuntimeError('private')) as run:
             for delay in [120, 240, 480, 960, 1800, 1800]:
@@ -114,10 +113,17 @@ class SyncSchedulerTests(unittest.TestCase):
                 for _ in range(20):
                     self.assertIsNone(scheduler.run(dry_run=False))
                 self.assertEqual(run.call_count, before + 1)
-                wake = Event(); wake.set()
-                with patch.object(worker.time, 'sleep') as sleep:
-                    self.assertEqual(scheduler.wait(wake), 'retry')
-                    sleep.assert_called_once_with(delay)
+                from unittest.mock import Mock
+                started = self.now
+                wake = Mock()
+                def wait(timeout):
+                    self.now += timeout
+                    return True  # A continuous event stream still cannot bypass the deadline.
+                wake.wait.side_effect = wait
+                self.assertEqual(scheduler.wait(wake), 'retry')
+                self.assertEqual(self.now - started, delay)
+                self.assertEqual(run.call_count, before + 1)
+                self.now = started
                 self.now += delay - 1
                 self.assertIsNone(scheduler.run(dry_run=False))
                 self.now += 1
@@ -125,7 +131,7 @@ class SyncSchedulerTests(unittest.TestCase):
             self.assertEqual(scheduler.run(dry_run=False), {'ok': True})
             self.assertEqual(scheduler.remaining(), 0)
             self.assertEqual(scheduler.failures, 0)
-            run.assert_called_once_with(dry_run=False, failure_count=7)
+            run.assert_called_once_with(dry_run=False, failure_count=7, blocking=False)
         with patch.object(worker, 'run_once', side_effect=RuntimeError()):
             with self.assertRaises(RuntimeError): scheduler.run(dry_run=False)
             self.assertEqual(scheduler.remaining(), 120)
@@ -141,7 +147,7 @@ class SyncSchedulerTests(unittest.TestCase):
             run.assert_not_called()
             self.now += 110
             self.assertEqual(scheduler.run(dry_run=False), {})
-            run.assert_called_once_with(dry_run=False, failure_count=2)
+            run.assert_called_once_with(dry_run=False, failure_count=2, blocking=False)
 
     def test_storage_failure_does_not_disable_in_memory_backoff(self):
         scheduler = worker.SyncScheduler(self.path)
@@ -165,3 +171,31 @@ class SyncSchedulerTests(unittest.TestCase):
              patch.object(worker, 'run_once', side_effect=RuntimeError()):
             with self.assertRaises(RuntimeError): scheduler.run(dry_run=False)
             self.assertEqual(scheduler.remaining(), 3600)
+
+
+    def test_explicit_manual_cycle_replaces_a_sleeping_workers_schedule(self):
+        from shopping_sync_status import record
+        env = {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}
+        with patch.dict('os.environ', env):
+            record(self.path, dry_run=False, error=RuntimeError())
+            scheduler = worker.SyncScheduler(self.path)
+            self.assertEqual(scheduler.remaining(), 120)
+            self.now += 5
+            record(self.path, dry_run=False, error=RuntimeError())
+            scheduler.refresh()
+            self.assertEqual(scheduler.remaining(), 240)
+            self.assertEqual(scheduler.failures, 2)
+            self.now += 5
+            record(self.path, dry_run=False)
+            scheduler.refresh()
+            self.assertEqual(scheduler.remaining(), 0)
+            self.assertEqual(scheduler.failures, 0)
+
+
+    def test_scheduled_cycle_does_not_wait_behind_or_compete_with_manual_cycle(self):
+        scheduler = worker.SyncScheduler(self.path)
+        with patch.object(worker, 'run_once', side_effect=BlockingIOError()) as run:
+            self.assertIsNone(scheduler.run(dry_run=False))
+            self.assertEqual(scheduler.failures, 0)
+            self.assertEqual(scheduler.remaining(), 0)
+            run.assert_called_once_with(dry_run=False, failure_count=1, blocking=False)

@@ -99,6 +99,8 @@ async function request<T>(
 }
 
 export const getShopping = () => request<ShoppingResponse>("shopping");
+export const forceShoppingSync = (operationId: string) =>
+  request<{ ok: boolean }>("shopping/sync", "POST", { operation_id: operationId });
 export const toggleShopping = (id: number, done: boolean) =>
   request("shopping/" + id + "/toggle", "POST", { done });
 export const clearCompletedShopping = () =>

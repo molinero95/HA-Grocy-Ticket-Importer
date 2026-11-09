@@ -174,3 +174,10 @@ Selector con sugeridos y resto del catálogo activo, búsqueda por nombre y elec
 ## Pausa de sincronización — 1.30.0
 
 Backoff de fallos 2/4/8/16/30 minutos, respetando intervalos mayores, reinicio tras éxito, persistencia en salud existente e in-memory fallback. Eventos no saltan la pausa; acciones manuales siguen disponibles y el siguiente ciclo lee snapshots nuevos. Mostrar próxima hora y mantener diagnóstico/error original durante esperas previstas; vigilar worker obsoleto tras el plazo y margen. No deshabilitar Alexa Devices, cambiar configuración de HA, vaciar colas/checkpoints ni repetir comandos inciertos. Validación aislada/CI en la PR; actualización y aceptación instalada posteriores por el usuario.
+
+
+## Aviso de pausa con relojes distintos — 1.31.0
+
+La API añade retry_after_seconds (0..3600) y conserva los campos existentes. SyncPause usa duración y dataUpdatedAt del navegador para descontar una respuesta cacheada; al vencer espera confirmación nueva. No usar next_retry_at absoluto como fecha de próximo intento, no reiniciar el plazo al renderizar y no afirmar recuperación automática. Payload antiguo/inválido muestra tiempo sin confirmar. Temporizador con limpieza al vencer/desmontar; sin nuevas peticiones ni mutaciones. Se conserva scheduler y no se cambia el reloj de HA.
+
+El usuario autoriza un botón de intento manual en el aviso. POST /shopping/sync ejecuta un ciclo habilitado y revisado con CSRF, UUID/journal y locks no bloqueantes. No forzar con sync desactivado ni reenviar mutaciones automáticamente; mantener todas las guardas de identidad/checkpoint. El worker observa la revisión del estado de salud de un ciclo manual para reanudar/reprogramar sin que eventos normales salten la pausa.

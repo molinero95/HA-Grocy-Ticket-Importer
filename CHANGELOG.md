@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.31.0] — 2026-11-09
+
+### Added
+- **Forzar sincronización** in the error/pause notice performs one explicit fresh-snapshot cycle immediately. Require enabled sync, session/ingress authorization, CSRF, operation UUID, process lock and nonblocking shared worker lock. Durable command journal deduplicates the same request; failures/uncertain responses are never automatically replayed. Disable repeated clicks and refresh health after the attempt.
+- A paused worker observes a manual cycle's atomic health update: success restores normal scheduling, failure respects the new retry deadline. Ordinary events still cannot shorten backoff. Scheduled work does not wait behind a manual cycle and immediately retry its failure.
+
+### Fixed
+- Display Alexa retry time as a relative wait computed from a bounded server-provided duration and the browser's response receipt time. Do not turn the server's absolute next-retry timestamp into a user-facing date; server/phone calendar differences no longer produce yesterday's next attempt.
+- Tick cached pause notices locally, even without a successful refresh. When the duration expires, show that the pause deadline passed and a new check is awaited; never claim the worker retried or recovered without confirmation. Missing/invalid durations use an explicit unconfirmed-time fallback instead of guessing from an old timestamp.
+- Preserve the existing backoff scheduler, persisted deadlines, fresh-snapshot retries, manual shopping actions and error diagnostics. No Home Assistant clock/settings, lists, stock or checkpoints changed.
+
 ## [1.30.0] — 2026-11-06
 
 ### Added

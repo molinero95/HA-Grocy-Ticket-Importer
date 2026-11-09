@@ -39,6 +39,42 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         return jsonify({"csrf_token": csrf_token()})
 
 
+    @app.post("/api/v1/shopping/sync")
+    def api_v1_force_shopping_sync():
+        from stock_commands import execute_once
+        from shopping_sync_events import notify_local
+        import shopping_sync_worker as worker
+        if os.environ.get("SHOPPING_SYNC_ENABLED") != "1" or not os.environ.get("ALEXA_SHOPPING_LIST_ENTITY"):
+            return jsonify({"error": "Activa la sincronización con Alexa antes de forzar un intento."}), 409
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("operation_id"), str):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            def attempt():
+                try:
+                    # Fresh snapshots and all ordinary identity/checkpoint guards.
+                    # Never wait behind the scheduled worker or replay a lost attempt.
+                    worker.run_once(dry_run=False, blocking=False)
+                    return {"status": 200, "body": {"ok": True}}
+                except BlockingIOError:
+                    return {"status": 409, "body": {"error": "operation_in_progress"}}
+                except Exception:
+                    return {"status": 503, "body": {"error": "No se ha completado la sincronización. Revisa el aviso actualizado antes de volver a intentarlo."}}
+                finally:
+                    notify_local(shopping_match_queue.DEFAULT_PATH)
+            result = execute_once(payload["operation_id"], {
+                "command": "manual-shopping-sync", "scope": str(shopping_match_queue.DEFAULT_PATH)}, attempt)
+            return jsonify(result["body"]), result["status"]
+        except CommandConflict:
+            return jsonify({"error": "No se ha repetido el intento. Actualiza la lista para comprobar su estado."}), 409
+        except Exception:
+            return jsonify({"error": "No se ha confirmado el intento. Actualiza la lista antes de volver a intentarlo."}), 502
+        finally:
+            lock.release()
+
+
     @app.get('/api/v1/alexa/matches/<path:key>/create-context')
     def api_v1_shopping_creation_context(key):
         from shopping_product_creation import creation_context
