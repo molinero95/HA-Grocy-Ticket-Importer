@@ -539,15 +539,16 @@ class ManualShoppingChoiceTests(unittest.TestCase):
             manual_choice(self.grocy, queue, self.path, "arroz redondo", 7, self.operation)
         self.assertEqual(self.writes, [])
 
-    def worker(self, dry_run):
+    def worker(self, dry_run, source_names=None):
         import shopping_sync_worker as worker
-        source = ["Arroz"]
+        source = list(source_names) if source_names is not None else ["Arroz"]
         names = {int(p["id"]): p["name"] for p in self.products}
         def rows():
             return [(names.get(int(r.get("product_id") or 0), r["note"]), copy.deepcopy(r))
                     for r in self.rows if int(r.get("shopping_list_id") or 1) == 1 and not int(r.get("done") or 0)]
-        def remove(_):
-            source.clear()
+        def remove(row):
+            from shopping_sync import normalize
+            source[:] = [name for name in source if normalize(name) != normalize(row["name"])]
         with patch.object(worker, "MATCH_QUEUE", self.path), \
              patch.object(worker, "STATE_V2", Path(self.temp.name) / "checkpoint.json"), \
              patch.object(worker, "ha_todo_items", side_effect=lambda: list(source)), \
@@ -556,6 +557,37 @@ class ManualShoppingChoiceTests(unittest.TestCase):
              patch.object(worker, "remove_alexa_identity", side_effect=remove) as remove_alexa:
             result = worker.run_once(dry_run=dry_run)
             return result, source, remove_alexa.call_count
+
+    def test_removed_canonical_row_is_not_resurrected_by_its_other_verified_name(self):
+        self.choose()
+        original = copy.deepcopy(self.rows[0])
+        queue.stage_entry_removal(self.path, original)
+        delete_verified(self.grocy, original)
+        result, source, writes = self.worker(False, ['Arroz', 'Arroz basmati'])
+        self.assertEqual(source, [])
+        self.assertEqual(self.rows, [])
+        self.assertEqual(writes, 2)
+        self.assertEqual(result['next_baseline'], [])
+        self.assertEqual(result['add_grocy'], [])
+
+    def test_removal_does_not_expand_to_other_product_variants(self):
+        self.choose()
+        original = copy.deepcopy(self.rows[0])
+        queue.stage_entry_removal(self.path, original)
+        delete_verified(self.grocy, original)
+        result, source, writes = self.worker(True, ['Arroz', 'Arroz basmati', 'Arroz redondo'])
+        self.assertEqual(writes, 0)
+        self.assertEqual([r['product_id'] for r in result['add_grocy']], [7])
+
+    def test_read_only_removed_synonym_cannot_be_reimported(self):
+        self.choose()
+        original = copy.deepcopy(self.rows[0])
+        queue.stage_entry_removal(self.path, original)
+        delete_verified(self.grocy, original)
+        result, source, writes = self.worker(True, ['Arroz', 'Arroz basmati'])
+        self.assertEqual(source, ['Arroz', 'Arroz basmati'])
+        self.assertEqual(writes, 0)
+        self.assertEqual(result['add_grocy'], [])
 
     def test_disabled_worker_does_not_reimport_or_write_alexa_after_manual_removal(self):
         remove_pending(self.grocy, queue, self.path, "arroz")

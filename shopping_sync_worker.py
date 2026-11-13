@@ -67,26 +67,6 @@ def _run_once(*, dry_run=True):
     import shopping_match_queue
     restore_verified_choices(shopping_match_queue, MATCH_QUEUE, grocy_rows, products)
     refresh_matches(MATCH_QUEUE, alexa, products, grocy_rows)
-    removals = [row for row in pending_matches(MATCH_QUEUE) if row.get("removed")]
-    if removals:
-        # Explicit manual deletion wins even before the first union/checkpoint.
-        # In read-only mode it only suppresses re-import; no Alexa writes occur.
-        from shopping_choice_conversion import delete_verified
-        if not dry_run:
-            for entry in removals:
-                if entry.get("removal"):
-                    delete_verified(grocy, entry["removal"])
-                remove_alexa_identity({"name": entry["name"]})
-            observed = ha_todo_items()
-            if {normalize(name) for name in observed}.intersection(entry["key"] for entry in removals):
-                raise RuntimeError("Manual Alexa removal could not be verified")
-            grocy_rows = grocy_entries()
-            from shopping_match_queue import finish_removals
-            finish_removals(MATCH_QUEUE, [entry["key"] for entry in removals])
-        removed_names = {entry["key"] for entry in removals}
-        removed_ids = {int(entry["removal"]["id"]) for entry in removals if entry.get("removal")}
-        alexa = [name for name in alexa if normalize(name) not in removed_names]
-        grocy_rows = [(name, row) for name, row in grocy_rows if int(row["id"]) not in removed_ids]
     choices = resolved_choices(MATCH_QUEUE, alexa, products)
     # Persistent aliases are explicit user mappings, not fuzzy suggestions.
     from shopping_aliases import choices as alias_choices
@@ -94,6 +74,44 @@ def _run_once(*, dry_run=True):
         if alias in choices and int(choices[alias]["product_id"]) != int(selected["product_id"]):
             raise IdentityConflict("Alexa alias conflicts with a pending manual choice")
         choices[alias] = {**selected, "trusted_alias": True}
+    removals = [row for row in pending_matches(MATCH_QUEUE) if row.get("removed")]
+    if removals:
+        # Explicit manual deletion wins even before the first union/checkpoint.
+        # In read-only mode it only suppresses re-import; no Alexa writes occur.
+        from shopping_choice_conversion import delete_verified
+        from shopping_sync import suggest_catalog_matches
+        removed_names = {entry["key"] for entry in removals}
+        removed_products = {int(entry["removal"].get("product_id") or 0)
+                            for entry in removals if entry.get("removal")}
+        removed_products.discard(0)
+        # Before the first verified checkpoint, another known synonym must not
+        # resurrect a deliberately removed canonical row. Expand only exact or
+        # explicitly validated IDs, never fuzzy candidates or unrelated notes.
+        for name in alexa:
+            key = normalize(name)
+            chosen = choices.get(key)
+            decision, candidates = suggest_catalog_matches(name, products)
+            pid = int(chosen["product_id"]) if chosen else (
+                int(candidates[0]["id"]) if decision == "exact" else None)
+            if pid in removed_products:
+                removed_names.add(key)
+        if not dry_run:
+            for entry in removals:
+                if entry.get("removal"):
+                    delete_verified(grocy, entry["removal"])
+            source_names = {normalize(name): name for name in alexa}
+            source_names.update({entry["key"]: entry["name"] for entry in removals})
+            for key in sorted(removed_names):
+                remove_alexa_identity({"name": source_names[key]})
+            observed = ha_todo_items()
+            if {normalize(name) for name in observed}.intersection(removed_names):
+                raise RuntimeError("Manual Alexa removal could not be verified")
+            grocy_rows = grocy_entries()
+            from shopping_match_queue import finish_removals
+            finish_removals(MATCH_QUEUE, [entry["key"] for entry in removals])
+        removed_ids = {int(entry["removal"]["id"]) for entry in removals if entry.get("removal")}
+        alexa = [name for name in alexa if normalize(name) not in removed_names]
+        grocy_rows = [(name, row) for name, row in grocy_rows if int(row["id"]) not in removed_ids]
     # An old manual selection that is no longer a valid candidate must never
     # silently become free text and trigger a deletion via the old checkpoint.
     present_names = {normalize(name) for name in alexa}
