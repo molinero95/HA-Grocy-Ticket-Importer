@@ -315,6 +315,78 @@ class ManualShoppingChoiceTests(unittest.TestCase):
         headers = {"X-CSRF-Token": client.get("/api/v1/auth/status").json["csrf_token"]}
         return client, headers
 
+    def test_old_verified_suggestion_is_recovered_by_attached_live_id(self):
+        self.note()
+        self.choose(8)
+        with queue.connect(self.path) as db:
+            db.execute('UPDATE pending_matches SET manual_product_id=NULL')
+        self.products[1]['name'] = 'Renamed catalog product'
+        result, _, _ = self.worker(False)
+        self.assertEqual(result['next_baseline'], ['p:8'])
+        self.assertEqual(queue.pending(self.path)[0]['manual_product_id'], 8)
+        self.assertEqual(len(self.writes), 1)
+
+    def test_old_unmaterialized_choice_is_not_promoted_from_a_name_guess(self):
+        from shopping_choice_conversion import restore_verified_choices
+        queue.choose(self.path, 'arroz', 8)
+        self.products[1]['name'] = 'Renamed catalog product'
+        restore_verified_choices(queue, self.path, [], self.products)
+        queue.refresh(self.path, ['Arroz'], self.products)
+        self.assertIsNone(queue.pending(self.path)[0]['manual_product_id'])
+        self.assertEqual(queue.resolved_choices(self.path, ['Arroz'], self.products), {})
+
+    def test_suggested_association_survives_rename_refresh_and_worker(self):
+        original = copy.deepcopy(self.note(amount=3))
+        self.choose(8)
+        self.products[1]['name'] = 'Producto renombrado sin parecido'
+        queue.refresh_catalog(self.path, self.products)
+        queue.refresh(self.path, ['Arroz'], self.products)
+        saved = queue.pending(self.path)[0]
+        self.assertEqual(saved['manual_product_id'], 8)
+        self.assertFalse(saved['selection_stale'])
+        self.assertTrue(queue.resolved_choices(self.path, ['Arroz'], self.products)['arroz']['trusted_manual'])
+        result, _, _ = self.worker(False)
+        self.assertEqual(result['next_baseline'], ['p:8'])
+        self.assertEqual(self.rows[0], {**original, 'product_id': 8, 'qu_id': 2})
+        self.assertEqual(len(self.writes), 1)
+
+    def test_shopping_read_keeps_committed_suggestions_while_worker_holds_lock(self):
+        client, _ = self.api()
+        with queue.mutation_lock(self.path):
+            response = client.get('/api/v1/shopping')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json['pending_matches_error'])
+        self.assertEqual(response.json['pending_matches'][0]['key'], 'arroz')
+        self.assertEqual(self.writes, [])
+
+    def test_completed_alexa_cleanup_is_explicit_csrf_guarded_and_not_replayed(self):
+        client, headers = self.api()
+        url = '/api/v1/shopping/alexa/clear-completed'
+        payload = {'operation_id': self.operation}
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}), \
+             patch('shopping_sync_adapters.clear_completed_alexa', return_value={'ok': True}) as clear:
+            self.assertEqual(client.post(url, json=payload).status_code, 403)
+            clear.assert_not_called()
+            for _ in range(2):
+                response = client.post(url, json=payload, headers=headers)
+                self.assertEqual(response.status_code, 200, response.json)
+            clear.assert_called_once()
+            with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '0'}):
+                self.assertEqual(client.post(url, json=payload, headers=headers).status_code, 409)
+        self.assertEqual(self.writes, [])
+
+    def test_uncertain_completed_cleanup_cannot_be_automatically_replayed(self):
+        client, headers = self.api()
+        url = '/api/v1/shopping/alexa/clear-completed'
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}), \
+             patch('shopping_sync_adapters.clear_completed_alexa', side_effect=RuntimeError('private')) as clear:
+            first = client.post(url, json={'operation_id': self.operation}, headers=headers)
+            second = client.post(url, json={'operation_id': self.operation}, headers=headers)
+        self.assertEqual(first.status_code, 502)
+        self.assertEqual(second.status_code, 409)
+        self.assertNotIn('private', str(first.json))
+        clear.assert_called_once()
+
     def test_force_sync_is_csrf_protected_enabled_only_and_never_replays_same_operation(self):
         import shopping_sync_worker as worker
         client, headers = self.api()
@@ -467,15 +539,16 @@ class ManualShoppingChoiceTests(unittest.TestCase):
             manual_choice(self.grocy, queue, self.path, "arroz redondo", 7, self.operation)
         self.assertEqual(self.writes, [])
 
-    def worker(self, dry_run):
+    def worker(self, dry_run, source_names=None):
         import shopping_sync_worker as worker
-        source = ["Arroz"]
+        source = list(source_names) if source_names is not None else ["Arroz"]
         names = {int(p["id"]): p["name"] for p in self.products}
         def rows():
             return [(names.get(int(r.get("product_id") or 0), r["note"]), copy.deepcopy(r))
                     for r in self.rows if int(r.get("shopping_list_id") or 1) == 1 and not int(r.get("done") or 0)]
-        def remove(_):
-            source.clear()
+        def remove(row):
+            from shopping_sync import normalize
+            source[:] = [name for name in source if normalize(name) != normalize(row["name"])]
         with patch.object(worker, "MATCH_QUEUE", self.path), \
              patch.object(worker, "STATE_V2", Path(self.temp.name) / "checkpoint.json"), \
              patch.object(worker, "ha_todo_items", side_effect=lambda: list(source)), \
@@ -484,6 +557,37 @@ class ManualShoppingChoiceTests(unittest.TestCase):
              patch.object(worker, "remove_alexa_identity", side_effect=remove) as remove_alexa:
             result = worker.run_once(dry_run=dry_run)
             return result, source, remove_alexa.call_count
+
+    def test_removed_canonical_row_is_not_resurrected_by_its_other_verified_name(self):
+        self.choose()
+        original = copy.deepcopy(self.rows[0])
+        queue.stage_entry_removal(self.path, original)
+        delete_verified(self.grocy, original)
+        result, source, writes = self.worker(False, ['Arroz', 'Arroz basmati'])
+        self.assertEqual(source, [])
+        self.assertEqual(self.rows, [])
+        self.assertEqual(writes, 2)
+        self.assertEqual(result['next_baseline'], [])
+        self.assertEqual(result['add_grocy'], [])
+
+    def test_removal_does_not_expand_to_other_product_variants(self):
+        self.choose()
+        original = copy.deepcopy(self.rows[0])
+        queue.stage_entry_removal(self.path, original)
+        delete_verified(self.grocy, original)
+        result, source, writes = self.worker(True, ['Arroz', 'Arroz basmati', 'Arroz redondo'])
+        self.assertEqual(writes, 0)
+        self.assertEqual([r['product_id'] for r in result['add_grocy']], [7])
+
+    def test_read_only_removed_synonym_cannot_be_reimported(self):
+        self.choose()
+        original = copy.deepcopy(self.rows[0])
+        queue.stage_entry_removal(self.path, original)
+        delete_verified(self.grocy, original)
+        result, source, writes = self.worker(True, ['Arroz', 'Arroz basmati'])
+        self.assertEqual(source, ['Arroz', 'Arroz basmati'])
+        self.assertEqual(writes, 0)
+        self.assertEqual(result['add_grocy'], [])
 
     def test_disabled_worker_does_not_reimport_or_write_alexa_after_manual_removal(self):
         remove_pending(self.grocy, queue, self.path, "arroz")

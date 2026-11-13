@@ -75,6 +75,50 @@ class RealStackTests(unittest.TestCase):
         for entity, rows in before.items(): self.assertEqual(self.instance.http('GET', 'objects/' + entity), rows)
         for _, row in saved: self.instance.http('DELETE', f"objects/shopping_list/{row['id']}")
 
+    def test_suggested_association_and_full_batch_preserve_real_rows_and_stock(self):
+        import tempfile
+        from pathlib import Path
+        import barcode_stock
+        import shopping_match_queue as queue
+        from shopping_choice_conversion import manual_choice
+        from shopping_identity_runtime import reconcile_identity, current_bindings, verify_bindings
+        from shopping_sync_adapters import add_grocy_identity, grocy_entries
+        piece = next(u['id'] for u in self.instance.http('GET', 'objects/quantity_units') if u['name'] == 'Piece')
+        pid = barcode_stock.create_catalog_product('Contract cereal selected', unit_id=piece)['product_id']
+        rid = int(self.instance.http('POST', 'objects/shopping_list', {
+            'shopping_list_id': 1, 'note': 'Contract cereal', 'amount': 3})['created_object_id'])
+        original = self.instance.http('GET', f'objects/shopping_list/{rid}')
+        stock = {entity: self.instance.http('GET', 'objects/' + entity) for entity in ('stock', 'stock_log')}
+        imported_names = [f'Independent batch item {index}' for index in range(24)]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'choices.sqlite3'
+            products = self.instance.http('GET', 'objects/products')
+            queue.refresh(path, ['Contract cereal'], products)
+            manual_choice(self.instance.http, queue, path, 'contract cereal', pid, str(uuid.uuid4()))
+            self.instance.http('PUT', f'objects/products/{pid}', {'name': 'Renamed selected cereal'})
+            products = self.instance.http('GET', 'objects/products')
+            names = ['Contract cereal', 'Renamed selected cereal', *imported_names]
+            queue.refresh(path, names, products)
+            choices = queue.resolved_choices(path, names, products)
+            self.assertTrue(choices['contract cereal']['trusted_manual'])
+            selected_row = self.instance.http('GET', f'objects/shopping_list/{rid}')
+            selected = [('Renamed selected cereal', selected_row)]
+            result = reconcile_identity(names, selected, products, None, choices, dry_run=False,
+                                        add_grocy=add_grocy_identity)
+            self.assertEqual(len(result['add_grocy']), 24)
+            owned = [(name, row) for name, row in grocy_entries()
+                     if int(row['id']) == rid or name in imported_names]
+            a, g = verify_bindings(names, owned, products, choices, None)
+            self.assertEqual(set(a), set(g))
+            self.assertEqual(current_bindings(a), {'contract cereal': pid, 'renamed selected cereal': pid})
+            retry = reconcile_identity(names, owned, products, None, choices, dry_run=True)
+            self.assertEqual(retry['add_grocy'], [])
+            self.assertEqual(selected_row, {**original, 'product_id': pid, 'qu_id': int(piece)})
+            for entity, before in stock.items():
+                self.assertEqual(self.instance.http('GET', 'objects/' + entity), before)
+            for _, row in owned:
+                self.instance.http('DELETE', f"objects/shopping_list/{row['id']}")
+
     def test_exact_note_review_preserves_real_row_quantity_and_stock(self):
         import shopping_match_queue
         from shopping_choice_conversion import manual_choice

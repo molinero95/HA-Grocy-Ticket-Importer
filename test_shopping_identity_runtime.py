@@ -40,6 +40,34 @@ class IdentityRuntimeTests(unittest.TestCase):
         verify_bindings([], [("Arroz basmati", {"id": 7, "product_id": 2})],
                         PRODUCTS, {}, previous)
 
+    def test_all_synonyms_are_checkpointed_and_rebinding_any_one_is_rejected(self):
+        from shopping_identity_runtime import current_bindings
+        choices = {"arroz": {"product_id": 2}}
+        a, _ = verify_bindings(["Arroz", "Arroz basmati"], [], PRODUCTS, choices, None)
+        self.assertEqual(current_bindings(a), {"arroz": 2, "arroz basmati": 2})
+        previous = {"keys": ["p:2"], "bindings": current_bindings(a)}
+        products = [*PRODUCTS, {"id": 3, "name": "Arroz integral"}]
+        with self.assertRaisesRegex(IdentityConflict, "changed its product"):
+            verify_bindings(["Arroz basmati", "Arroz"], [], products,
+                            {"arroz": {"product_id": 3, "trusted_manual": True}}, previous)
+
+    def test_full_24_item_snapshot_is_imported_before_failed_alexa_write(self):
+        names = [f"Unmatched item {i}" for i in range(24)]
+        rows = [("Arroz basmati", {"id": 99, "product_id": 2, "amount": 5})]
+        imported = []
+        def fail(row):
+            self.assertEqual(len(imported), 24)
+            raise RuntimeError("Amazon unavailable")
+        with self.assertRaisesRegex(RuntimeError, "Amazon unavailable"):
+            reconcile_identity(names, rows, PRODUCTS, None, {}, dry_run=False,
+                               add_grocy=imported.append, add_alexa=fail)
+        self.assertEqual({row["name"] for row in imported}, set(names))
+        materialized = rows + [(row["name"], {"id": i+100, "product_id": None,
+                                  "note": row["name"], "amount": 1}) for i, row in enumerate(imported)]
+        retry = reconcile_identity(names, materialized, PRODUCTS, None, {}, dry_run=True)
+        self.assertEqual(retry["add_grocy"], [])
+        self.assertEqual(len(retry["add_alexa"]), 1)
+
     def test_missing_callback_aborts_before_any_write(self):
         with self.assertRaisesRegex(IdentityConflict, "Missing callback"):
             reconcile_identity(["Arroz"], [], PRODUCTS, None,
@@ -61,6 +89,27 @@ class IdentityRuntimeTests(unittest.TestCase):
 
 
 class IdentityAdapterTests(unittest.TestCase):
+    def test_alexa_snapshot_filters_all_completed_and_retains_all_24_pending(self):
+        from shopping_sync_adapters import alexa_items
+        items = [{'summary': f'Item {i}', 'status': 'needs_action', 'uid': str(i)} for i in range(24)]
+        completed = [{'summary': 'Historical', 'status': 'completed', 'uid': 'old'}] * 76
+        with patch('shopping_sync_adapters.ALEXA_LIST', 'todo.test'), \
+             patch('shopping_sync_adapters.ha_service', return_value={'service_response': {'todo.test': {'items': items + completed}}}) as service:
+            self.assertEqual(alexa_items(), items)
+            service.assert_called_once_with('get_items', {'entity_id': 'todo.test'})
+
+    def test_native_completed_cleanup_targets_configured_list_and_verifies(self):
+        from shopping_sync_adapters import clear_completed_alexa
+        with patch('shopping_sync_adapters.ALEXA_LIST', 'todo.test'), \
+             patch('shopping_sync_adapters.ha_service', return_value={'todo.test': {'items': [{'summary': 'Keep', 'status': 'needs_action'}]}}) as service:
+            self.assertEqual(clear_completed_alexa(), {'ok': True})
+            self.assertEqual([c.args for c in service.call_args_list], [
+                ('remove_completed_items', {'entity_id': 'todo.test'}), ('get_items', {'entity_id': 'todo.test'})])
+        with patch('shopping_sync_adapters.ALEXA_LIST', 'todo.test'), \
+             patch('shopping_sync_adapters.ha_service', return_value={'todo.test': {'items': [{'summary': 'Old', 'status': 'completed'}]}}):
+            with self.assertRaisesRegex(RuntimeError, 'could not be verified'):
+                clear_completed_alexa()
+
     def test_grocy_active_entries_include_string_zero_completion(self):
         entries = [
             {"id": 11, "product_id": 2, "shopping_list_id": 1, "done": "0"},

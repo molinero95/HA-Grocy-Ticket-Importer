@@ -40,3 +40,31 @@ test("automatic sync pause shows the next attempt while shopping remains usable 
   await expect(page.getByText(/Sincronización con Alexa en pausa automática/)).toHaveCount(0);
   expect(attempts).toBe(1);
 });
+
+
+test("Alexa completed cleanup is explicit, CSRF protected and leaves pending items on mobile", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 850 });
+  let calls = 0;
+  await page.route("**/api/v1/shopping", route => route.fulfill({ json: {
+    items: [{ id: 71, product_id: null, name: "Pending grocery", amount: 2, unit: "Piece", done: false }],
+    pending_matches: [], shopping_error: false, pending_matches_error: false, sync: { state: "ok" },
+  } }));
+  await page.route("**/api/v1/shopping/alexa/clear-completed", async route => {
+    calls++;
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().headers()["x-csrf-token"]).toBeTruthy();
+    expect(route.request().postDataJSON().operation_id).toMatch(/^[a-f0-9-]{36}$/);
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("http://127.0.0.1:8766/api/hassio_ingress/browser-test/react/");
+  page.once("dialog", dialog => dialog.dismiss());
+  await page.getByRole("button", { name: "Limpiar completados de Alexa" }).click();
+  expect(calls).toBe(0);
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Limpiar completados de Alexa" }).click();
+  await expect(page.getByText("Completados de Alexa eliminados.")).toBeVisible();
+  await expect(page.getByText("Pending grocery", { exact: true })).toBeVisible();
+  expect(calls).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("alexa-cleanup-mobile.png"), fullPage: true });
+});

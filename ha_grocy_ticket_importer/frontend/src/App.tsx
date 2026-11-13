@@ -1,3 +1,4 @@
+import { ClearCompletedAlexa } from "./ClearCompletedAlexa";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavigationContext, useAppNavigation } from "./navigation";
@@ -368,6 +369,7 @@ function AuthenticatedApp() {
               )}
             </div>
           </div>
+          {data?.sync && !["disabled", "unconfigured"].includes(data.sync.state) && <ClearCompletedAlexa />}
           <div className="search-box" role="search" aria-label="Buscar artículos de compra">
             <Search size={20} aria-hidden="true" />
             <input type="search" aria-label="Buscar en la lista de la compra" placeholder="Buscar en la lista de la compra" value={shoppingSearch} onChange={event => setShoppingSearch(event.target.value)} />
@@ -573,7 +575,7 @@ function AuthenticatedApp() {
       )}
       {creatingMatch && <ShoppingProductCreation sourceKey={creatingMatch.key} name={creatingMatch.name} onClose={() => setCreatingMatch(null)} onSaved={() => { setCreatingMatch(null); choiceSaved(); }} />}
       {quantityItem && <ShoppingQuantity item={quantityItem} onClose={() => setQuantityItem(null)} />}
-      <footer>Despensa 1.31.0</footer>
+      <footer>Despensa 1.32.0</footer>
     </div>
     </NavigationContext.Provider>
   );

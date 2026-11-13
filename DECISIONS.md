@@ -181,3 +181,16 @@ Backoff de fallos 2/4/8/16/30 minutos, respetando intervalos mayores, reinicio t
 La API añade retry_after_seconds (0..3600) y conserva los campos existentes. SyncPause usa duración y dataUpdatedAt del navegador para descontar una respuesta cacheada; al vencer espera confirmación nueva. No usar next_retry_at absoluto como fecha de próximo intento, no reiniciar el plazo al renderizar y no afirmar recuperación automática. Payload antiguo/inválido muestra tiempo sin confirmar. Temporizador con limpieza al vencer/desmontar; sin nuevas peticiones ni mutaciones. Se conserva scheduler y no se cambia el reloj de HA.
 
 El usuario autoriza un botón de intento manual en el aviso. POST /shopping/sync ejecuta un ciclo habilitado y revisado con CSRF, UUID/journal y locks no bloqueantes. No forzar con sync desactivado ni reenviar mutaciones automáticamente; mantener todas las guardas de identidad/checkpoint. El worker observa la revisión del estado de salud de un ciclo manual para reanudar/reprogramar sin que eventos normales salten la pausa.
+
+
+## Sincronización completa y asociaciones — 1.32.0
+
+Cada ciclo lee la lista completa de pendientes. Se aplican todas las altas de Grocy antes de las escrituras en Alexa; un fallo posterior mantiene el checkpoint anterior y la siguiente lectura evita duplicar las altas ya materializadas. No se importa una copia obsoleta cuando Home Assistant no puede consultar la entidad.
+
+Varios nombres exactos o asociados explícitamente al mismo ID forman una identidad de compra: no incrementan cantidades ni fusionan filas. Se conservan los bindings de todos los nombres; al retirar esa identidad se retiran sus orígenes verificados. Los conflictos de notas, duplicados reales de Grocy y cambios de identidad siguen bloqueando.
+
+Guardar una sugerencia conserva evidencia manual por ID durante ese episodio. El worker recupera elecciones antiguas únicamente cuando la fila adjunta real sigue asociada al mismo producto activo; no deduce asociaciones por nombre. Un producto retirado/archivado o un episodio nuevo requiere revisión.
+
+«Limpiar completados de Alexa» pide confirmación y usa `todo.remove_completed_items` sobre la entidad configurada. Es independiente de los comprados de Grocy y del worker: no se ejecuta automáticamente. Requiere sync habilitado, sesión/CSRF, UUID/journal y bloqueo compartido; un resultado incierto no se reenvía. Documentación oficial: https://www.home-assistant.io/actions/todo.remove_completed_items/ .
+
+El límite de peticiones de Amazon o una entidad Alexa no disponible siguen impidiendo la comprobación real. Esta versión no reinicia su pausa ni reconfigura Alexa Devices.
