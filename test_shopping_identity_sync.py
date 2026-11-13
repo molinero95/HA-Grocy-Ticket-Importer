@@ -62,10 +62,28 @@ class IdentityPlannerTests(unittest.TestCase):
             plan_identity(["Arroz"], [note], PRODUCTS, None,
                           {"arroz": {"product_id": 2}})
 
-    def test_duplicate_product_identity_fails_closed(self):
-        with self.assertRaisesRegex(IdentityConflict, "same identity"):
-            plan_identity(["Arroz", "Arroz basmati"], [], PRODUCTS, None,
-                          {"arroz": {"product_id": 2}})
+    def test_multiple_verified_names_share_one_product_without_adding_quantity(self):
+        choices = {"arroz": {"product_id": 2}}
+        p = plan_identity(["Arroz", "Arroz basmati"], [], PRODUCTS, None, choices)
+        self.assertEqual(len(p["add_grocy"]), 1)
+        self.assertEqual(p["add_grocy"][0]["product_id"], 2)
+        self.assertEqual(p["next_baseline"], ["p:2"])
+        p = plan_identity(["Arroz", "Arroz basmati"], [entry(2, amount=9)], PRODUCTS, None, choices)
+        self.assertFalse(any(p[action] for action in ("add_grocy", "add_alexa", "remove_alexa", "remove_grocy")))
+
+    def test_removal_covers_each_source_but_one_remaining_source_keeps_product(self):
+        choices = {"arroz": {"product_id": 2}}
+        p = plan_identity(["Arroz", "Arroz basmati"], [], PRODUCTS, ["p:2"], choices)
+        self.assertEqual([r["name"] for r in p["remove_alexa"]], ["Arroz", "Arroz basmati"])
+        p = plan_identity(["Arroz"], [entry(2)], PRODUCTS, ["p:2"], choices)
+        self.assertEqual(p["remove_grocy"], [])
+        self.assertEqual(p["next_baseline"], ["p:2"])
+
+    def test_secondary_alias_note_conflict_is_not_hidden_by_grouping(self):
+        note = ("Bebida blanca", {"id": 10, "product_id": None, "note": "Bebida blanca", "amount": 3})
+        with self.assertRaisesRegex(IdentityConflict, "selected product"):
+            identities(["Leche entera", "Bebida blanca"], [note], PRODUCTS,
+                       {"bebida blanca": {"product_id": 3, "trusted_alias": True}})
 
     def test_missing_selected_product_fails_closed(self):
         with self.assertRaisesRegex(IdentityConflict, "no longer"):

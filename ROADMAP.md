@@ -206,3 +206,6 @@ Backoff de fallos 2/4/8/16/30 minutos, respetando intervalos mayores, reinicio t
 La API añade retry_after_seconds (0..3600) y conserva los campos existentes. SyncPause usa duración y dataUpdatedAt del navegador para descontar una respuesta cacheada; al vencer espera confirmación nueva. No usar next_retry_at absoluto como fecha de próximo intento, no reiniciar el plazo al renderizar y no afirmar recuperación automática. Payload antiguo/inválido muestra tiempo sin confirmar. Temporizador con limpieza al vencer/desmontar; sin nuevas peticiones ni mutaciones. Se conserva scheduler y no se cambia el reloj de HA.
 
 El usuario autoriza un botón de intento manual en el aviso. POST /shopping/sync ejecuta un ciclo habilitado y revisado con CSRF, UUID/journal y locks no bloqueantes. No forzar con sync desactivado ni reenviar mutaciones automáticamente; mantener todas las guardas de identidad/checkpoint. El worker observa la revisión del estado de salud de un ciclo manual para reanudar/reprogramar sin que eventos normales salten la pausa.
+
+
+- 1.32.0: full-snapshot inbound-first reconciliation, verified synonym bindings, durable suggested selections and explicit Alexa completed cleanup. Installed acceptance remains pending an upgrade and an available Alexa entity; never use stale unavailable data as a deletion snapshot.

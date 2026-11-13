@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.32.0 — 2026-11-13
+
+- Sincronizar primero todos los artículos recibidos de Alexa antes de intentar escrituras en Alexa.
+- Varios nombres o alias verificados del mismo producto comparten una identidad sin duplicar filas ni sumar cantidades; se conservan todas sus asociaciones y retiradas.
+- Conservar por ID las elecciones explícitas de las sugerencias, aunque cambie el ranking o el nombre del producto. Recuperar elecciones antiguas solo con su fila real verificada.
+- Mantener las sugerencias visibles mientras el sincronizador ocupa el bloqueo compartido.
+- Añadir «Limpiar completados de Alexa», con confirmación y sin tocar pendientes. Acción manual independiente, protegida contra reenvíos de la misma operación.
+
+
 ## [1.31.0] — 2026-11-09
 
 ### Added

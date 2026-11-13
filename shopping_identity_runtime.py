@@ -52,7 +52,8 @@ def verify_bindings(alexa_names, grocy_rows, products, choices, previous):
     """Refuse silent identity changes for Alexa items that still exist."""
     a, g = identities(alexa_names, grocy_rows, products, choices)
     if previous is not None:
-        current = {row["normalized"]: row["product_id"] for row in a.values()}
+        current = {source["normalized"]: row["product_id"]
+                   for row in a.values() for source in row["sources"]}
         for normalized, pid in previous["bindings"].items():
             if normalized in current and current[normalized] != pid:
                 raise IdentityConflict("An Alexa item changed its product identity")
@@ -60,8 +61,9 @@ def verify_bindings(alexa_names, grocy_rows, products, choices, previous):
 
 
 def current_bindings(alexa_snapshot):
-    return {row["normalized"]: row["product_id"]
-            for row in alexa_snapshot.values() if row["product_id"]}
+    return {source["normalized"]: row["product_id"]
+            for row in alexa_snapshot.values() if row["product_id"]
+            for source in row["sources"]}
 
 
 def reconcile_identity(alexa_names, grocy_rows, products, previous, choices,
@@ -79,7 +81,9 @@ def reconcile_identity(alexa_names, grocy_rows, products, previous, choices,
     for action, callback in callbacks.items():
         if result[action] and not callable(callback):
             raise IdentityConflict("Missing callback for " + action)
-    for action in ("remove_alexa", "remove_grocy", "add_alexa", "add_grocy"):
+    # Import the entire inbound snapshot before any Amazon mutation. An Alexa
+    # write failure must not prevent unrelated new items reaching Despensa.
+    for action in ("add_grocy", "remove_grocy", "remove_alexa", "add_alexa"):
         for row in result[action]:
             callbacks[action](row)
     return result

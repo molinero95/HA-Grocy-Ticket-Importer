@@ -337,3 +337,16 @@ Si un servidor antiguo no proporciona una duración válida, se muestra **Tiempo
 
 
 En el mismo aviso, **Forzar sincronización** permite un intento inmediato aunque la espera automática siga activa. El botón muestra **Sincronizando…** y bloquea pulsaciones repetidas. No está disponible si la sincronización está desactivada. Se conservan las comprobaciones de productos, cantidades y checkpoints: no se fuerza una asociación incompatible. Si falla, se actualiza el error y continúa la espera; si funciona, se restablece el ritmo normal. Una respuesta perdida no se reenvía automáticamente y el mismo identificador de operación nunca ejecuta otro ciclo.
+
+
+## Sincronización completa y asociaciones — 1.32.0
+
+Cada ciclo lee la lista completa de pendientes. Se aplican todas las altas de Grocy antes de las escrituras en Alexa; un fallo posterior mantiene el checkpoint anterior y la siguiente lectura evita duplicar las altas ya materializadas. No se importa una copia obsoleta cuando Home Assistant no puede consultar la entidad.
+
+Varios nombres exactos o asociados explícitamente al mismo ID forman una identidad de compra: no incrementan cantidades ni fusionan filas. Se conservan los bindings de todos los nombres; al retirar esa identidad se retiran sus orígenes verificados. Los conflictos de notas, duplicados reales de Grocy y cambios de identidad siguen bloqueando.
+
+Guardar una sugerencia conserva evidencia manual por ID durante ese episodio. El worker recupera elecciones antiguas únicamente cuando la fila adjunta real sigue asociada al mismo producto activo; no deduce asociaciones por nombre. Un producto retirado/archivado o un episodio nuevo requiere revisión.
+
+«Limpiar completados de Alexa» pide confirmación y usa `todo.remove_completed_items` sobre la entidad configurada. Es independiente de los comprados de Grocy y del worker: no se ejecuta automáticamente. Requiere sync habilitado, sesión/CSRF, UUID/journal y bloqueo compartido; un resultado incierto no se reenvía. Documentación oficial: https://www.home-assistant.io/actions/todo.remove_completed_items/ .
+
+El límite de peticiones de Amazon o una entidad Alexa no disponible siguen impidiendo la comprobación real. Esta versión no reinicia su pausa ni reconfigura Alexa Devices.

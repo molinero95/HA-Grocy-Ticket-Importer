@@ -513,3 +513,6 @@ export type ReceiptAliasCatalog = { aliases: ReceiptAlias[]; products: { id: num
 export const getReceiptAliases = () => request<ReceiptAliasCatalog>("receipt-aliases");
 export const updateReceiptAlias = (expected: ReceiptAlias, value: { merchant: string; source_name: string; product_id: number }) => request("receipt-aliases", "PUT", { expected, ...value });
 export const deleteReceiptAlias = (expected: ReceiptAlias) => request("receipt-aliases", "DELETE", { expected });
+
+export const clearCompletedAlexa = (operationId: string) =>
+  request<{ ok: boolean }>("shopping/alexa/clear-completed", "POST", { operation_id: operationId });

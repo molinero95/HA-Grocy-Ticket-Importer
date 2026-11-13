@@ -28,15 +28,36 @@ def ha_service(service, body, *, url=None, token=None):
         return json.loads(raw) if raw.strip() else {}
 
 
-def alexa_items():
+def all_alexa_items():
     if not ALEXA_LIST.startswith("todo."):
         raise ValueError("Alexa shopping list entity is not configured")
     response = ha_service("get_items", {"entity_id": ALEXA_LIST})
     data = response.get("service_response", response)
     if ALEXA_LIST not in data or not isinstance(data[ALEXA_LIST].get("items"), list):
         raise ValueError("Invalid Alexa list response")
-    return [item for item in data[ALEXA_LIST]["items"]
-            if item.get("status") == "needs_action"]
+    items = data[ALEXA_LIST]["items"]
+    if any(not isinstance(item, dict) or not isinstance(item.get("summary"), str)
+           or item.get("status") not in ("needs_action", "completed") for item in items):
+        raise ValueError("Invalid Alexa list items")
+    return items
+
+
+def alexa_items():
+    return [item for item in all_alexa_items() if item["status"] == "needs_action"]
+
+
+def clear_completed_alexa():
+    """One explicitly requested HA action; never delete by stale name or UID.
+
+    HA's native action evaluates completion at execution time. Keep it out of
+    the worker: cleanup is independent of reconciliation/checkpoints/stock.
+    """
+    if not ALEXA_LIST.startswith("todo."):
+        raise ValueError("Alexa shopping list entity is not configured")
+    ha_service("remove_completed_items", {"entity_id": ALEXA_LIST})
+    if any(item["status"] == "completed" for item in all_alexa_items()):
+        raise RuntimeError("Alexa cleanup could not be verified")
+    return {"ok": True}
 
 
 def ha_todo_items():
@@ -141,6 +162,7 @@ def add_grocy_identity(row):
         if match is None:
             raise IdentityConflict("Selected Grocy product was deleted")
         reserved_names = {normalize(name), normalize(match["name"])}
+        reserved_names.update(source["normalized"] for source in row.get("sources", ()))
         if any(not entry.get("product_id") and normalize(existing) in reserved_names
                for existing, entry in current):
             raise IdentityConflict("Conflicting Grocy note was added concurrently")

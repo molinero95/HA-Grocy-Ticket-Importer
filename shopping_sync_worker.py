@@ -63,6 +63,9 @@ def _run_once(*, dry_run=True):
         raise RuntimeError("Grocy catalog unavailable for Alexa review")
     from shopping_sync_adapters import _grocy_done
     products = [p for p in products if _grocy_done(p.get("active", True))]
+    from shopping_choice_conversion import restore_verified_choices
+    import shopping_match_queue
+    restore_verified_choices(shopping_match_queue, MATCH_QUEUE, grocy_rows, products)
     refresh_matches(MATCH_QUEUE, alexa, products, grocy_rows)
     removals = [row for row in pending_matches(MATCH_QUEUE) if row.get("removed")]
     if removals:
@@ -93,8 +96,10 @@ def _run_once(*, dry_run=True):
         choices[alias] = {**selected, "trusted_alias": True}
     # An old manual selection that is no longer a valid candidate must never
     # silently become free text and trigger a deletion via the old checkpoint.
+    present_names = {normalize(name) for name in alexa}
     for row in pending_matches(MATCH_QUEUE):
-        if not row.get("removed") and row["selected_product_id"] is not None and row["key"] not in choices:
+        if (row["key"] in present_names and not row.get("removed")
+                and row["selected_product_id"] is not None and row["key"] not in choices):
             raise IdentityConflict("An Alexa selection needs renewed review", product_ids=(row["selected_product_id"],))
     previous = load_identity_state(STATE_V2)
     from shopping_choice_conversion import project_choices, apply_choices

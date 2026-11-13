@@ -75,6 +75,31 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
             lock.release()
 
 
+    @app.post("/api/v1/shopping/alexa/clear-completed")
+    def api_v1_clear_completed_alexa():
+        from stock_commands import execute_once
+        from shopping_sync_adapters import clear_completed_alexa
+        if os.environ.get("SHOPPING_SYNC_ENABLED") != "1" or not os.environ.get("ALEXA_SHOPPING_LIST_ENTITY"):
+            return jsonify({"error": "Activa la sincronización con Alexa antes de limpiar los completados."}), 409
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("operation_id"), str):
+            return jsonify({"error": "invalid_payload"}), 400
+        if not lock.acquire(blocking=False):
+            return jsonify({"error": "operation_in_progress"}), 409
+        try:
+            with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+                result = execute_once(payload["operation_id"], {
+                    "command": "clear-completed-alexa", "scope": os.environ["ALEXA_SHOPPING_LIST_ENTITY"]},
+                    clear_completed_alexa)
+            return jsonify(result)
+        except (BlockingIOError, CommandConflict):
+            return jsonify({"error": "No se ha repetido la limpieza. Comprueba Alexa antes de volver a intentarlo."}), 409
+        except Exception:
+            return jsonify({"error": "Limpieza sin confirmar. Comprueba Alexa antes de volver a intentarlo."}), 502
+        finally:
+            lock.release()
+
+
     @app.get('/api/v1/alexa/matches/<path:key>/create-context')
     def api_v1_shopping_creation_context(key):
         from shopping_product_creation import creation_context
@@ -269,15 +294,20 @@ def register_shopping_routes(app, barcode_stock, shopping_match_queue, lock, ing
         try:
             # The catalog may change independently of Alexa's next worker event.
             # Refresh only advisory local candidates; never invoke remote sync.
-            with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
-                notes = [item["name"] for item in items if not item.get("product_id") and not item.get("done")]
-                if notes or shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH):
-                    products = barcode_stock.grocy("GET", "objects/products")
-                    if not isinstance(products, list):
-                        raise ValueError("Catalog unavailable for suggestions")
-                    from shopping_sync_adapters import _grocy_done
-                    products = [p for p in products if _grocy_done(p.get("active", True))]
-                    shopping_match_queue.refresh_catalog(shopping_match_queue.DEFAULT_PATH, products, notes)
+            try:
+                with shopping_match_queue.mutation_lock(shopping_match_queue.DEFAULT_PATH, blocking=False):
+                    notes = [item["name"] for item in items if not item.get("product_id") and not item.get("done")]
+                    if notes or shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH):
+                        products = barcode_stock.grocy("GET", "objects/products")
+                        if not isinstance(products, list):
+                            raise ValueError("Catalog unavailable for suggestions")
+                        from shopping_sync_adapters import _grocy_done
+                        products = [p for p in products if _grocy_done(p.get("active", True))]
+                        shopping_match_queue.refresh_catalog(shopping_match_queue.DEFAULT_PATH, products, notes)
+            except BlockingIOError:
+                # The worker owns the mutation lock. Read committed advisory
+                # choices rather than making all suggestions disappear.
+                pass
             matches = [row for row in shopping_match_queue.pending(shopping_match_queue.DEFAULT_PATH)
                        if not row.get("removed")
                        and (not row.get("dismissed") or row.get("selection_stale") or row.get("selected_product_id") in affected_ids)]

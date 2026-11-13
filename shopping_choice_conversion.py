@@ -79,11 +79,13 @@ def manual_choice(grocy, queue, path, key, product_id, operation_id=None, *, cat
         if len(saved) != 1:
             raise RuntimeError("No se pudo verificar la elección; comprueba la lista antes de reintentar")
         if product_id:
-            if catalog_choice is None:
-                queue.choose(path, entry["key"], product_id)
-            else:
-                queue.choose(path, entry["key"], product_id, catalog_choice=catalog_choice)
-                queue.refresh_catalog(path, products)
+            # Every explicit save is ID evidence for this episode, including a
+            # suggested option. Re-ranking must not undo a verified association.
+            proof = catalog_choice or {"expected_name": entry["name"],
+                                      "generation": entry["generation"],
+                                      "product_name": product["name"]}
+            queue.choose(path, entry["key"], product_id, catalog_choice=proof)
+            queue.refresh_catalog(path, products)
         else:
             queue.keep_original(path, entry["key"])
         queue.attach_entry(path, entry["key"], saved[0]["id"])
@@ -92,6 +94,26 @@ def manual_choice(grocy, queue, path, key, product_id, operation_id=None, *, cat
     return execute_once(operation_id, {"kind": "manual-shopping-choice", "scope": str(path),
                                      "key": entry["key"], "product_id": product_id,
                                      **({"catalog_choice": catalog_choice} if catalog_choice is not None else {})}, apply)
+
+
+def restore_verified_choices(queue, path, rows, products):
+    """Retain older explicit saves only when their attached live row proves the ID.
+
+    No guessing from names, remote mutation or checkpoint reset. Missing rows,
+    archived products and unmaterialized suggestions keep their existing guards.
+    """
+    catalog = {int(p["id"]): p for p in products}
+    live = {int(row["id"]): row for _, row in rows}
+    for entry in queue.pending(path):
+        pid = entry.get("selected_product_id")
+        attached = live.get(entry.get("shopping_entry_id"))
+        if (not pid or entry.get("removed") or entry.get("manual_product_id")
+                or entry.get("created_product_id") or pid not in catalog
+                or attached is None or int(attached.get("product_id") or 0) != pid):
+            continue
+        queue.choose(path, entry["key"], pid, catalog_choice={
+            "expected_name": entry["name"], "generation": entry["generation"],
+            "product_name": catalog[pid]["name"]})
 
 
 def delete_verified(grocy, original):

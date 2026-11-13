@@ -315,6 +315,78 @@ class ManualShoppingChoiceTests(unittest.TestCase):
         headers = {"X-CSRF-Token": client.get("/api/v1/auth/status").json["csrf_token"]}
         return client, headers
 
+    def test_old_verified_suggestion_is_recovered_by_attached_live_id(self):
+        self.note()
+        self.choose(8)
+        with queue.connect(self.path) as db:
+            db.execute('UPDATE pending_matches SET manual_product_id=NULL')
+        self.products[1]['name'] = 'Renamed catalog product'
+        result, _, _ = self.worker(False)
+        self.assertEqual(result['next_baseline'], ['p:8'])
+        self.assertEqual(queue.pending(self.path)[0]['manual_product_id'], 8)
+        self.assertEqual(len(self.writes), 1)
+
+    def test_old_unmaterialized_choice_is_not_promoted_from_a_name_guess(self):
+        from shopping_choice_conversion import restore_verified_choices
+        queue.choose(self.path, 'arroz', 8)
+        self.products[1]['name'] = 'Renamed catalog product'
+        restore_verified_choices(queue, self.path, [], self.products)
+        queue.refresh(self.path, ['Arroz'], self.products)
+        self.assertIsNone(queue.pending(self.path)[0]['manual_product_id'])
+        self.assertEqual(queue.resolved_choices(self.path, ['Arroz'], self.products), {})
+
+    def test_suggested_association_survives_rename_refresh_and_worker(self):
+        original = copy.deepcopy(self.note(amount=3))
+        self.choose(8)
+        self.products[1]['name'] = 'Producto renombrado sin parecido'
+        queue.refresh_catalog(self.path, self.products)
+        queue.refresh(self.path, ['Arroz'], self.products)
+        saved = queue.pending(self.path)[0]
+        self.assertEqual(saved['manual_product_id'], 8)
+        self.assertFalse(saved['selection_stale'])
+        self.assertTrue(queue.resolved_choices(self.path, ['Arroz'], self.products)['arroz']['trusted_manual'])
+        result, _, _ = self.worker(False)
+        self.assertEqual(result['next_baseline'], ['p:8'])
+        self.assertEqual(self.rows[0], {**original, 'product_id': 8, 'qu_id': 2})
+        self.assertEqual(len(self.writes), 1)
+
+    def test_shopping_read_keeps_committed_suggestions_while_worker_holds_lock(self):
+        client, _ = self.api()
+        with queue.mutation_lock(self.path):
+            response = client.get('/api/v1/shopping')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json['pending_matches_error'])
+        self.assertEqual(response.json['pending_matches'][0]['key'], 'arroz')
+        self.assertEqual(self.writes, [])
+
+    def test_completed_alexa_cleanup_is_explicit_csrf_guarded_and_not_replayed(self):
+        client, headers = self.api()
+        url = '/api/v1/shopping/alexa/clear-completed'
+        payload = {'operation_id': self.operation}
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}), \
+             patch('shopping_sync_adapters.clear_completed_alexa', return_value={'ok': True}) as clear:
+            self.assertEqual(client.post(url, json=payload).status_code, 403)
+            clear.assert_not_called()
+            for _ in range(2):
+                response = client.post(url, json=payload, headers=headers)
+                self.assertEqual(response.status_code, 200, response.json)
+            clear.assert_called_once()
+            with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '0'}):
+                self.assertEqual(client.post(url, json=payload, headers=headers).status_code, 409)
+        self.assertEqual(self.writes, [])
+
+    def test_uncertain_completed_cleanup_cannot_be_automatically_replayed(self):
+        client, headers = self.api()
+        url = '/api/v1/shopping/alexa/clear-completed'
+        with patch.dict(os.environ, {'SHOPPING_SYNC_ENABLED': '1', 'ALEXA_SHOPPING_LIST_ENTITY': 'todo.test'}), \
+             patch('shopping_sync_adapters.clear_completed_alexa', side_effect=RuntimeError('private')) as clear:
+            first = client.post(url, json={'operation_id': self.operation}, headers=headers)
+            second = client.post(url, json={'operation_id': self.operation}, headers=headers)
+        self.assertEqual(first.status_code, 502)
+        self.assertEqual(second.status_code, 409)
+        self.assertNotIn('private', str(first.json))
+        clear.assert_called_once()
+
     def test_force_sync_is_csrf_protected_enabled_only_and_never_replays_same_operation(self):
         import shopping_sync_worker as worker
         client, headers = self.api()

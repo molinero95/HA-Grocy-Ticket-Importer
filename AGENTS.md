@@ -1,6 +1,16 @@
 # AGENTS.md — Despensa / Grocy Ticket Importer
 
-## Current handoff — 2026-11-09
+## Current handoff — 2026-11-13
+
+1.32.0 addresses full-list inbound progress and associations saved from shopping. Proven Alexa synonyms share one canonical identity with all source-name bindings; removal plans include each source. Never sum quantities, rename Alexa or consolidate Grocy rows. All incoming Grocy additions precede Alexa mutations; final convergence and checkpoint guards remain. A failed outbound write leaves materialized inbound rows and the old checkpoint; retry reads fresh state. Keep duplicate normalized input/Grocy rows, note conflicts, changed bindings and uncertain writes guarded.
+
+Every verified explicit suggestion now stores episode-scoped manual_product_id, like full-catalog choices. Before queue refresh the worker may restore older selections ONLY if the attached live row proves the same active product ID. No name inference or reset. Selections whose source is absent do not block unrelated sync. GET /shopping falls back to committed advisory suggestions when the worker owns the shared mutation lock; saves still require the lock and current-state validation.
+
+New explicit POST /shopping/alexa/clear-completed uses HA's native todo.remove_completed_items for the configured entity, then verifies no completed items remain. Enabled sync, auth/CSRF, operation UUID/journal and nonblocking locks required. Never run it automatically or replay an uncertain result. UI asks confirmation, suppresses double clicks and has no automatic retry. It does not clear Grocy completed rows or change checkpoints/stock. Official action reference in DOCS.
+
+Read-only installed diagnosis: HA held 24 pending Alexa items but marked the entity unavailable; system logs reported Amazon Too Many Requests. Grocy's live default shopping list held four rows. Add-on logs also showed duplicate Alexa identity conflicts and GET suggestion lock contention. Do not claim production recovery from isolated tests; no installed lists/configuration/checkpoints/app update performed. Final validation/CI recorded in the PR.
+
+## Previous handoff — 2026-11-09
 
 1.31.0 also implements the user's explicit **Forzar sincronización** request. POST /api/v1/shopping/sync runs one immediate fresh-snapshot cycle only with enabled/configured sync, auth/CSRF, operation UUID/execute_once and the nonblocking shared mutation lock. Do not replay a lost/uncertain command, bypass identity/checkpoint guards or change options. The UI locks double clicks, makes no automatic retries and invalidates shopping health after settlement. Scheduled work uses a nonblocking lock and observes externally changed atomic health revisions while waiting; manual success resets normal cadence, manual failure replaces the deadline, ordinary list events cannot bypass cooldown. Existing 1.30 no-production-force-API wording below describes the previous scope and is superseded by this explicit user request. No production sync was triggered for testing.
 

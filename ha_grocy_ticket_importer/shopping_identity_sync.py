@@ -19,7 +19,8 @@ def identities(alexa_names, grocy_rows, products, choices=None):
 
     grocy_rows are (display_name, raw_shopping_entry) pairs from grocy_entries.
     A manual choice is only a mapping; it never renames an Alexa item or a
-    Grocy shopping note. Duplicate identities and orphan products fail closed.
+    Grocy shopping note. Proven Alexa synonyms share one product identity;
+    duplicate Grocy rows and orphan products still fail closed.
     """
     choices = choices or {}
     by_id = {int(product["id"]): product for product in products}
@@ -43,10 +44,15 @@ def identities(alexa_names, grocy_rows, products, choices=None):
             decision, candidates = suggest_catalog_matches(name, products)
             key = ("p:" + str(candidates[0]["id"])
                    if decision == "exact" else "n:" + normalized)
+        source = {"name": name, "normalized": normalized}
         if key in alexa:
-            raise IdentityConflict("Multiple Alexa items resolve to the same identity")
-        alexa[key] = {"name": name, "normalized": normalized,
-                      "product_id": int(key[2:]) if key.startswith("p:") else None}
+            # Each name has independently passed the exact/explicit-choice guard.
+            # This is one shopping identity, not extra quantity or permission to
+            # merge Grocy rows. Preserve every source for bindings and removals.
+            alexa[key]["sources"].append(source)
+        else:
+            alexa[key] = {**source, "sources": [source],
+                          "product_id": int(key[2:]) if key.startswith("p:") else None}
 
     grocy = {}
     grocy_notes = set()
@@ -93,7 +99,7 @@ def identities(alexa_names, grocy_rows, products, choices=None):
     # Even an explicit Alexa choice is not permission to delete that note.
     for row in alexa.values():
         if row["product_id"]:
-            if row["normalized"] in grocy_notes:
+            if any(source["normalized"] in grocy_notes for source in row["sources"]):
                 raise IdentityConflict("A Grocy note conflicts with a selected product")
             canonical = normalize(by_id[row["product_id"]]["name"])
             if canonical in grocy_notes:
@@ -121,7 +127,9 @@ def plan_identity(alexa_names, grocy_rows, products, baseline=None, choices=None
             continue
         if baseline is not None and key in old:
             if a:
-                result["remove_alexa"].append({"key": key, **a})
+                result["remove_alexa"].extend(
+                    {"key": key, "product_id": a["product_id"], **source}
+                    for source in a["sources"])
             if g:
                 result["remove_grocy"].append({"key": key, **g})
         elif a:
